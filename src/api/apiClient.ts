@@ -1,4 +1,8 @@
 import axios from 'axios';
+import mockApiClient from './mockApiClient';
+
+// Configuration for mock mode
+const USE_MOCK_DATA = import.meta.env.VITE_USE_MOCK_DATA !== 'false'; // Default to true for demo
 
 // Central Axios instance for API calls
 const apiClient = axios.create({
@@ -41,27 +45,52 @@ apiClient.interceptors.response.use(
 
 export default apiClient;
 
-// API endpoints
+// API endpoints with mock fallback
 export const eventAPI = {
   // Create new event simulation
-  createEvent: (eventData: FormData) => 
-    apiClient.post('/events', eventData, {
+  createEvent: (eventData: FormData) => {
+    if (USE_MOCK_DATA) {
+      console.log('🎭 Using mock data for createEvent');
+      return mockApiClient.createEvent(eventData);
+    }
+    return apiClient.post('/events', eventData, {
       headers: { 'Content-Type': 'multipart/form-data' }
-    }),
+    });
+  },
   
   // Get simulation results
-  getSimulationResults: (eventId: string) => 
-    apiClient.get(`/events/${eventId}/simulation`),
+  getSimulationResults: (eventId: string) => {
+    if (USE_MOCK_DATA) {
+      console.log('🎭 Using mock data for getSimulationResults');
+      return mockApiClient.getSimulationResults(eventId);
+    }
+    return apiClient.get(`/events/${eventId}/simulation`);
+  },
   
   // Get event history
-  getEventHistory: () => 
-    apiClient.get('/events'),
+  getEventHistory: () => {
+    if (USE_MOCK_DATA) {
+      console.log('🎭 Using mock data for getEventHistory');
+      return mockApiClient.getEventHistory();
+    }
+    return apiClient.get('/events');
+  },
   
   // Get specific event details
-  getEvent: (eventId: string) => 
-    apiClient.get(`/events/${eventId}`),
+  getEvent: (eventId: string) => {
+    if (USE_MOCK_DATA) {
+      console.log('🎭 Using mock data for getEvent');
+      return mockApiClient.getEvent(eventId);
+    }
+    return apiClient.get(`/events/${eventId}`);
+  },
   
   // Check simulation status
-  getSimulationStatus: (eventId: string) => 
-    apiClient.get(`/events/${eventId}/status`),
+  getSimulationStatus: (eventId: string) => {
+    if (USE_MOCK_DATA) {
+      console.log('🎭 Using mock data for getSimulationStatus');
+      return mockApiClient.getSimulationStatus(eventId);
+    }
+    return apiClient.get(`/events/${eventId}/status`);
+  },
 };
