@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import { Brain, Users, BarChart3, Zap, ArrowRight, Play } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import Button from '../components/common/Button';
-import Scene3D from '../components/three/Scene3D';
+import Scene3DWithModels from '../components/three/Scene3DWithModels';
 
 const Landing: React.FC = () => {
   const navigate = useNavigate();
@@ -102,7 +102,7 @@ const Landing: React.FC = () => {
 
       {/* Hero Section */}
       <div className="relative z-10 max-w-7xl mx-auto px-6 py-20">
-        <div className="grid lg:grid-cols-2 gap-12 items-center">
+        <div className="grid lg:grid-cols-2 gap-32 items-center">
           {/* Left Content */}
           <div className="space-y-8">
             <motion.div
@@ -182,9 +182,14 @@ const Landing: React.FC = () => {
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: isLoaded ? 1 : 0, scale: isLoaded ? 1 : 0.8 }}
             transition={{ duration: 1, delay: 0.5 }}
-            className="h-[600px] relative"
+            className="h-[400px] relative"
           >
-            <Scene3D />
+            <Scene3DWithModels 
+              useCustomModels={true}
+              showCarousel={false}
+              showCrowd={false}
+              showInfoBanner={false}
+            />
           </motion.div>
         </div>
       </div>
