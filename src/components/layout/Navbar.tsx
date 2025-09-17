@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Brain, Menu, X } from 'lucide-react';
+import { Brain, Menu, X, LogOut, User } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
 import Button from '../common/Button';
 
 interface NavbarProps {
@@ -10,6 +11,7 @@ interface NavbarProps {
 
 const Navbar: React.FC<NavbarProps> = ({ sidebarOpen, setSidebarOpen }) => {
   const location = useLocation();
+  const { user, signOut, loading } = useAuth();
 
   const navigation = [
     { name: 'Dashboard', href: '/', icon: Brain },
@@ -61,9 +63,42 @@ const Navbar: React.FC<NavbarProps> = ({ sidebarOpen, setSidebarOpen }) => {
 
           {/* Right side */}
           <div className="flex items-center space-x-4">
-            <div className="text-sm text-gray-500">
-              Crowd Simulation Platform
-            </div>
+            {user && (
+              <>
+                {/* User info */}
+                <div className="hidden sm:flex items-center space-x-3">
+                  {user.user_metadata?.avatar_url || user.user_metadata?.picture ? (
+                    <img
+                      src={user.user_metadata.avatar_url || user.user_metadata.picture}
+                      alt="Profile"
+                      className="h-8 w-8 rounded-full"
+                    />
+                  ) : (
+                    <div className="h-8 w-8 rounded-full bg-gray-300 flex items-center justify-center">
+                      <User className="h-4 w-4 text-gray-600" />
+                    </div>
+                  )}
+                  <div className="text-sm">
+                    <p className="text-gray-900 font-medium">
+                      {user.user_metadata?.full_name || user.user_metadata?.name || user.email}
+                    </p>
+                    <p className="text-gray-500">{user.email}</p>
+                  </div>
+                </div>
+
+                {/* Sign out button */}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={signOut}
+                  disabled={loading}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  <LogOut className="h-4 w-4" />
+                  <span className="hidden sm:ml-2 sm:inline">Sign Out</span>
+                </Button>
+              </>
+            )}
           </div>
         </div>
       </div>

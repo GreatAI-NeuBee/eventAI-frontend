@@ -12,6 +12,7 @@
   "dependencies": {
     "@react-three/drei": "^10.7.6",
     "@react-three/fiber": "^9.3.0",
+    "@supabase/supabase-js": "^2.57.4",
     "@types/node": "^24.5.0",
     "@types/three": "^0.180.0",
     "@vis.gl/react-google-maps": "^1.5.5",

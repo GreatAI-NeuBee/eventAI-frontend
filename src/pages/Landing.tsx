@@ -2,21 +2,32 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Brain, Users, BarChart3, Zap, ArrowRight, Play } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 import Button from '../components/common/Button';
 import Scene3D from '../components/three/Scene3D';
 
 const Landing: React.FC = () => {
   const navigate = useNavigate();
   const [isLoaded, setIsLoaded] = useState(false);
+  const { user, signInWithGoogle, loading, error } = useAuth();
 
   useEffect(() => {
     setIsLoaded(true);
   }, []);
 
-  const handleSignIn = () => {
-    // For now, directly redirect to dashboard
-    // In the future, this will integrate with authentication
-    navigate('/dashboard');
+  // Redirect to dashboard if already authenticated
+  useEffect(() => {
+    if (user && !loading) {
+      navigate('/dashboard');
+    }
+  }, [user, loading, navigate]);
+
+  const handleSignIn = async () => {
+    try {
+      await signInWithGoogle();
+    } catch (err) {
+      console.error('Sign in failed:', err);
+    }
   };
 
   const features = [
@@ -69,13 +80,25 @@ const Landing: React.FC = () => {
             animate={{ opacity: isLoaded ? 1 : 0, x: isLoaded ? 0 : 20 }}
             transition={{ duration: 0.6, delay: 0.2 }}
           >
-            <Button onClick={handleSignIn} className="bg-blue-600 hover:bg-blue-700">
-              Sign In
-              <ArrowRight className="ml-2 h-4 w-4" />
+            <Button 
+              onClick={handleSignIn} 
+              loading={loading}
+              disabled={loading}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              {loading ? 'Signing In...' : 'Sign In with Google'}
+              {!loading && <ArrowRight className="ml-2 h-4 w-4" />}
             </Button>
           </motion.div>
         </div>
       </nav>
+
+      {/* Auth Error Display */}
+      {error && (
+        <div className="fixed top-4 right-4 z-50 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg shadow-lg">
+          <p className="text-sm">{error}</p>
+        </div>
+      )}
 
       {/* Hero Section */}
       <div className="relative z-10 max-w-7xl mx-auto px-6 py-20">
@@ -114,9 +137,11 @@ const Landing: React.FC = () => {
               <Button
                 size="lg"
                 onClick={handleSignIn}
+                loading={loading}
+                disabled={loading}
                 className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-8 py-4"
               >
-                Get Started
+                {loading ? 'Signing In...' : 'Get Started'}
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
               
@@ -223,9 +248,11 @@ const Landing: React.FC = () => {
           <Button
             size="lg"
             onClick={handleSignIn}
+            loading={loading}
+            disabled={loading}
             className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-12 py-4"
           >
-            Start Your Free Trial
+            {loading ? 'Signing In...' : 'Start Your Free Trial'}
             <ArrowRight className="ml-2 h-5 w-5" />
           </Button>
         </motion.div>
