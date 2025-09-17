@@ -1,5 +1,4 @@
 import React from 'react';
-import { Brain } from 'lucide-react';
 
 interface LogoProps {
   className?: string;
@@ -14,7 +13,6 @@ const Logo: React.FC<LogoProps> = ({
   size = "md", 
   showText = true,
   textColor = "text-gray-900",
-  iconColor = "text-primary-600"
 }) => {
   // Size mappings
   const sizes = {
