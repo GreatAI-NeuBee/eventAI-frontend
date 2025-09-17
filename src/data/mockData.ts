@@ -8,6 +8,13 @@ export const mockEvents: EventData[] = [
     capacity: 5000,
     date: '2024-12-15T09:00:00Z',
     venue: 'Convention Center Downtown',
+    venueLocation: {
+      lat: 37.7843676,
+      lng: -122.4007407,
+      address: "747 Howard St, San Francisco, CA 94103",
+      placeId: "ChIJiX4p7X2AhYARbDw5qoA4Vdk",
+      name: "Moscone Center"
+    },
     status: 'completed',
     createdAt: '2024-01-10T10:00:00Z',
   },
@@ -17,6 +24,13 @@ export const mockEvents: EventData[] = [
     capacity: 15000,
     date: '2024-07-20T14:00:00Z',
     venue: 'Central Park Amphitheater',
+    venueLocation: {
+      lat: 37.7694,
+      lng: -122.4862,
+      address: "Golden Gate Park, San Francisco, CA 94117",
+      placeId: "ChIJIQBpAG2ahYAR_6128GcTUEo",
+      name: "Golden Gate Park Music Concourse"
+    },
     status: 'completed',
     createdAt: '2024-02-05T14:30:00Z',
   },
@@ -26,6 +40,13 @@ export const mockEvents: EventData[] = [
     capacity: 800,
     date: '2024-11-30T18:00:00Z',
     venue: 'Grand Ballroom Hotel',
+    venueLocation: {
+      lat: 37.7879,
+      lng: -122.4075,
+      address: "335 Powell St, San Francisco, CA 94102",
+      placeId: "ChIJIQBpAG2ahYAR_6128GcTUEo",
+      name: "St. Francis Hotel"
+    },
     status: 'processing',
     createdAt: '2024-03-12T16:45:00Z',
   },

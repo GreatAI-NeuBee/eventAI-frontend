@@ -6,6 +6,13 @@ export interface EventData {
   capacity: number;
   date: string;
   venue: string;
+  venueLocation?: {
+    lat: number;
+    lng: number;
+    address?: string;
+    placeId?: string;
+    name?: string;
+  };
   status: 'draft' | 'processing' | 'completed' | 'error';
   createdAt: string;
 }

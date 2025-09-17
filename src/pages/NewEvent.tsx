@@ -1,10 +1,13 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Upload, Calendar, Users, MapPin } from 'lucide-react';
+import { Upload, Calendar, Users } from 'lucide-react';
 import Card from '../components/common/Card';
 import Button from '../components/common/Button';
 import Input from '../components/common/Input';
 import Spinner from '../components/common/Spinner';
+import GoogleMapPicker from '../components/maps/GoogleMapPicker';
+import VenueLayoutMap from '../components/maps/VenueLayoutMap';
+import VenueSearchInput from '../components/maps/VenueSearchInput';
 import { useEventStore } from '../store/eventStore';
 import { eventAPI } from '../api/apiClient';
 
@@ -27,6 +30,14 @@ const NewEvent: React.FC = () => {
     ticketingData: null,
     venueLayout: null,
   });
+
+  const [venueLocation, setVenueLocation] = useState<{
+    lat: number;
+    lng: number;
+    address?: string;
+    placeId?: string;
+    name?: string;
+  } | null>(null);
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -81,6 +92,10 @@ const NewEvent: React.FC = () => {
       newErrors.ticketingData = 'Ticketing data file is required';
     } else if (!files.ticketingData.name.toLowerCase().endsWith('.csv')) {
       newErrors.ticketingData = 'Ticketing data must be a CSV file';
+    }
+
+    if (!venueLocation) {
+      newErrors.venueLocation = 'Please select a venue location on the map';
     }
 
     setErrors(newErrors);
@@ -179,16 +194,33 @@ const NewEvent: React.FC = () => {
               required
             />
 
-            <Input
-              label="Venue"
-              name="venue"
-              value={formData.venue}
-              onChange={handleInputChange}
-              placeholder="Enter venue name"
-              icon={MapPin}
-              error={errors.venue}
-              required
-            />
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Venue *
+              </label>
+              <VenueSearchInput
+                placeholder="Search for venue (e.g., Moscone Center)"
+                value={formData.venue}
+                onValueChange={(value) => {
+                  setFormData(prev => ({ ...prev, venue: value }));
+                  // Clear error when user starts typing
+                  if (errors.venue) {
+                    setErrors(prev => ({ ...prev, venue: '' }));
+                  }
+                }}
+                onVenueSelected={(location) => {
+                  setVenueLocation(location);
+                  setFormData(prev => ({ ...prev, venue: location.name || location.address || '' }));
+                  // Clear venue location error if exists
+                  if (errors.venueLocation) {
+                    setErrors(prev => ({ ...prev, venueLocation: '' }));
+                  }
+                }}
+              />
+              {errors.venue && (
+                <p className="mt-1 text-sm text-red-600">{errors.venue}</p>
+              )}
+            </div>
           </div>
 
           <div className="mt-6">
@@ -244,40 +276,33 @@ const NewEvent: React.FC = () => {
               )}
             </div>
 
-            {/* Venue Layout */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Venue Layout (Optional)
-              </label>
-              <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-lg hover:border-gray-400 transition-colors">
-                <div className="space-y-1 text-center">
-                  <Upload className="mx-auto h-12 w-12 text-gray-400" />
-                  <div className="flex text-sm text-gray-600">
-                    <label className="relative cursor-pointer bg-white rounded-md font-medium text-primary-600 hover:text-primary-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-primary-500">
-                      <span>Upload venue layout</span>
-                      <input
-                        type="file"
-                        accept=".png,.jpg,.jpeg,.json"
-                        onChange={(e) => handleFileChange(e, 'venueLayout')}
-                        className="sr-only"
-                      />
-                    </label>
-                    <p className="pl-1">or drag and drop</p>
-                  </div>
-                  <p className="text-xs text-gray-500">PNG, JPG, or JSON files</p>
-                  {files.venueLayout && (
-                    <p className="text-sm text-green-600 font-medium">
-                      ✓ {files.venueLayout.name}
-                    </p>
-                  )}
-                </div>
-              </div>
-              {errors.venueLayout && (
-                <p className="mt-1 text-sm text-red-600">{errors.venueLayout}</p>
-              )}
-            </div>
           </div>
         </Card>
+
+        {/* Venue Location Picker */}
+        <GoogleMapPicker
+          onLocationSelected={(location) => {
+            setVenueLocation(location);
+            // Auto-fill venue name if not already set
+            if (!formData.venue && location.name) {
+              setFormData(prev => ({ ...prev, venue: location.name || location.address || '' }));
+            }
+            // Clear venue location error if exists
+            if (errors.venueLocation) {
+              setErrors(prev => ({ ...prev, venueLocation: '' }));
+            }
+          }}
+          initialLocation={venueLocation || undefined}
+          title={venueLocation ? "Venue Location - Click to change" : "Select Venue Location"}
+        />
+
+        {/* Venue Layout Display */}
+        {venueLocation && (
+          <VenueLayoutMap
+            venueLocation={venueLocation}
+            title="Venue Layout & Nearby Facilities"
+          />
+        )}
 
         {/* Submit */}
         <div className="flex justify-end space-x-4">

@@ -179,7 +179,10 @@ const Dashboard: React.FC = () => {
           <SimulationChart data={simulationResult.crowdDensity} />
 
           {/* Venue Map */}
-          <VenueMap hotspots={simulationResult.hotspots} />
+          <VenueMap 
+            hotspots={simulationResult.hotspots} 
+            venueLocation={currentEvent?.venueLocation}
+          />
 
           {/* Scenario Analysis */}
           <ScenarioTabs scenarios={simulationResult.scenarios} />

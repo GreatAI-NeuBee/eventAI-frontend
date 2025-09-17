@@ -1,4 +1,5 @@
 import React from 'react';
+import VenueLayoutMap from '../maps/VenueLayoutMap';
 import Card from '../common/Card';
 
 interface Hotspot {
@@ -10,15 +11,36 @@ interface Hotspot {
 
 interface VenueMapProps {
   hotspots: Hotspot[];
+  venueLocation?: {
+    lat: number;
+    lng: number;
+    address?: string;
+    placeId?: string;
+    name?: string;
+  };
   venueImage?: string;
   title?: string;
 }
 
 const VenueMap: React.FC<VenueMapProps> = ({ 
   hotspots, 
+  venueLocation,
   venueImage, 
   title = 'Venue Layout & Predicted Hotspots' 
 }) => {
+  // If we have venue location data, use the new Google Maps layout
+  if (venueLocation) {
+    return (
+      <VenueLayoutMap
+        venueLocation={venueLocation}
+        hotspots={hotspots}
+        showHotspots={true}
+        title={title}
+      />
+    );
+  }
+
+  // Fallback to original implementation for backward compatibility
   // Get intensity color based on hotspot intensity
   const getHotspotColor = (intensity: number) => {
     if (intensity >= 0.8) return 'bg-red-500';
@@ -77,7 +99,7 @@ const VenueMap: React.FC<VenueMapProps> = ({
                 </svg>
               </div>
               <p className="text-lg font-medium">Venue Layout</p>
-              <p className="text-sm">Upload venue image for detailed visualization</p>
+              <p className="text-sm">Select venue location for detailed visualization</p>
             </div>
           </div>
         )}
