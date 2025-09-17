@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Brain, Users, BarChart3, Zap, ArrowRight, Play } from 'lucide-react';
+import { Users, BarChart3, Zap, ArrowRight, Play } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import Button from '../components/common/Button';
+import Logo from '../components/common/Logo';
 import Scene3DWithModels from '../components/three/Scene3DWithModels';
 
 const Landing: React.FC = () => {
@@ -32,7 +33,7 @@ const Landing: React.FC = () => {
 
   const features = [
     {
-      icon: Brain,
+      icon: BarChart3,
       title: 'AI-Powered Analysis',
       description: 'Advanced machine learning algorithms analyze crowd patterns and predict behavior.',
     },
@@ -69,10 +70,13 @@ const Landing: React.FC = () => {
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: isLoaded ? 1 : 0, x: isLoaded ? 0 : -20 }}
             transition={{ duration: 0.6 }}
-            className="flex items-center space-x-2"
           >
-            <Brain className="h-8 w-8 text-blue-400" />
-            <span className="text-2xl font-bold text-white">EventAI</span>
+            <Logo 
+              size="lg" 
+              textColor="text-white" 
+              iconColor="text-blue-400"
+              className="mb-4"
+            />
           </motion.div>
           
           <motion.div

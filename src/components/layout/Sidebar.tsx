@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Brain, BarChart3, Plus, History, X } from 'lucide-react';
+import { BarChart3, Plus, History, X } from 'lucide-react';
+import Logo from '../common/Logo';
 
 interface SidebarProps {
   open: boolean;
@@ -35,9 +36,8 @@ const Sidebar: React.FC<SidebarProps> = ({ open, setOpen }) => {
         <div className="flex flex-col h-full">
           {/* Header */}
           <div className="flex items-center justify-between h-16 px-4 border-b border-gray-200">
-            <Link to="/" className="flex items-center">
-              <Brain className="h-8 w-8 text-primary-600 mr-2" />
-              <span className="text-xl font-bold text-gray-900">EventAI</span>
+            <Link to="/">
+              <Logo size="md" />
             </Link>
             <button
               className="p-1 rounded-md hover:bg-gray-100"

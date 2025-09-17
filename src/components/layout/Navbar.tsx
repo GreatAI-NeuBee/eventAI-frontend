@@ -1,8 +1,9 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Brain, Menu, X, LogOut, User } from 'lucide-react';
+import { Menu, X, LogOut, User } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import Button from '../common/Button';
+import Logo from '../common/Logo';
 
 interface NavbarProps {
   sidebarOpen: boolean;
@@ -14,7 +15,7 @@ const Navbar: React.FC<NavbarProps> = ({ sidebarOpen, setSidebarOpen }) => {
   const { user, signOut, loading } = useAuth();
 
   const navigation = [
-    { name: 'Dashboard', href: '/', icon: Brain },
+    { name: 'Dashboard', href: '/dashboard' },
     { name: 'New Event', href: '/new-event' },
     { name: 'History', href: '/history' },
   ];
@@ -35,9 +36,8 @@ const Navbar: React.FC<NavbarProps> = ({ sidebarOpen, setSidebarOpen }) => {
             </Button>
 
             {/* Logo */}
-            <Link to="/" className="flex items-center">
-              <Brain className="h-8 w-8 text-primary-600 mr-2" />
-              <span className="text-xl font-bold text-gray-900">EventAI</span>
+            <Link to="/">
+              <Logo size="md" />
             </Link>
 
             {/* Desktop navigation */}
