@@ -6,6 +6,8 @@ import Landing from './pages/Landing';
 import Dashboard from './pages/Dashboard';
 import NewEvent from './pages/NewEvent';
 import History from './pages/History';
+import Login from './pages/Login';
+import OngoingEvent from './pages/OnGoingEvent';
 
 function App() {
   return (
@@ -34,6 +36,14 @@ function App() {
             <ProtectedRoute>
               <DashboardLayout>
                 <History />
+              </DashboardLayout>
+            </ProtectedRoute>
+          } />
+
+          <Route path="/ongoingevent" element={
+            <ProtectedRoute>
+              <DashboardLayout>
+                <OngoingEvent />
               </DashboardLayout>
             </ProtectedRoute>
           } />

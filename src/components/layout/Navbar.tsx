@@ -18,6 +18,7 @@ const Navbar: React.FC<NavbarProps> = ({ sidebarOpen, setSidebarOpen }) => {
     { name: 'Dashboard', href: '/dashboard' },
     { name: 'New Event', href: '/new-event' },
     { name: 'History', href: '/history' },
+    { name: 'On-going event', href: '/ongoingevent'},
   ];
 
   return (

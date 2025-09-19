@@ -15,6 +15,8 @@ const Sidebar: React.FC<SidebarProps> = ({ open, setOpen }) => {
     { name: 'Dashboard', href: '/', icon: BarChart3 },
     { name: 'New Event', href: '/new-event', icon: Plus },
     { name: 'History', href: '/history', icon: History },
+    { name: 'On going Events', href: '/ongoing', icon: History },
+    
   ];
 
   return (
