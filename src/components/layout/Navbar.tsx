@@ -4,7 +4,6 @@ import { Menu, X, LogOut, User } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import Button from '../common/Button';
 import Logo from '../common/Logo';
-import ApiStatus from '../common/ApiStatus';
 
 interface NavbarProps {
   sidebarOpen: boolean;
@@ -18,8 +17,8 @@ const Navbar: React.FC<NavbarProps> = ({ sidebarOpen, setSidebarOpen }) => {
   const navigation = [
     { name: 'Dashboard', href: '/dashboard' },
     { name: 'New Event', href: '/new-event' },
+    { name: 'Ongoing Events', href: '/ongoingevent' },
     { name: 'History', href: '/history' },
-    { name: 'On-going event', href: '/ongoingevent'},
   ];
 
   return (
@@ -65,8 +64,6 @@ const Navbar: React.FC<NavbarProps> = ({ sidebarOpen, setSidebarOpen }) => {
 
           {/* Right side */}
           <div className="flex items-center space-x-4">
-            {/* API Status Indicator */}
-            <ApiStatus />
             {user && (
               <>
                 {/* User info */}

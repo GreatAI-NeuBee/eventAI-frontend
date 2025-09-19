@@ -1,5 +1,4 @@
 import axios from 'axios';
-import type { User } from '@supabase/supabase-js';
 
 // API Base URL
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api/v1';
@@ -23,13 +22,22 @@ export interface CreateUserRequest {
   metadata?: Record<string, any>;
 }
 
-export interface CreateUserResponse {
-  id: string;
+export interface BackendUserData {
+  id: number;
+  userId: string;
   email: string;
-  name?: string;
-  avatar_url?: string;
-  created_at: string;
-  updated_at: string;
+  username: string;
+  status: 'ACTIVE' | 'INACTIVE' | 'SUSPENDED';
+  phone: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateUserResponse {
+  success: boolean;
+  data: BackendUserData;
+  message?: string;
+  statusCode?: number;
 }
 
 export interface ApiError {
@@ -40,13 +48,12 @@ export interface ApiError {
 
 // User Service Class
 export class UserService {
+
   /**
    * Create or update user in the backend database
    */
   static async createOrUpdateUser(supabaseUser: any): Promise<CreateUserResponse> {
     try {
-      console.log('🔄 Creating/updating user in backend:', supabaseUser.email);
-      
       // Extract user data from Supabase user object
       const userData: CreateUserRequest = {
         id: supabaseUser.id,
@@ -64,12 +71,9 @@ export class UserService {
         }
       };
 
-      console.log('📤 Sending user data to API:', userData);
-
       // Make API call to create/update user
       const response = await apiClient.post<CreateUserResponse>('/users', userData);
       
-      console.log('✅ User created/updated successfully:', response.data);
       return response.data;
       
     } catch (error) {
@@ -84,9 +88,10 @@ export class UserService {
         
         // Handle specific error cases
         if (error.response?.status === 409) {
-          console.log('ℹ️ User already exists, this is normal');
-          // If user already exists, try to get the user data
-          return error.response.data;
+          // If user already exists, the backend should return the existing user data
+          if (error.response.data && error.response.data.data) {
+            return error.response.data;
+          }
         }
         
         throw apiError;
@@ -100,22 +105,47 @@ export class UserService {
   }
 
   /**
-   * Get user by ID from backend
+   * Get user by email address
    */
-  static async getUserById(userId: string): Promise<CreateUserResponse | null> {
+  static async getUserByEmail(email: string): Promise<CreateUserResponse | null> {
     try {
-      console.log('🔄 Fetching user from backend:', userId);
+      if (!email) {
+        throw new Error('Email is required');
+      }
       
-      const response = await apiClient.get<CreateUserResponse>(`/users/${userId}`);
+      const response = await apiClient.get<CreateUserResponse>(`/users/email/${encodeURIComponent(email)}`);
       
-      console.log('✅ User fetched successfully:', response.data);
+      return response.data;
+      
+    } catch (error) {
+      console.error('❌ Error fetching user by email:', error);
+      
+      if (axios.isAxiosError(error) && error.response?.status === 404) {
+        return null;
+      }
+      
+      throw error;
+    }
+  }
+
+  /**
+   * Get user by backend user ID (not Supabase ID)
+   * @deprecated Use getUserByEmail instead
+   */
+  static async getUserById(backendUserId: string): Promise<CreateUserResponse | null> {
+    try {
+      if (!backendUserId) {
+        throw new Error('Backend user ID is required');
+      }
+      
+      const response = await apiClient.get<CreateUserResponse>(`/users/${backendUserId}`);
+      
       return response.data;
       
     } catch (error) {
       console.error('❌ Error fetching user:', error);
       
       if (axios.isAxiosError(error) && error.response?.status === 404) {
-        console.log('ℹ️ User not found in backend');
         return null;
       }
       

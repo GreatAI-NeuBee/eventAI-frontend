@@ -6,6 +6,8 @@ import Landing from './pages/Landing';
 import Dashboard from './pages/Dashboard';
 import NewEvent from './pages/NewEvent';
 import History from './pages/History';
+import User from './pages/User';
+import OngoingEvent from './pages/OnGoingEvent';
 
 // Import API testing utilities (available in browser console)
 import './utils/apiTest';
@@ -37,6 +39,20 @@ function App() {
             <ProtectedRoute>
               <DashboardLayout>
                 <History />
+              </DashboardLayout>
+            </ProtectedRoute>
+          } />
+          <Route path="/user" element={
+            <ProtectedRoute>
+              <DashboardLayout>
+                <User />
+              </DashboardLayout>
+            </ProtectedRoute>
+          } />
+          <Route path="/ongoingevent" element={
+            <ProtectedRoute>
+              <DashboardLayout>
+                <OngoingEvent />
               </DashboardLayout>
             </ProtectedRoute>
           } />
