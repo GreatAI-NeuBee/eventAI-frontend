@@ -37,6 +37,11 @@ const Dashboard: React.FC = () => {
     selectedLocation,
   });
 
+  // Debug logging
+  console.log('Dashboard - simulationResult:', simulationResult);
+  console.log('Dashboard - dynamicRecommendations:', dynamicRecommendations);
+  console.log('Dashboard - selectedLocation:', selectedLocation);
+
   useEffect(() => {
     if (!eventId) {
       navigate('/new-event');
@@ -181,7 +186,7 @@ const Dashboard: React.FC = () => {
           <Card padding="sm">
             <div className="text-center">
               <div className="text-2xl font-bold text-orange-600">
-                {simulationResult.recommendations.filter(r => r.priority === 'high').length}
+                {dynamicRecommendations.filter(r => r.priority === 'high').length}
               </div>
               <div className="text-sm text-gray-600">High Priority Alerts</div>
             </div>

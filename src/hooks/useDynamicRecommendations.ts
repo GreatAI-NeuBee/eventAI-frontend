@@ -25,8 +25,12 @@ export const useDynamicRecommendations = ({
   selectedTimeRange
 }: UseDynamicRecommendationsProps) => {
   const recommendations = useMemo(() => {
-    if (!simulationResult) return [];
+    if (!simulationResult) {
+      console.log('No simulation result available');
+      return [];
+    }
 
+    console.log('Generating dynamic recommendations for:', simulationResult);
     const dynamicRecommendations: DynamicRecommendation[] = [];
     const { crowdDensity, hotspots } = simulationResult;
 
@@ -163,10 +167,13 @@ export const useDynamicRecommendations = ({
       return acc;
     }, [] as DynamicRecommendation[]);
 
-    return uniqueRecommendations.sort((a, b) => {
+    const sortedRecommendations = uniqueRecommendations.sort((a, b) => {
       const priorityOrder = { high: 3, medium: 2, low: 1 };
       return priorityOrder[b.priority] - priorityOrder[a.priority];
     });
+
+    console.log('Generated recommendations:', sortedRecommendations);
+    return sortedRecommendations;
   }, [simulationResult, selectedLocation, selectedTimeRange]);
 
   return recommendations;
