@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { AlertTriangle, CheckCircle, Clock, TrendingUp } from 'lucide-react';
 import Card from '../components/common/Card';
@@ -10,10 +10,12 @@ import RecommendationCard from '../components/dashboard/RecommendationCard';
 import ScenarioTabs from '../components/dashboard/ScenarioTabs';
 import { useEventStore } from '../store/eventStore';
 import { useSimulation } from '../hooks/useSimulation';
+import { useDynamicRecommendations } from '../hooks/useDynamicRecommendations';
 
 const Dashboard: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const [selectedLocation, setSelectedLocation] = useState<string | null>(null);
   
   const {
     currentEvent,
@@ -29,6 +31,12 @@ const Dashboard: React.FC = () => {
   // Use simulation hook to fetch and monitor results
   const { startSimulationMonitoring } = useSimulation(eventId);
 
+  // Use dynamic recommendations hook
+  const dynamicRecommendations = useDynamicRecommendations({
+    simulationResult,
+    selectedLocation,
+  });
+
   useEffect(() => {
     if (!eventId) {
       navigate('/new-event');
@@ -38,6 +46,10 @@ const Dashboard: React.FC = () => {
   const handleRecommendationAction = (recommendation: any) => {
     console.log('Action clicked for recommendation:', recommendation);
     // Implement specific actions based on recommendation type
+  };
+
+  const handleLocationClick = (location: string) => {
+    setSelectedLocation(selectedLocation === location ? null : location);
   };
 
   const handleRetry = () => {
@@ -202,6 +214,8 @@ const Dashboard: React.FC = () => {
                 data={simulationResult.crowdDensity}
                 predictedData={predictedAll}
                 showPredictionsDefault={true}
+                onLocationSelect={setSelectedLocation}
+                selectedLocation={selectedLocation}
               />
             );
           })()}
@@ -219,30 +233,48 @@ const Dashboard: React.FC = () => {
         {/* Right Column - Recommendations */}
         <div className="space-y-6">
           <div>
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">
-              Recommendations
-            </h2>
-            {simulationResult.recommendations.length > 0 ? (
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold text-gray-900">
+                Recommendations
+              </h2>
+              {selectedLocation && (
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray-600">Filtered by:</span>
+                  <span className="inline-flex items-center px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-sm">
+                    📍 {selectedLocation}
+                  </span>
+                  <button
+                    onClick={() => setSelectedLocation(null)}
+                    className="text-gray-400 hover:text-gray-600"
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
+            </div>
+            {dynamicRecommendations.length > 0 ? (
               <div className="space-y-4">
-                {simulationResult.recommendations
-                  .sort((a, b) => {
-                    const priorityOrder = { high: 3, medium: 2, low: 1 };
-                    return priorityOrder[b.priority] - priorityOrder[a.priority];
-                  })
-                  .map((recommendation) => (
-                    <RecommendationCard
-                      key={recommendation.id}
-                      recommendation={recommendation}
-                      onActionClick={handleRecommendationAction}
-                    />
-                  ))}
+                {dynamicRecommendations.map((recommendation) => (
+                  <RecommendationCard
+                    key={recommendation.id}
+                    recommendation={recommendation}
+                    onActionClick={handleRecommendationAction}
+                    onLocationClick={handleLocationClick}
+                    isHighlighted={selectedLocation === recommendation.location}
+                  />
+                ))}
               </div>
             ) : (
               <Card padding="md">
                 <div className="text-center py-8 text-gray-500">
                   <CheckCircle className="mx-auto h-12 w-12 mb-4" />
                   <p>No specific recommendations</p>
-                  <p className="text-sm">Your event looks well-planned!</p>
+                  <p className="text-sm">
+                    {selectedLocation 
+                      ? `No issues detected at ${selectedLocation}` 
+                      : 'Your event looks well-planned!'
+                    }
+                  </p>
                 </div>
               </Card>
             )}

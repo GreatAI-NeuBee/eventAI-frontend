@@ -14,9 +14,19 @@ interface SimulationChartProps {
   title?: string;
   showPredictionsDefault?: boolean;
   onlyLocation?: string;
+  onLocationSelect?: (location: string | null) => void;
+  selectedLocation?: string | null;
 }
 
-const SimulationChart: React.FC<SimulationChartProps> = ({ data, predictedData, title = 'Crowd Density Over Time', showPredictionsDefault = true, onlyLocation }) => {
+const SimulationChart: React.FC<SimulationChartProps> = ({ 
+  data, 
+  predictedData, 
+  title = 'Crowd Density Over Time', 
+  showPredictionsDefault = true, 
+  onlyLocation,
+  onLocationSelect,
+  selectedLocation
+}) => {
   const [showPredictions, setShowPredictions] = React.useState<boolean>(showPredictionsDefault);
   const [hiddenSeries, setHiddenSeries] = React.useState<Record<string, boolean>>({});
   const [hoveredSeries, setHoveredSeries] = React.useState<string | null>(null);
@@ -105,7 +115,17 @@ const SimulationChart: React.FC<SimulationChartProps> = ({ data, predictedData, 
 
   return (
     <Card>
-      <h3 className="text-lg font-semibold text-gray-900 mb-2">{title}</h3>
+      <div className="flex items-center justify-between mb-2">
+        <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
+        {selectedLocation && (
+          <div className="flex items-center gap-2 text-sm">
+            <span className="text-gray-600">Focusing on:</span>
+            <span className="inline-flex items-center px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">
+              📍 {selectedLocation}
+            </span>
+          </div>
+        )}
+      </div>
       <div className="flex items-center gap-4 mb-2 justify-between">
         <div className="flex items-center gap-4">
         {predictedData && predictedData.length > 0 && (
@@ -135,7 +155,10 @@ const SimulationChart: React.FC<SimulationChartProps> = ({ data, predictedData, 
           <span>Focus</span>
           <select
             value={focusLocation}
-            onChange={(e) => setFocusLocation(e.target.value)}
+            onChange={(e) => {
+              setFocusLocation(e.target.value);
+              onLocationSelect?.(e.target.value === 'ALL' ? null : e.target.value);
+            }}
             className="border border-gray-300 rounded px-2 py-1 text-sm"
           >
             <option value="ALL">All locations</option>
@@ -198,13 +221,21 @@ const SimulationChart: React.FC<SimulationChartProps> = ({ data, predictedData, 
                   name={location}
                   dataKey={location}
                   stroke={colors[index % colors.length]}
-                  strokeWidth={1.5}
-                  dot={{ r: 2 }}
+                  strokeWidth={selectedLocation === location ? 3 : 1.5}
+                  dot={{ r: selectedLocation === location ? 4 : 2 }}
                   activeDot={{ r: 6 }}
                   hide={!!hiddenSeries[location] || !visibleLocations.includes(location)}
                   strokeOpacity={hoveredSeries && hoveredSeries !== location ? 0.25 : 1}
-                  onMouseOver={() => setHoveredSeries(location)}
-                  onMouseOut={() => setHoveredSeries(null)}
+                  onMouseOver={() => {
+                    setHoveredSeries(location);
+                    onLocationSelect?.(location);
+                  }}
+                  onMouseOut={() => {
+                    setHoveredSeries(null);
+                    if (selectedLocation === location) {
+                      onLocationSelect?.(null);
+                    }
+                  }}
                 />
                 {showPredictions && predictedData && predictedData.length > 0 && (
                   <Line
@@ -239,8 +270,15 @@ const SimulationChart: React.FC<SimulationChartProps> = ({ data, predictedData, 
             return (
               <div
                 key={location}
-                className="h-48 border border-gray-200 rounded-md p-2 hover:shadow cursor-pointer"
-                onClick={() => setModalLocation(location)}
+                className={`h-48 border rounded-md p-2 hover:shadow cursor-pointer transition-all ${
+                  selectedLocation === location 
+                    ? 'border-blue-500 bg-blue-50' 
+                    : 'border-gray-200'
+                }`}
+                onClick={() => {
+                  setModalLocation(location);
+                  onLocationSelect?.(location);
+                }}
               >
                 <div className="text-xs font-medium text-gray-700 mb-1 flex items-center justify-between">
                   <span className="flex items-center gap-2">
