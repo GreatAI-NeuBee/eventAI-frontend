@@ -136,6 +136,20 @@ const Dashboard: React.FC = () => {
           <p className="mt-2 text-gray-600">
             AI-powered crowd simulation analysis and recommendations
           </p>
+          <div className="mt-2 flex items-center gap-4 text-sm text-gray-500">
+            <span className="flex items-center gap-1">
+              <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
+              Click chart lines to filter recommendations
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+              Click location tags to focus chart
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="w-2 h-2 bg-purple-500 rounded-full"></span>
+              Dashed lines show predictions
+            </span>
+          </div>
         </div>
         <div className="flex items-center space-x-2">
           <CheckCircle className="h-5 w-5 text-green-500" />
@@ -234,9 +248,16 @@ const Dashboard: React.FC = () => {
         <div className="space-y-6">
           <div>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-semibold text-gray-900">
-                Recommendations
-              </h2>
+              <div className="flex items-center gap-3">
+                <h2 className="text-xl font-semibold text-gray-900">
+                  Recommendations
+                </h2>
+                {dynamicRecommendations.length > 0 && (
+                  <span className="inline-flex items-center px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">
+                    📊 {dynamicRecommendations.length} Active
+                  </span>
+                )}
+              </div>
               {selectedLocation && (
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-gray-600">Filtered by:</span>
@@ -251,6 +272,16 @@ const Dashboard: React.FC = () => {
                   </button>
                 </div>
               )}
+            </div>
+            
+            {/* Connection Indicator */}
+            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <div className="flex items-center gap-2 text-sm text-blue-700">
+                <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                <span className="font-medium">Interactive Dashboard</span>
+                <span className="text-blue-600">•</span>
+                <span>Chart and recommendations are synchronized</span>
+              </div>
             </div>
             {dynamicRecommendations.length > 0 ? (
               <div className="space-y-4">

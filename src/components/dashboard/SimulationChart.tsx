@@ -116,7 +116,14 @@ const SimulationChart: React.FC<SimulationChartProps> = ({
   return (
     <Card>
       <div className="flex items-center justify-between mb-2">
-        <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
+        <div className="flex items-center gap-3">
+          <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
+          {showPredictions && predictedData && predictedData.length > 0 && (
+            <span className="inline-flex items-center px-2 py-1 bg-purple-100 text-purple-800 rounded-full text-xs font-medium">
+              🔮 Predictions Active
+            </span>
+          )}
+        </div>
         {selectedLocation && (
           <div className="flex items-center gap-2 text-sm">
             <span className="text-gray-600">Focusing on:</span>
@@ -243,11 +250,11 @@ const SimulationChart: React.FC<SimulationChartProps> = ({
                     name={`${location} (Pred)`}
                     dataKey={`${location} (Pred)`}
                     stroke={colors[index % colors.length]}
-                    strokeWidth={1.5}
+                    strokeWidth={2}
                     dot={false}
-                    strokeDasharray="6 6"
+                    strokeDasharray="8 4"
                     hide={!!hiddenSeries[`${location} (Pred)`] || !visibleLocations.includes(location)}
-                    strokeOpacity={hoveredSeries && hoveredSeries !== location ? 0.15 : 0.85}
+                    strokeOpacity={hoveredSeries && hoveredSeries !== location ? 0.2 : 0.9}
                     onMouseOver={() => setHoveredSeries(location)}
                     onMouseOut={() => setHoveredSeries(null)}
                   />
@@ -270,10 +277,10 @@ const SimulationChart: React.FC<SimulationChartProps> = ({
             return (
               <div
                 key={location}
-                className={`h-48 border rounded-md p-2 hover:shadow cursor-pointer transition-all ${
+                className={`h-48 border rounded-md p-2 hover:shadow cursor-pointer transition-all duration-300 ${
                   selectedLocation === location 
-                    ? 'border-blue-500 bg-blue-50' 
-                    : 'border-gray-200'
+                    ? 'border-blue-500 bg-blue-50 shadow-lg scale-105' 
+                    : 'border-gray-200 hover:scale-[1.02]'
                 }`}
                 onClick={() => {
                   setModalLocation(location);

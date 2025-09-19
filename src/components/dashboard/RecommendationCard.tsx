@@ -105,8 +105,8 @@ const RecommendationCard: React.FC<RecommendationCardProps> = ({
 
   return (
     <Card 
-      className={`${colors.bg} ${colors.border} border transition-all hover:shadow-md ${
-        isHighlighted ? 'ring-2 ring-blue-500 ring-opacity-50' : ''
+      className={`${colors.bg} ${colors.border} border transition-all duration-300 hover:shadow-lg hover:scale-[1.02] ${
+        isHighlighted ? 'ring-2 ring-blue-500 ring-opacity-50 shadow-lg scale-[1.02]' : ''
       }`}
       padding="md"
     >
