@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase, type User, type AuthState } from '../lib/supabase';
 import type { Session } from '@supabase/supabase-js';
+import { UserService, type ApiError } from '../services/userService';
 
 interface AuthContextType extends AuthState {
   signInWithGoogle: () => Promise<void>;
@@ -28,6 +29,28 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Handle user creation in backend database
+  const handleUserCreation = async (supabaseUser: User) => {
+    try {
+      console.log('🔄 Handling user creation for:', supabaseUser.email);
+      
+      // Create or update user in backend database
+      await UserService.createOrUpdateUser(supabaseUser);
+      
+      console.log('✅ User successfully synced with backend database');
+    } catch (err) {
+      console.error('❌ Failed to sync user with backend:', err);
+      
+      // Don't block the auth flow if backend sync fails
+      // Just log the error and continue
+      const apiError = err as ApiError;
+      console.warn('⚠️ User authentication successful but backend sync failed:', apiError.message);
+      
+      // Optionally set a non-blocking error state
+      // setError(`Warning: ${apiError.message}`);
+    }
+  };
+
   useEffect(() => {
     // Get initial session
     const getInitialSession = async () => {
@@ -39,6 +62,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         } else {
           setSession(session);
           setUser(session?.user as User || null);
+          
+          // If there's an existing session, ensure user exists in backend
+          if (session?.user) {
+            console.log('Found existing session, syncing user with backend');
+            await handleUserCreation(session.user);
+          }
         }
       } catch (err) {
         console.error('Error in getInitialSession:', err);
@@ -60,8 +89,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         setError(null);
 
         // Handle different auth events
-        if (event === 'SIGNED_IN') {
-          console.log('User signed in:', session?.user?.email);
+        if (event === 'SIGNED_IN' && session?.user) {
+          console.log('User signed in:', session.user.email);
+          
+          // Create or update user in backend database
+          await handleUserCreation(session.user);
+          
         } else if (event === 'SIGNED_OUT') {
           console.log('User signed out');
         } else if (event === 'TOKEN_REFRESHED') {
