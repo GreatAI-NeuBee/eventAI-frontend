@@ -176,7 +176,35 @@ const Dashboard: React.FC = () => {
         {/* Left Column - Charts and Map */}
         <div className="lg:col-span-2 space-y-8">
           {/* Simulation Chart */}
-          <SimulationChart data={simulationResult.crowdDensity} />
+          {(() => {
+            // Build simple predicted data for each location separately
+            const byLocation = simulationResult.crowdDensity.reduce<Record<string, typeof simulationResult.crowdDensity>>(
+              (acc, point) => {
+                (acc[point.location] ||= []).push(point);
+                return acc;
+              },
+              {}
+            );
+            const predictedAll: typeof simulationResult.crowdDensity = [];
+            Object.values(byLocation).forEach(series => {
+              series.forEach((point, idx, arr) => {
+                const prev = arr[idx - 1]?.density ?? point.density;
+                const prev2 = arr[idx - 2]?.density ?? prev;
+                const avg = (point.density + prev + prev2) / 3;
+                const trend = point.density * 0.05;
+                const density = Math.max(0, Math.min(1, parseFloat((avg + trend).toFixed(2))));
+                predictedAll.push({ ...point, density });
+              });
+            });
+
+            return (
+              <SimulationChart
+                data={simulationResult.crowdDensity}
+                predictedData={predictedAll}
+                showPredictionsDefault={true}
+              />
+            );
+          })()}
 
           {/* Venue Map */}
           <VenueMap 
