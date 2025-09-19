@@ -68,23 +68,25 @@ const Navbar: React.FC<NavbarProps> = ({ sidebarOpen, setSidebarOpen }) => {
               <>
                 {/* User info */}
                 <div className="hidden sm:flex items-center space-x-3">
-                  {user.user_metadata?.avatar_url || user.user_metadata?.picture ? (
-                    <img
-                      src={user.user_metadata.avatar_url || user.user_metadata.picture}
-                      alt="Profile"
-                      className="h-8 w-8 rounded-full"
-                    />
-                  ) : (
-                    <div className="h-8 w-8 rounded-full bg-gray-300 flex items-center justify-center">
-                      <User className="h-4 w-4 text-gray-600" />
+                  <Link to="/user" className="flex items-center space-x-3 hover:opacity-80 transition-opacity">
+                    {user.user_metadata?.avatar_url || user.user_metadata?.picture ? (
+                      <img
+                        src={user.user_metadata.avatar_url || user.user_metadata.picture}
+                        alt="Profile"
+                        className="h-8 w-8 rounded-full"
+                      />
+                    ) : (
+                      <div className="h-8 w-8 rounded-full bg-gray-300 flex items-center justify-center">
+                        <User className="h-4 w-4 text-gray-600" />
+                      </div>
+                    )}
+                    <div className="text-sm">
+                      <p className="text-gray-900 font-medium">
+                        {user.user_metadata?.full_name || user.user_metadata?.name || user.email}
+                      </p>
+                      <p className="text-gray-500">{user.email}</p>
                     </div>
-                  )}
-                  <div className="text-sm">
-                    <p className="text-gray-900 font-medium">
-                      {user.user_metadata?.full_name || user.user_metadata?.name || user.email}
-                    </p>
-                    <p className="text-gray-500">{user.email}</p>
-                  </div>
+                  </Link>
                 </div>
 
                 {/* Sign out button */}

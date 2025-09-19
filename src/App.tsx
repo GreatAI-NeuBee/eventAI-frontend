@@ -8,6 +8,7 @@ import NewEvent from './pages/NewEvent';
 import History from './pages/History';
 import Login from './pages/Login';
 import OngoingEvent from './pages/OnGoingEvent';
+import UserProfile from './pages/User';
 
 function App() {
   return (
@@ -16,6 +17,9 @@ function App() {
         <Routes>
           {/* Landing page (no layout) */}
           <Route path="/" element={<Landing />} />
+          
+          {/* Login page (no layout) */}
+          <Route path="/login" element={<Login />} />
           
           {/* Protected Dashboard routes (with layout) */}
           <Route path="/dashboard" element={
@@ -39,11 +43,17 @@ function App() {
               </DashboardLayout>
             </ProtectedRoute>
           } />
-
           <Route path="/ongoingevent" element={
             <ProtectedRoute>
               <DashboardLayout>
                 <OngoingEvent />
+              </DashboardLayout>
+            </ProtectedRoute>
+          } />
+          <Route path="/user" element={
+            <ProtectedRoute>
+              <DashboardLayout>
+                <UserProfile />
               </DashboardLayout>
             </ProtectedRoute>
           } />
