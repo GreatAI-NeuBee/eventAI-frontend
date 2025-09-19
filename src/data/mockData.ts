@@ -1,4 +1,4 @@
-import type { EventData, SimulationResult } from '../store/eventStore';
+import type { EventData, SimulationResult } from '../types/simulation';
 
 // Mock event data
 export const mockEvents: EventData[] = [

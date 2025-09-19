@@ -9,18 +9,25 @@ interface Recommendation {
   description: string;
   priority: 'high' | 'medium' | 'low';
   action: string;
+  location?: string;
+  density?: number;
+  timestamp?: string;
 }
 
 interface RecommendationCardProps {
   recommendation: Recommendation;
   onActionClick?: (recommendation: Recommendation) => void;
+  onLocationClick?: (location: string) => void;
+  isHighlighted?: boolean;
 }
 
 const RecommendationCard: React.FC<RecommendationCardProps> = ({
   recommendation,
   onActionClick,
+  onLocationClick,
+  isHighlighted = false,
 }) => {
-  const { type, title, description, priority, action } = recommendation;
+  const { type, title, description, priority, action, location, density, timestamp } = recommendation;
 
   // Get icon based on type
   const getIcon = () => {
@@ -98,7 +105,9 @@ const RecommendationCard: React.FC<RecommendationCardProps> = ({
 
   return (
     <Card 
-      className={`${colors.bg} ${colors.border} border transition-all hover:shadow-md`}
+      className={`${colors.bg} ${colors.border} border transition-all duration-300 hover:shadow-lg hover:scale-[1.02] ${
+        isHighlighted ? 'ring-2 ring-blue-500 ring-opacity-50 shadow-lg scale-[1.02]' : ''
+      }`}
       padding="md"
     >
       <div className="flex items-start space-x-3">
@@ -121,6 +130,30 @@ const RecommendationCard: React.FC<RecommendationCardProps> = ({
           <p className={`text-sm ${colors.text} mb-3`}>
             {description}
           </p>
+
+          {/* Additional Info */}
+          {(location || density !== undefined || timestamp) && (
+            <div className="flex flex-wrap gap-2 mb-3 text-xs text-gray-600">
+              {location && (
+                <span 
+                  className="inline-flex items-center px-2 py-1 bg-gray-100 rounded cursor-pointer hover:bg-gray-200 transition-colors"
+                  onClick={() => onLocationClick?.(location)}
+                >
+                  📍 {location}
+                </span>
+              )}
+              {density !== undefined && (
+                <span className="inline-flex items-center px-2 py-1 bg-gray-100 rounded">
+                  📊 {Math.round(density * 100)}% density
+                </span>
+              )}
+              {timestamp && (
+                <span className="inline-flex items-center px-2 py-1 bg-gray-100 rounded">
+                  🕒 {new Date(timestamp).toLocaleTimeString()}
+                </span>
+              )}
+            </div>
+          )}
 
           {/* Action Button */}
           {action && (

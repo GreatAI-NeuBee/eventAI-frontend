@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { BarChart3, Plus, History, X } from 'lucide-react';
+import { BarChart3, Plus, History, User, X, Activity } from 'lucide-react';
 import Logo from '../common/Logo';
 
 interface SidebarProps {
@@ -12,11 +12,11 @@ const Sidebar: React.FC<SidebarProps> = ({ open, setOpen }) => {
   const location = useLocation();
 
   const navigation = [
-    { name: 'Dashboard', href: '/', icon: BarChart3 },
+    { name: 'Dashboard', href: '/dashboard', icon: BarChart3 },
     { name: 'New Event', href: '/new-event', icon: Plus },
+    { name: 'Ongoing Events', href: '/ongoingevent', icon: Activity },
     { name: 'History', href: '/history', icon: History },
-    { name: 'On going Events', href: '/ongoing', icon: History },
-    
+    { name: 'Profile', href: '/user', icon: User },
   ];
 
   return (
