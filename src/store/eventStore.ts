@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { EventData, SimulationResult } from '../types/simulation';
+import type { EventData, SimulationResult } from '../types/simulation';
 
 interface EventStore {
   // State

@@ -5,7 +5,8 @@ import Card from '../components/common/Card';
 import Button from '../components/common/Button';
 import Input from '../components/common/Input';
 import Spinner from '../components/common/Spinner';
-import { useEventStore, type EventData } from '../store/eventStore';
+import { useEventStore } from '../store/eventStore';
+import type { EventData } from '../types/simulation';
 import { eventAPI } from '../api/apiClient';
 
 const History: React.FC = () => {
@@ -93,7 +94,7 @@ const History: React.FC = () => {
   };
 
   const getStatusBadge = (status: EventData['status']) => {
-    const statusConfig = {
+    const statusConfig: Record<EventData['status'], { color: string; label: string }> = {
       draft: { color: 'bg-gray-100 text-gray-800', label: 'Draft' },
       processing: { color: 'bg-blue-100 text-blue-800', label: 'Processing' },
       completed: { color: 'bg-green-100 text-green-800', label: 'Completed' },

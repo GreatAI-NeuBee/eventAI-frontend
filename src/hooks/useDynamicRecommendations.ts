@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { SimulationResult } from '../types/simulation';
+import type { SimulationResult } from '../types/simulation';
 
 interface DynamicRecommendation {
   id: string;
@@ -15,7 +15,7 @@ interface DynamicRecommendation {
 
 interface UseDynamicRecommendationsProps {
   simulationResult: SimulationResult | null;
-  selectedLocation?: string;
+  selectedLocation?: string | null;
   selectedTimeRange?: { start: string; end: string };
 }
 
