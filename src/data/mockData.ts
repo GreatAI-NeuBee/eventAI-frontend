@@ -5,8 +5,8 @@ export const mockEvents: EventData[] = [
   {
     id: 'event-1',
     name: 'Tech Conference 2024',
-    capacity: 5000,
-    date: '2024-12-15T09:00:00Z',
+    dateStart: '2024-12-15T09:00:00Z',
+    dateEnd: '2024-12-15T18:00:00Z',
     venue: 'Convention Center Downtown',
     venueLocation: {
       lat: 37.7843676,
@@ -21,8 +21,8 @@ export const mockEvents: EventData[] = [
   {
     id: 'event-2',
     name: 'Music Festival Summer',
-    capacity: 15000,
-    date: '2024-07-20T14:00:00Z',
+    dateStart: '2024-07-20T14:00:00Z',
+    dateEnd: '2024-07-20T23:00:00Z',
     venue: 'Central Park Amphitheater',
     venueLocation: {
       lat: 37.7694,
@@ -37,8 +37,8 @@ export const mockEvents: EventData[] = [
   {
     id: 'event-3',
     name: 'Corporate Gala Night',
-    capacity: 800,
-    date: '2024-11-30T18:00:00Z',
+    dateStart: '2024-11-30T18:00:00Z',
+    dateEnd: '2024-11-30T23:30:00Z',
     venue: 'Grand Ballroom Hotel',
     venueLocation: {
       lat: 37.7879,
@@ -201,12 +201,36 @@ export const mockApiResponses = {
   createEvent: (eventData: any): Promise<{ data: EventData }> => {
     return new Promise((resolve) => {
       setTimeout(() => {
+        // Parse venue location if provided
+        let venueLocation = null;
+        if (eventData.get('venueLocation')) {
+          try {
+            venueLocation = JSON.parse(eventData.get('venueLocation'));
+          } catch (e) {
+            console.warn('Failed to parse venue location:', e);
+          }
+        }
+
+        // Parse venue layout if provided
+        let venueLayout = null;
+        if (eventData.get('venueLayout')) {
+          try {
+            venueLayout = JSON.parse(eventData.get('venueLayout'));
+          } catch (e) {
+            console.warn('Failed to parse venue layout:', e);
+          }
+        }
+
         const newEvent: EventData = {
           id: `event-${Date.now()}`,
           name: eventData.get('name') || 'New Event',
-          capacity: parseInt(eventData.get('capacity')) || 1000,
-          date: eventData.get('date') || new Date().toISOString(),
+          dateStart: eventData.get('dateStart') || new Date().toISOString(),
+          dateEnd: eventData.get('dateEnd') || new Date(Date.now() + 3600000).toISOString(), // 1 hour later
           venue: eventData.get('venue') || 'Unknown Venue',
+          description: eventData.get('description') || '',
+          venueLocation: venueLocation,
+          venueLayout: venueLayout,
+          userEmail: eventData.get('userEmail') || '',
           status: 'processing',
           createdAt: new Date().toISOString(),
         };
@@ -261,10 +285,13 @@ export const generateRandomEvent = (): Partial<EventData> => {
   const randomEventType = eventTypes[Math.floor(Math.random() * eventTypes.length)];
   const randomVenue = venues[Math.floor(Math.random() * venues.length)];
   
+  const startDate = new Date(Date.now() + Math.random() * 90 * 24 * 60 * 60 * 1000);
+  const endDate = new Date(startDate.getTime() + (Math.random() * 8 + 2) * 60 * 60 * 1000); // 2-10 hours later
+  
   return {
     name: `${randomEventType} ${new Date().getFullYear()}`,
-    capacity: Math.floor(Math.random() * 10000) + 500,
     venue: `${randomVenue} Downtown`,
-    date: new Date(Date.now() + Math.random() * 90 * 24 * 60 * 60 * 1000).toISOString(),
+    dateStart: startDate.toISOString(),
+    dateEnd: endDate.toISOString(),
   };
 };

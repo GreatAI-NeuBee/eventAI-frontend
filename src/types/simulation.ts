@@ -29,9 +29,10 @@ interface SimulationResult {
 interface EventData {
   id: string;
   name: string;
-  capacity: number;
-  date: string;
+  dateStart: string;
+  dateEnd: string;
   venue: string;
+  description?: string;
   venueLocation?: {
     lat: number;
     lng: number;
@@ -39,6 +40,8 @@ interface EventData {
     placeId?: string;
     name?: string;
   };
+  venueLayout?: any; // JSON object for venue configuration
+  userEmail?: string; // Email of the user who created the event
   status: 'draft' | 'processing' | 'completed' | 'error';
   createdAt: string;
 }

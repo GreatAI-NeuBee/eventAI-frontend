@@ -286,7 +286,7 @@ const OngoingEvent: React.FC = () => {
     [zones]
   );
 
-  const eventDate = activeEvent?.date ? new Date(activeEvent.date) : null;
+  const eventDate = activeEvent?.dateStart ? new Date(activeEvent.dateStart) : null;
 
   if (isLoading && !simulationResult) {
     return (
@@ -336,8 +336,8 @@ const OngoingEvent: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card padding="sm" className="bg-gradient-to-br from-blue-50 to-blue-100">
           <div className="text-center">
-            <div className="text-2xl font-bold text-primary-600">{activeEvent?.capacity?.toLocaleString?.() || "—"}</div>
-            <div className="text-sm text-gray-600">Capacity</div>
+            <div className="text-2xl font-bold text-primary-600">{zones.length || "—"}</div>
+            <div className="text-sm text-gray-600">Active Zones</div>
           </div>
         </Card>
         <Card padding="sm" className="bg-gradient-to-br from-cyan-50 to-cyan-100">
@@ -410,8 +410,8 @@ const OngoingEvent: React.FC = () => {
             <div className="space-y-2 text-sm text-gray-700">
               <div className="flex justify-between"><span className="text-gray-600">Event:</span> <span className="font-medium">{activeEvent?.name || "—"}</span></div>
               <div className="flex justify-between"><span className="text-gray-600">Venue:</span> <span className="font-medium">{activeEvent?.venue || activeEvent?.venueLocation?.name || "—"}</span></div>
-              <div className="flex justify-between"><span className="text-gray-600">Date:</span> <span className="font-medium">{activeEvent?.date ? new Date(activeEvent.date).toLocaleString() : "—"}</span></div>
-              <div className="flex justify-between"><span className="text-gray-600">Capacity:</span> <span className="font-medium">{activeEvent?.capacity?.toLocaleString?.() || "—"}</span></div>
+              <div className="flex justify-between"><span className="text-gray-600">Start:</span> <span className="font-medium">{activeEvent?.dateStart ? new Date(activeEvent.dateStart).toLocaleString() : "—"}</span></div>
+              <div className="flex justify-between"><span className="text-gray-600">End:</span> <span className="font-medium">{activeEvent?.dateEnd ? new Date(activeEvent.dateEnd).toLocaleString() : "—"}</span></div>
             </div>
           </Card>
 
