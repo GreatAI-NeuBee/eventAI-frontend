@@ -1,12 +1,14 @@
 import axios from 'axios';
 import mockApiClient from './mockApiClient';
 
-// Configuration for mock mode
+// Configuration for mock mode - disable mock for specific endpoints
 const USE_MOCK_DATA = import.meta.env.VITE_USE_MOCK_DATA !== 'false'; // Default to true for demo
+const USE_MOCK_CREATE_EVENT = false; // Always use real API for event creation
+const USE_MOCK_EVENT_HISTORY = false; // Always use real API for event history
 
 // Central Axios instance for API calls
 const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api',
+  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api/v1',
   timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
@@ -47,14 +49,15 @@ export default apiClient;
 
 // API endpoints with mock fallback
 export const eventAPI = {
-  // Create new event simulation
-  createEvent: (eventData: FormData) => {
-    if (USE_MOCK_DATA) {
+  // Create new event simulation - always use real API
+  createEvent: (eventData: any) => {
+    if (USE_MOCK_CREATE_EVENT) {
       console.log('🎭 Using mock data for createEvent');
       return mockApiClient.createEvent(eventData);
     }
+    console.log('🌐 Using real API for createEvent:', `${apiClient.defaults.baseURL}/events`);
     return apiClient.post('/events', eventData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
+      headers: { 'Content-Type': 'application/json' }
     });
   },
   
@@ -68,12 +71,16 @@ export const eventAPI = {
   },
   
   // Get event history
-  getEventHistory: () => {
-    if (USE_MOCK_DATA) {
+  getEventHistory: (userEmail?: string) => {
+    if (USE_MOCK_EVENT_HISTORY) {
       console.log('🎭 Using mock data for getEventHistory');
       return mockApiClient.getEventHistory();
     }
-    return apiClient.get('/events');
+    
+    console.log('🌐 Using real API for getEventHistory:', `${apiClient.defaults.baseURL}/events`);
+    // Add userEmail as query parameter if provided
+    const params = userEmail ? { userEmail } : {};
+    return apiClient.get('/events', { params });
   },
   
   // Get specific event details

@@ -1,16 +1,18 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Calendar, Users, MapPin, Eye, Trash2, Search } from 'lucide-react';
+import { Calendar, MapPin, Eye, Trash2, Search, Clock, ShieldAlert, ArrowRight } from 'lucide-react';
 import Card from '../components/common/Card';
 import Button from '../components/common/Button';
 import Input from '../components/common/Input';
 import Spinner from '../components/common/Spinner';
 import { useEventStore } from '../store/eventStore';
+import { useAuth } from '../contexts/AuthContext';
 import type { EventData } from '../types/simulation';
 import { eventAPI } from '../api/apiClient';
 
 const History: React.FC = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { events, setEvents, setCurrentEvent, isLoading, setLoading, setError } = useEventStore();
   
   const [searchTerm, setSearchTerm] = useState('');
@@ -20,20 +22,68 @@ const History: React.FC = () => {
   // Fetch event history on component mount
   useEffect(() => {
     const fetchEventHistory = async () => {
+      // Don't fetch if user is not logged in or email is not available
+      if (!user?.email) {
+        setLoading(false);
+        setError('User not authenticated');
+        return;
+      }
+
       setLoading(true);
+      setError(null);
+      
       try {
-        const response = await eventAPI.getEventHistory();
-        setEvents(response.data);
+        const response = await eventAPI.getEventHistory(user.email);
+        
+        // Debug: Log the response to see what we're getting
+        console.log('API Response:', response.data);
+        
+        // Handle the backend response structure
+        const backendEvents = response.data.data?.events || response.data.events || response.data.data || response.data;
+        
+        // Transform backend events to frontend EventData format
+        const transformedEvents: EventData[] = Array.isArray(backendEvents) 
+          ? backendEvents.map((event: any) => {
+              // Normalize status to expected values
+              let status: EventData['status'] = 'completed'; // Default
+              if (event.status) {
+                const normalizedStatus = event.status.toLowerCase();
+                // Map backend status to frontend status
+                if (normalizedStatus === 'created') {
+                  status = 'active';
+                } else if (['draft', 'processing', 'completed', 'error', 'active'].includes(normalizedStatus)) {
+                  status = normalizedStatus as EventData['status'];
+                }
+              }
+
+              return {
+                id: event.eventId || event.id,
+                name: event.name,
+                dateStart: event.dateOfEventStart || event.dateStart,
+                dateEnd: event.dateOfEventEnd || event.dateEnd,
+                venue: event.venue || event.venueLocation?.name || event.venueLocation?.address || 'Venue location',
+                description: event.description || '',
+                venueLocation: event.venueLocation,
+                venueLayout: event.venueLayout,
+                userEmail: event.userEmail,
+                status,
+                createdAt: event.createdAt,
+              };
+            })
+          : [];
+        
+        setEvents(transformedEvents);
       } catch (error: any) {
         console.error('Error fetching event history:', error);
         setError(error.response?.data?.message || 'Failed to fetch event history');
+        setEvents([]); // Clear events on error
       } finally {
         setLoading(false);
       }
     };
 
     fetchEventHistory();
-  }, [setEvents, setLoading, setError]);
+  }, [user?.email, setEvents, setLoading, setError]);
 
   // Filter and sort events
   const filteredAndSortedEvents = React.useMemo(() => {
@@ -57,8 +107,8 @@ const History: React.FC = () => {
           break;
         case 'date':
         default:
-          aValue = new Date(a.date).getTime();
-          bValue = new Date(b.date).getTime();
+          aValue = new Date(a.dateStart).getTime();
+          bValue = new Date(b.dateStart).getTime();
           break;
       }
 
@@ -99,9 +149,11 @@ const History: React.FC = () => {
       processing: { color: 'bg-blue-100 text-blue-800', label: 'Processing' },
       completed: { color: 'bg-green-100 text-green-800', label: 'Completed' },
       error: { color: 'bg-red-100 text-red-800', label: 'Error' },
+      active: { color: 'bg-emerald-100 text-emerald-800', label: 'Active' },
     };
 
-    const config = statusConfig[status];
+    // Fallback to 'completed' if status is not recognized
+    const config = statusConfig[status] || statusConfig.completed;
     return (
       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${config.color}`}>
         {config.label}
@@ -109,6 +161,7 @@ const History: React.FC = () => {
     );
   };
 
+  // Show loading state
   if (isLoading) {
     return (
       <div className="max-w-7xl mx-auto p-6">
@@ -116,6 +169,28 @@ const History: React.FC = () => {
           <Spinner size="lg" className="mb-4" />
           <p className="text-gray-600">Loading event history...</p>
         </div>
+      </div>
+    );
+  }
+
+  // Show authentication error if user is not logged in
+  if (!user) {
+    return (
+      <div className="max-w-7xl mx-auto p-6">
+        <Card>
+          <div className="text-center py-12">
+            <ShieldAlert className="mx-auto h-16 w-16 text-gray-400 mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">
+              Authentication Required
+            </h3>
+            <p className="text-gray-600 mb-6">
+              Please sign in to view your event history
+            </p>
+            <Button onClick={() => navigate('/login')}>
+              Sign In
+            </Button>
+          </div>
+        </Card>
       </div>
     );
   }
@@ -200,28 +275,57 @@ const History: React.FC = () => {
                     {getStatusBadge(event.status)}
                   </div>
                   
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm text-gray-600">
-                    <div className="flex items-center">
-                      <Calendar className="h-4 w-4 mr-2" />
-                      {new Date(event.date).toLocaleDateString('en-US', {
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric',
-                      })}
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-4 text-sm text-gray-600">
+                    <div className="flex items-start">
+                    <Clock className="h-4 w-4 mr-2 mt-0.5 flex-shrink-0" />
+                      <div>
+                        <div className="font-medium">Start</div>
+                        <div>{new Date(event.dateStart).toLocaleString('en-MY', {
+                          timeZone: 'Asia/Kuala_Lumpur',
+                          year: 'numeric',
+                          month: 'short',
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                          hour12: true,
+                        })}</div>
+                      </div>
                     </div>
-                    <div className="flex items-center">
-                      <MapPin className="h-4 w-4 mr-2" />
-                      {event.venue}
+                    
+                    <div className="hidden sm:flex items-center justify-center">
+                      <ArrowRight className="h-4 w-4 text-gray-400" />
                     </div>
-                    <div className="flex items-center">
-                      <Users className="h-4 w-4 mr-2" />
-                      {event.capacity.toLocaleString()} capacity
+                    
+                    <div className="flex items-start">
+                     
+                      <div>
+                        <div className="font-medium">End</div>
+                        <div>{new Date(event.dateEnd).toLocaleString('en-MY', {
+                          timeZone: 'Asia/Kuala_Lumpur',
+                          year: 'numeric',
+                          month: 'short',
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                          hour12: true,
+                        })}</div>
+                      </div>
                     </div>
                   </div>
                   
-                  <div className="mt-2 text-xs text-gray-500">
-                    Created {new Date(event.createdAt).toLocaleDateString()}
+                  {/* Venue row */}
+                  <div className="mt-3 flex items-center text-sm text-gray-600">
+                    <MapPin className="h-4 w-4 mr-2" />
+                    {event.venue}
                   </div>
+                  
+                  {/* Description row */}
+                  {/* <div className="mt-2 flex items-center text-sm text-gray-600">
+                    <FileText className="h-4 w-4 mr-2" />
+                    {event.description || 'No description provided'}
+                  </div> */}
+                  
+                  
                 </div>
 
                 <div className="flex items-center space-x-2 ml-4">
@@ -273,10 +377,10 @@ const History: React.FC = () => {
               <div className="text-sm text-gray-600">Processing</div>
             </div>
             <div>
-              <div className="text-2xl font-bold text-orange-600">
-                {events.reduce((sum, event) => sum + event.capacity, 0).toLocaleString()}
+              <div className="text-2xl font-bold text-emerald-600">
+                {events.filter(e => e.status === 'active').length}
               </div>
-              <div className="text-sm text-gray-600">Total Capacity</div>
+              <div className="text-sm text-gray-600">Active</div>
             </div>
           </div>
         </Card>
