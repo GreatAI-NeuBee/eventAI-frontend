@@ -1,7 +1,7 @@
 import axios from 'axios';
 import mockApiClient from './mockApiClient';
 
-// Configuration for mock mode - disable mock for createEvent
+conso// Configuration for mock mode - disable mock for createEvent
 const USE_MOCK_DATA = import.meta.env.VITE_USE_MOCK_DATA !== 'false'; // Default to true for demo
 const USE_MOCK_CREATE_EVENT = false; // Always use real API for event creation
 

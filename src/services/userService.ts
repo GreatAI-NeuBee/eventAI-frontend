@@ -44,6 +44,7 @@ export interface ApiError {
   message: string;
   status?: number;
   code?: string;
+  isUserExists?: boolean;
 }
 
 // User Service Class
@@ -77,8 +78,6 @@ export class UserService {
       return response.data;
       
     } catch (error) {
-      console.error('❌ Error creating/updating user:', error);
-      
       if (axios.isAxiosError(error)) {
         const apiError: ApiError = {
           message: error.response?.data?.message || error.message || 'Failed to create user',
@@ -88,12 +87,21 @@ export class UserService {
         
         // Handle specific error cases
         if (error.response?.status === 409) {
+          // User already exists - this is expected behavior, not an error
           // If user already exists, the backend should return the existing user data
           if (error.response.data && error.response.data.data) {
             return error.response.data;
           }
+          
+          // If no user data in response, we'll try to fetch it separately
+          throw {
+            ...apiError,
+            isUserExists: true, // Flag to indicate this is a "user exists" scenario
+          };
         }
         
+        // Only log actual errors, not expected conflicts
+        console.error('❌ Error creating/updating user:', error);
         throw apiError;
       }
       
@@ -158,11 +166,8 @@ export class UserService {
    */
   static async updateUserProfile(userId: string, updates: Partial<CreateUserRequest>): Promise<CreateUserResponse> {
     try {
-      console.log('🔄 Updating user profile:', userId, updates);
-      
       const response = await apiClient.patch<CreateUserResponse>(`/users/${userId}`, updates);
       
-      console.log('✅ User profile updated successfully:', response.data);
       return response.data;
       
     } catch (error) {
@@ -176,11 +181,7 @@ export class UserService {
    */
   static async deleteUser(userId: string): Promise<void> {
     try {
-      console.log('🔄 Deleting user from backend:', userId);
-      
       await apiClient.delete(`/users/${userId}`);
-      
-      console.log('✅ User deleted successfully');
       
     } catch (error) {
       console.error('❌ Error deleting user:', error);
@@ -209,14 +210,16 @@ apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
     if (axios.isAxiosError(error)) {
-      // Log API errors for debugging
-      console.error('API Error:', {
-        url: error.config?.url,
-        method: error.config?.method,
-        status: error.response?.status,
-        data: error.response?.data,
-        message: error.message,
-      });
+      // Only log non-409 errors (409 is expected for existing users)
+      if (error.response?.status !== 409) {
+        console.error('API Error:', {
+          url: error.config?.url,
+          method: error.config?.method,
+          status: error.response?.status,
+          data: error.response?.data,
+          message: error.message,
+        });
+      }
     }
     return Promise.reject(error);
   }
