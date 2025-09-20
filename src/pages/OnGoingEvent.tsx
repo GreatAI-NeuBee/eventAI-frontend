@@ -55,6 +55,7 @@ function ringSectorPoints(
   return pts;
 }
 
+
 // Little gate polygon at angle θ
 function gateRectPoints(
   cx: number,
@@ -187,13 +188,6 @@ const StadiumPlanSVG: React.FC<{
           return <polygon key={`exit-${idx}`} points={gatePts} fill="#f8fafc" stroke="#1e293b" strokeWidth={0.35} />;
         })}
 
-        {/* Legend */}
-        <g transform="translate(4,57)">
-          <rect x={0} y={0} width={36} height={3.5} rx={1.5} fill="url(#legendGradient)" />
-          <text x={0} y={-1.5} fontSize={2.2} fill="#e2e8f0" fontWeight="bold">Low</text>
-          <text x={36} y={-1.5} fontSize={2.2} fill="#e2e8f0" fontWeight="bold" textAnchor="end">High</text>
-        </g>
-
         <defs>
           <linearGradient id="legendGradient" x1="0" y1="0" x2="1" y2="0">
             <stop offset="0%"   stopColor={COLORS.green} />
@@ -209,8 +203,8 @@ const StadiumPlanSVG: React.FC<{
         aria-live="polite"
       >
         {centerZone ? (
-          <div className="px-5 py-4 rounded-xl shadow-xl border border-gray-200">
-            <div className="text-xl text-gray-900 mb-1 tracking-wide">
+          <div className="px-5 py-4 rounded-xl shadow-xl">
+            <div className="text-xl text-white text-gray-900 mb-1 tracking-wide">
               {centerZone.name || `L${centerZone.layer} · S${centerZone.section}`}
             </div>
             <div className="text-sm text-gray-600">
@@ -221,8 +215,7 @@ const StadiumPlanSVG: React.FC<{
             </div>
           </div>
         ) : (
-          <div className="px-4 py-2 bg-white/80 rounded-lg shadow border border-gray-200 text-gray-700">
-            Hover a section
+          <div className="px-4 py-2 rounded-lg shadow text-gray-700">
           </div>
         )}
       </div>
@@ -243,9 +236,9 @@ const OngoingEvent: React.FC = () => {
   const activeEvent: any = currentEvent ?? DEMO_EVENT;
 
   // Params (fixed for now)
-  const SECTIONS = 5;
+  const SECTIONS = 10;
   const LAYERS = 2;
-  const EXITS = 4;
+  const EXITS = 10;
 
   // Build zones either from API or generated sectors
   const zones: FloorZonePolygon[] = useMemo(() => {
@@ -369,11 +362,11 @@ const OngoingEvent: React.FC = () => {
           <Card className="bg-gradient-to-b from-white to-gray-50">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
-                <Map className="h-5 w-5 text-gray-700" />
+                <Map className="h-4 w-4 text-gray-700" />
                 <h2 className="text-xl font-semibold text-gray-900">Venue Floor Plan (SVG)</h2>
               </div>
               <div className="flex items-center gap-2 text-sm text-gray-600">
-                <span className="flex items-center gap-1"><DoorOpen className="h-4 w-4" /> {EXITS} exits</span>
+                <span className="flex items-center gap-1"><DoorOpen className="h-3 w-3" /> {EXITS} exits</span>
                 <span>{LAYERS} layers</span>
                 <span>{SECTIONS} sections</span>
               </div>

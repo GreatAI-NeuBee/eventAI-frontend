@@ -10,6 +10,8 @@ import VenueLayoutMap from '../components/maps/VenueLayoutMap';
 import VenueSearchInput from '../components/maps/VenueSearchInput';
 import { useEventStore } from '../store/eventStore';
 import { eventAPI } from '../api/apiClient';
+import StadiumMapEditor from "../components/maps/StadiumMapEditor";
+import type { StadiumMapJSON } from '../components/maps/StadiumMapEditor';
 
 const NewEvent: React.FC = () => {
   const navigate = useNavigate();
@@ -295,6 +297,14 @@ const NewEvent: React.FC = () => {
           initialLocation={venueLocation || undefined}
           title={venueLocation ? "Venue Location - Click to change" : "Select Venue Location"}
         />
+        <Card>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold text-gray-900">Stadium Map Builder (JSON)</h2>
+            <span className="text-xs text-gray-500">Draw sections & place exits anywhere</span>
+          </div>
+          <StadiumMapEditor initialLayers={2} />
+        </Card>
+
 
         {/* Venue Layout Display */}
         {venueLocation && (
