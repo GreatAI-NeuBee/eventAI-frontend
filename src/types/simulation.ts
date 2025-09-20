@@ -42,7 +42,7 @@ interface EventData {
   };
   venueLayout?: any; // JSON object for venue configuration
   userEmail?: string; // Email of the user who created the event
-  status: 'draft' | 'processing' | 'completed' | 'error';
+  status: 'draft' | 'processing' | 'completed' | 'error' | 'active';
   createdAt: string;
 }
 

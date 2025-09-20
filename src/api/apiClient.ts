@@ -1,9 +1,10 @@
 import axios from 'axios';
 import mockApiClient from './mockApiClient';
 
-conso// Configuration for mock mode - disable mock for createEvent
+// Configuration for mock mode - disable mock for specific endpoints
 const USE_MOCK_DATA = import.meta.env.VITE_USE_MOCK_DATA !== 'false'; // Default to true for demo
 const USE_MOCK_CREATE_EVENT = false; // Always use real API for event creation
+const USE_MOCK_EVENT_HISTORY = false; // Always use real API for event history
 
 // Central Axios instance for API calls
 const apiClient = axios.create({
@@ -70,12 +71,16 @@ export const eventAPI = {
   },
   
   // Get event history
-  getEventHistory: () => {
-    if (USE_MOCK_DATA) {
+  getEventHistory: (userEmail?: string) => {
+    if (USE_MOCK_EVENT_HISTORY) {
       console.log('🎭 Using mock data for getEventHistory');
       return mockApiClient.getEventHistory();
     }
-    return apiClient.get('/events');
+    
+    console.log('🌐 Using real API for getEventHistory:', `${apiClient.defaults.baseURL}/events`);
+    // Add userEmail as query parameter if provided
+    const params = userEmail ? { userEmail } : {};
+    return apiClient.get('/events', { params });
   },
   
   // Get specific event details
