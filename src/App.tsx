@@ -1,13 +1,13 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
+import { GoogleMapsProvider } from './contexts/GoogleMapsContext';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import DashboardLayout from './components/layout/DashboardLayout';
 import Landing from './pages/Landing';
 import Dashboard from './pages/Dashboard';
 import NewEvent from './pages/NewEvent';
-import History from './pages/History';
+import EventDetails from './pages/EventDetails';
 import User from './pages/User';
-import OngoingEvent from './pages/OnGoingEvent';
 
 // Import API testing utilities (available in browser console)
 import './utils/apiTest';
@@ -15,8 +15,9 @@ import './utils/apiTest';
 function App() {
   return (
     <AuthProvider>
-      <Router>
-        <Routes>
+      <GoogleMapsProvider>
+        <Router>
+          <Routes>
           {/* Landing page (no layout) */}
           <Route path="/" element={<Landing />} />
           
@@ -35,10 +36,10 @@ function App() {
               </DashboardLayout>
             </ProtectedRoute>
           } />
-          <Route path="/history" element={
+          <Route path="/event/:eventId" element={
             <ProtectedRoute>
               <DashboardLayout>
-                <History />
+                <EventDetails />
               </DashboardLayout>
             </ProtectedRoute>
           } />
@@ -49,18 +50,16 @@ function App() {
               </DashboardLayout>
             </ProtectedRoute>
           } />
-          <Route path="/ongoingevent" element={
-            <ProtectedRoute>
-              <DashboardLayout>
-                <OngoingEvent />
-              </DashboardLayout>
-            </ProtectedRoute>
-          } />
+          
+          {/* Redirect old routes to dashboard */}
+          <Route path="/history" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/ongoingevent" element={<Navigate to="/dashboard" replace />} />
           
           {/* Catch all route redirects to landing */}
           <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </Router>
+          </Routes>
+        </Router>
+      </GoogleMapsProvider>
     </AuthProvider>
   );
 }

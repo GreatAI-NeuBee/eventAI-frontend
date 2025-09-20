@@ -1,9 +1,10 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { APIProvider, Map, AdvancedMarker, Pin } from '@vis.gl/react-google-maps';
+import { Map, AdvancedMarker, Pin } from '@vis.gl/react-google-maps';
 import type { MapCameraChangedEvent } from '@vis.gl/react-google-maps';
 import { MapPin, Navigation, Target } from 'lucide-react';
 import Card from '../common/Card';
 import Button from '../common/Button';
+import { useGoogleMaps } from '../../contexts/GoogleMapsContext';
 
 interface LocationData {
   lat: number;
@@ -34,6 +35,7 @@ const GoogleMapPicker: React.FC<GoogleMapPickerProps> = ({
   const [isGeocoding, setIsGeocoding] = useState(false);
   const [isGettingLocation, setIsGettingLocation] = useState(false);
   const mapRef = useRef<google.maps.Map | null>(null);
+  const { isLoaded } = useGoogleMaps();
 
   // Google Maps API Key from environment
   const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
@@ -263,7 +265,14 @@ const GoogleMapPicker: React.FC<GoogleMapPickerProps> = ({
       )}
 
       <div className="h-96 rounded-lg overflow-hidden border border-gray-200">
-        <APIProvider apiKey={apiKey} libraries={['places']}>
+        {!isLoaded ? (
+          <div className="h-full flex items-center justify-center bg-gray-100">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto mb-2"></div>
+              <p className="text-sm text-gray-600">Loading Google Maps...</p>
+            </div>
+          </div>
+        ) : (
           <Map
             defaultCenter={mapCenter}
             defaultZoom={zoom}
@@ -288,7 +297,7 @@ const GoogleMapPicker: React.FC<GoogleMapPickerProps> = ({
               </AdvancedMarker>
             )}
           </Map>
-        </APIProvider>
+        )}
       </div>
 
       <div className="mt-4 text-sm text-gray-600">

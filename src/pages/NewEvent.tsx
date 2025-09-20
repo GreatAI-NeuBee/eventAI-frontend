@@ -189,7 +189,7 @@ const NewEvent: React.FC = () => {
       setCurrentEvent(newEvent);
 
       // Navigate to dashboard
-      navigate('/dashboard', { state: { eventId: newEvent.id } });
+      navigate(`/event/${newEvent.id}`);
     } catch (error: any) {
       console.error('❌ Error creating event:', error);
       console.error('Error response:', error.response?.data);
@@ -403,7 +403,7 @@ const NewEvent: React.FC = () => {
                     setCurrentEvent(newEvent);
 
                     // Navigate to dashboard
-                    navigate('/dashboard', { state: { eventId: newEvent.id } });
+                    navigate(`/event/${newEvent.id}`);
                   } catch (error: any) {
                     console.error('Error creating event:', error);
                     setError(error.response?.data?.message || 'Failed to create event');
