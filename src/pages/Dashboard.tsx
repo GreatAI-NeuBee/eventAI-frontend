@@ -8,6 +8,8 @@ import SimulationChart from '../components/dashboard/SimulationChart';
 import VenueMap from '../components/dashboard/VenueMap';
 import RecommendationCard from '../components/dashboard/RecommendationCard';
 import ScenarioTabs from '../components/dashboard/ScenarioTabs';
+import TransitForecast from '../components/dashboard/TransitForecast';
+import ParkingForecast from '../components/dashboard/ParkingForecast';
 import { useEventStore } from '../store/eventStore';
 import { useSimulation } from '../hooks/useSimulation';
 import { useDynamicRecommendations } from '../hooks/useDynamicRecommendations';
@@ -22,6 +24,8 @@ const Dashboard: React.FC = () => {
     simulationResult,
     isLoading,
     error,
+    hasRunForecast,
+    setHasRunForecast,
     clearError,
   } = useEventStore();
 
@@ -117,14 +121,25 @@ const Dashboard: React.FC = () => {
         <div className="text-center py-12">
           <TrendingUp className="mx-auto h-16 w-16 text-gray-400 mb-4" />
           <h2 className="text-2xl font-semibold text-gray-900 mb-2">
-            No Simulation Data
+            {hasRunForecast ? 'Simulation in Progress' : 'No Simulation Data'}
           </h2>
           <p className="text-gray-600 mb-6">
-            Start by creating a new event to see simulation results
+            {hasRunForecast 
+              ? 'Your simulation is being processed. This may take a few minutes.'
+              : 'Start by creating a new event to see simulation results'
+            }
           </p>
-          <Button onClick={() => navigate('/new-event')}>
-            Create New Event
-          </Button>
+          <div className="space-x-4">
+            {hasRunForecast ? (
+              <Button onClick={() => window.location.reload()}>
+                Refresh Status
+              </Button>
+            ) : (
+              <Button onClick={() => navigate('/new-event')}>
+                Create New Event
+              </Button>
+            )}
+          </div>
         </div>
       </div>
     );
@@ -244,6 +259,25 @@ const Dashboard: React.FC = () => {
             hotspots={simulationResult.hotspots} 
             venueLocation={currentEvent?.venueLocation}
           />
+
+          {/* Parking and Transit Forecast - Always show when event exists */}
+          {currentEvent && (
+            <>
+              {/* Parking Forecast */}
+              <ParkingForecast
+                venueLocation={currentEvent.venueLocation || { lat: 3.1579, lng: 101.7116, name: 'KLCC' }}
+                eventDate={currentEvent.date}
+                expectedCapacity={currentEvent.capacity}
+              />
+
+              {/* Transit Forecast */}
+              <TransitForecast
+                venueLocation={currentEvent.venueLocation || { lat: 3.1579, lng: 101.7116, name: 'KLCC' }}
+                eventDate={currentEvent.date}
+                expectedCapacity={currentEvent.capacity}
+              />
+            </>
+          )}
 
           {/* Scenario Analysis */}
           <ScenarioTabs scenarios={simulationResult.scenarios} />
