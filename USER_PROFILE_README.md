@@ -173,3 +173,4 @@ The user profile page is accessible at `/user` and requires authentication.
 - [ ] Profile completion progress
 - [ ] Social media integration
 - [ ] Profile analytics
+
