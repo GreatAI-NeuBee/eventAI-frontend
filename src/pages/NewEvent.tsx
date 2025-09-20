@@ -5,7 +5,6 @@ import Card from '../components/common/Card';
 import Button from '../components/common/Button';
 import Input from '../components/common/Input';
 import Spinner from '../components/common/Spinner';
-import GoogleMapPicker from '../components/maps/GoogleMapPicker';
 import VenueSearchInput from '../components/maps/VenueSearchInput';
 import { useEventStore } from '../store/eventStore';
 import { eventAPI } from '../api/apiClient';
@@ -157,7 +156,33 @@ const NewEvent: React.FC = () => {
       const response = await eventAPI.createEvent(submitData);
       console.log('✅ Event created successfully:', response.data);
       
-      const newEvent = response.data;
+      // Transform backend response to frontend EventData format
+      const backendEvent = response.data.data || response.data;
+      
+      // Map backend status to frontend status
+      let status: 'draft' | 'processing' | 'completed' | 'error' | 'active' = 'active';
+      if (backendEvent.status) {
+        const normalizedStatus = backendEvent.status.toLowerCase();
+        if (normalizedStatus === 'created') {
+          status = 'active';
+        } else if (['draft', 'processing', 'completed', 'error', 'active'].includes(normalizedStatus)) {
+          status = normalizedStatus as typeof status;
+        }
+      }
+      
+      const newEvent = {
+        id: backendEvent.eventId || backendEvent.id,
+        name: backendEvent.name || formData.name,
+        dateStart: backendEvent.dateOfEventStart || submitData.dateOfEventStart,
+        dateEnd: backendEvent.dateOfEventEnd || submitData.dateOfEventEnd,
+        venue: backendEvent.venue || venueLocation?.name || venueLocation?.address || 'Event Venue',
+        description: backendEvent.description || formData.description,
+        venueLocation: venueLocation || undefined,
+        venueLayout: JSON.parse(venueLayoutJson || '{}'),
+        userEmail: backendEvent.userEmail || submitData.userEmail,
+        status,
+        createdAt: backendEvent.createdAt || new Date().toISOString(),
+      };
 
       // Add event to store
       addEvent(newEvent);
@@ -239,7 +264,7 @@ const NewEvent: React.FC = () => {
                 Venue *
               </label>
               <VenueSearchInput
-                placeholder="Search for venue (e.g., Moscone Center)"
+                placeholder="Search for venue (e.g., Stadium Bukit Jalil)"
                 value={formData.venue}
                 onValueChange={(value) => {
                   setFormData(prev => ({ ...prev, venue: value }));
@@ -306,7 +331,7 @@ const NewEvent: React.FC = () => {
         </Card>
 
         {/* Venue Location Picker */}
-        <GoogleMapPicker
+        {/* <GoogleMapPicker
           onLocationSelected={(location) => {
             setVenueLocation(location);
             // Auto-fill venue name if not already set
@@ -320,7 +345,7 @@ const NewEvent: React.FC = () => {
           }}
           initialLocation={venueLocation || undefined}
           title={venueLocation ? "Venue Location - Click to change" : "Select Venue Location"}
-        />
+        /> */}
 
 
         {/* User Authentication Error */}
@@ -343,7 +368,7 @@ const NewEvent: React.FC = () => {
           </Button>
           
           <div className="flex space-x-4">
-            <Button
+            {/* <Button
               type="button"
               variant="outline"
               onClick={async (e) => {
@@ -390,7 +415,7 @@ const NewEvent: React.FC = () => {
               disabled={isLoading}
             >
               Create Event & Run Forecast
-            </Button>
+            </Button> */}
             
             <Button
               type="submit"
@@ -403,7 +428,7 @@ const NewEvent: React.FC = () => {
                   Creating Event...
                 </>
               ) : (
-                'Create Event Only'
+                'Create Event'
               )}
             </Button>
           </div>

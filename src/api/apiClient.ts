@@ -100,4 +100,10 @@ export const eventAPI = {
     }
     return apiClient.get(`/events/${eventId}/status`);
   },
+  
+  // Delete event
+  deleteEvent: (eventId: string) => {
+    console.log('🗑️ Using real API for deleteEvent:', `${apiClient.defaults.baseURL}/events/${eventId}`);
+    return apiClient.delete(`/events/${eventId}`);
+  },
 };

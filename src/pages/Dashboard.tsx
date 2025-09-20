@@ -185,15 +185,15 @@ const Dashboard: React.FC = () => {
           <Card padding="sm">
             <div className="text-center">
               <div className="text-2xl font-bold text-primary-600">
-                {currentEvent.capacity.toLocaleString()}
+                {currentEvent.status === 'active' ? 'Active' : 'N/A'}
               </div>
-              <div className="text-sm text-gray-600">Capacity</div>
+              <div className="text-sm text-gray-600">Status</div>
             </div>
           </Card>
           <Card padding="sm">
             <div className="text-center">
               <div className="text-2xl font-bold text-green-600">
-                {simulationResult.hotspots.length}
+                {simulationResult?.hotspots?.length || 0}
               </div>
               <div className="text-sm text-gray-600">Hotspots Detected</div>
             </div>
@@ -209,7 +209,12 @@ const Dashboard: React.FC = () => {
           <Card padding="sm">
             <div className="text-center">
               <div className="text-2xl font-bold text-blue-600">
-                {new Date(currentEvent.date).toLocaleDateString()}
+                {new Date(currentEvent.dateStart).toLocaleDateString('en-MY', {
+                  timeZone: 'Asia/Kuala_Lumpur',
+                  year: 'numeric',
+                  month: 'short',
+                  day: 'numeric',
+                })}
               </div>
               <div className="text-sm text-gray-600">Event Date</div>
             </div>
@@ -266,15 +271,15 @@ const Dashboard: React.FC = () => {
               {/* Parking Forecast */}
               <ParkingForecast
                 venueLocation={currentEvent.venueLocation || { lat: 3.1579, lng: 101.7116, name: 'KLCC' }}
-                eventDate={currentEvent.date}
-                expectedCapacity={currentEvent.capacity}
+                eventDate={currentEvent.dateStart}
+                expectedCapacity={5000}
               />
 
               {/* Transit Forecast */}
               <TransitForecast
                 venueLocation={currentEvent.venueLocation || { lat: 3.1579, lng: 101.7116, name: 'KLCC' }}
-                eventDate={currentEvent.date}
-                expectedCapacity={currentEvent.capacity}
+                eventDate={currentEvent.dateStart}
+                expectedCapacity={5000}
               />
             </>
           )}
