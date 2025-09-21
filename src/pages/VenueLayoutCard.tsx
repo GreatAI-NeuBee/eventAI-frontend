@@ -185,7 +185,7 @@ function pointInPolygon(p: PctPoint, pts: PctPoint[]): boolean {
 }
 
 /* ========= Particles engine (adaptive) ========= */
-const SPEED = 3.5 / 1000;
+const SPEED = 4.5 / 1000;
 const TTL_MS = 7000;
 
 type DotScale = {
@@ -235,13 +235,17 @@ function spawnArrivalsDots(
     const raw = Math.round((ppl || 0) / Math.max(1, scale.peoplePerDot));
     const dots = clamp(raw, scale.minDotsPerGate, scale.maxDotsPerGate);
 
+    // reduce spawn intensity further to keep particle count low on screen
+    // (use ~28% of calculated dots)
+    const reduced = Math.max(1, Math.round(dots * 0.28));
+
     const alias = gateLetterToExitNumber(gateId);
     const start =
       gatesById[gateId] ??
       (alias ? gatesById[alias] : undefined) ??
       exits[0]?.position ?? [50, 2.2];
 
-    for (let i = 0; i < dots; i++) {
+    for (let i = 0; i < reduced; i++) {
       const [tx, ty] = pickTarget();
       const jitter = () => (Math.random() - 0.5) * 0.8;
       const x = start[0] + jitter(), y = start[1] + jitter();
@@ -268,11 +272,14 @@ function spawnExitDots(
   const rawTotal = Math.round((totalPpl || 0) / Math.max(1, scale.peoplePerDot));
   const totalDots = clamp(rawTotal, exitCount * scale.minDotsPerGate, exitCount * scale.maxDotsPerGate);
 
+  // reduce overall exit-dot spawn intensity (keep lower)
+  const reducedTotal = Math.max(exitCount, Math.round(totalDots * 0.28));
+
   const out: Particle[] = [];
   const totalWeight = zones.reduce((s, z) => s + (z.congestion || 1), 0) || 1;
 
   for (const z of zones) {
-    const share = Math.round(totalDots * (z.congestion || 1) / totalWeight);
+    const share = Math.round(reducedTotal * (z.congestion || 1) / totalWeight);
     for (let i = 0; i < share; i++) {
       const [x, y] = randomInPolygon(z.points);
       const [tx, ty] = nearestExit(exits, [x, y]);
@@ -412,7 +419,11 @@ export const VenueLayoutCard: React.FC<{ event: EventData | null }> = ({ event }
           );
 
     lastSpawnedIndexRef.current = idx;
-    setParticles((prev) => [...prev, ...newly].slice(-2000)); // cap particle count
+    // keep particle count very limited to avoid overload
+    setParticles((prev) => {
+      const merged = [...prev, ...newly];
+      return merged.slice(-300); // tighter cap
+    });
   }, [idx, scrubbing, frame.phase, plan, zones, gateLoads, dotScale]);
 
   // motion RAF
@@ -646,7 +657,7 @@ const StadiumPlanSVG: React.FC<{
 
   // unified hover info for zones and toilets
   const [hoverInfo, setHoverInfo] = useState<{ name: string; congestion: number } | null>(null);
-  
+
   return (
     <div className="relative w-full aspect-[16/10] rounded-xl overflow-hidden border border-gray-300 bg-white">
       <svg viewBox={`0 0 ${vbW} ${vbH}`} preserveAspectRatio="xMidYMid meet" className="h-full w-full">
@@ -719,34 +730,37 @@ const StadiumPlanSVG: React.FC<{
              );
            })}
 
-           {/* toilets */}
-           {(plan.toiletsList ?? []).map((t, i) => (
-             <g
-               key={t.id}
-               onMouseEnter={() => setHoverInfo({ name: t.label ?? t.id, congestion: toiletCongestions[i] ?? 0 })}
-               onMouseMove={() => setHoverInfo({ name: t.label ?? t.id, congestion: toiletCongestions[i] ?? 0 })}
-               onMouseLeave={() => setHoverInfo(null)}
-               style={{ cursor: "default" }}
-             >
-              {/* Congestion circle */}
-              <circle
-                cx={t.position[0]}
-                cy={t.position[1]}
-                r={2.2}
-                fill="none"
-                stroke={bandedColor(toiletCongestions[i])}
-                strokeWidth={0.5}
-                opacity={0.8}
-              />
-              <text x={t.position[0]} y={t.position[1]} fontSize={3} textAnchor="middle" dominantBaseline="central">🚻</text>
-              {t.label ? (
-                <text x={t.position[0] + 2.2} y={t.position[1]} fontSize={1.8} fill="#0f172a" dominantBaseline="middle">
-                  {t.label}
-                </text>
-              ) : null}
-            </g>
-           ))}
- 
+           {/* toilets (only draw icon + pulsing circle inside clip) */}
+           {(plan.toiletsList ?? []).map((t, i) => {
+             return (
+               <g
+                 key={t.id}
+                 onMouseEnter={() => setHoverInfo({ name: t.label ?? t.id, congestion: toiletCongestions[i] ?? 0 })}
+                 onMouseMove={() => setHoverInfo({ name: t.label ?? t.id, congestion: toiletCongestions[i] ?? 0 })}
+                 onMouseLeave={() => setHoverInfo(null)}
+                 style={{ cursor: "pointer" }}
+               >
+                 {/* Congestion circle with slow pulse to indicate interactivity */}
+                 <circle
+                   cx={t.position[0]}
+                   cy={t.position[1]}
+                   r={2.2}
+                   fill="none"
+                   stroke={bandedColor(toiletCongestions[i])}
+                   strokeWidth={0.5}
+                   opacity={0.9}
+                 >
+                   {/* slow radius pulse */}
+                   <animate attributeName="r" values="2.2;3.2;2.2" dur="2.8s" repeatCount="indefinite" />
+                   {/* subtle stroke opacity pulse */}
+                   <animate attributeName="stroke-opacity" values="0.6;1;0.6" dur="2.8s" repeatCount="indefinite" />
+                 </circle>
+                 <text x={t.position[0]} y={t.position[1]} fontSize={3} textAnchor="middle" dominantBaseline="central">🚻</text>
+                 {/* label is intentionally NOT drawn here so it won't be clipped by stadium circle */}
+               </g>
+             );
+           })}
+
            {/* particles */}
            <g>
              {particles.map((p) => (
@@ -754,7 +768,8 @@ const StadiumPlanSVG: React.FC<{
              ))}
            </g>
          </g>
- 
+
+        {/* toilet names removed - only icon + pulsing circle remain */}
          {/* exits pins + current loads */}
          {(plan.exitsList ?? []).map((e) => {
            const trailing = (e.name?.match(/\b(\w+)\b$/)?.[1] ?? e.id);
