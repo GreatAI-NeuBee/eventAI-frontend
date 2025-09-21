@@ -190,22 +190,28 @@ const EventDetails: React.FC = () => {
         console.log('🔍 EventDetails: Transformed event:', transformedEvent);
         setCurrentEvent(transformedEvent);
         
-        // Check if forecast_result exists
-        if (eventData.forecast_result) {
+        // Check if forecastResult exists (note: API returns 'forecastResult', not 'forecast_result')
+        if (eventData.forecastResult) {
           console.log('EventDetails: Forecast result found, loading simulation data');
-          setForecastResult(eventData.forecast_result);
+          console.log('EventDetails: Forecast result structure:', eventData.forecastResult);
+          setForecastResult(eventData.forecastResult);
+          
+          // Handle nested forecast structure - data might be under 'forecast' property
+          const forecastData = eventData.forecastResult.forecast || eventData.forecastResult;
+          
           // Set simulation result in the store for components to use
-          if (eventData.forecast_result.crowdDensity || eventData.forecast_result.hotspots) {
+          if (forecastData.crowdDensity || forecastData.hotspots || forecastData.summary) {
             const simulationData = {
               eventId: eventId,
-              crowdDensity: eventData.forecast_result.crowdDensity || [],
-              hotspots: eventData.forecast_result.hotspots || [],
-              recommendations: eventData.forecast_result.recommendations || [],
-              scenarios: eventData.forecast_result.scenarios || { entry: {}, exit: {}, congestion: {} }
+              crowdDensity: forecastData.crowdDensity || [],
+              hotspots: forecastData.hotspots || [],
+              recommendations: forecastData.recommendations || [],
+              scenarios: forecastData.scenarios || { entry: {}, exit: {}, congestion: {} }
             };
             // Update the simulation result in the store
             const { setSimulationResult } = useEventStore.getState();
             setSimulationResult(simulationData);
+            console.log('EventDetails: Simulation data set in store:', simulationData);
           }
         } else {
           console.log('EventDetails: No forecast result found, showing basic event info');
@@ -429,7 +435,7 @@ const EventDetails: React.FC = () => {
           </div>
           <div className="flex items-center space-x-4">
             {getStatusBadge(currentEvent.status)}
-            {!forecastResult && (
+            {(!forecastResult || Object.keys(forecastResult).length === 0) && (
               <Button 
                 onClick={handleGenerateForecast}
                 disabled={isForecastLoading || !currentEvent.venueLayout}
@@ -507,7 +513,7 @@ const EventDetails: React.FC = () => {
           </div>
         </Card>
 
-        {forecastResult && (
+        {forecastResult && Object.keys(forecastResult).length > 0 && (
           <Card>
             <div className="flex items-center">
               <CheckCircle className="h-8 w-8 text-purple-500" />
@@ -523,7 +529,7 @@ const EventDetails: React.FC = () => {
       </div>
 
       {/* Show venue layout configuration when no forecast is available */}
-      {!forecastResult && !isForecastLoading && (
+      {(!forecastResult || Object.keys(forecastResult).length === 0) && !isForecastLoading && (
         <div className="space-y-6">
           {/* Forecast Info Card */}
           <Card className="mb-6">
@@ -569,7 +575,7 @@ const EventDetails: React.FC = () => {
       )}
 
       {/* Main Dashboard Content - Only show if forecast exists */}
-      {forecastResult && (
+      {forecastResult && Object.keys(forecastResult).length > 0 && (
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
           {/* Left Column - Simulation Chart and Venue Map */}
           <div className="xl:col-span-2 space-y-6">
@@ -632,7 +638,7 @@ const EventDetails: React.FC = () => {
       )}
 
       {/* Bottom Row - Transit and Parking Forecasts */}
-      {forecastResult && currentEvent.venueLocation && (
+      {forecastResult && Object.keys(forecastResult).length > 0 && currentEvent.venueLocation && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
           <div className="h-fit">
             <TransitForecast venueLocation={currentEvent.venueLocation} />
