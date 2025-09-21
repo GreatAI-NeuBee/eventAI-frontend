@@ -9,7 +9,6 @@ import VenueMap from '../components/dashboard/VenueMap';
 import ScenarioTabs from '../components/dashboard/ScenarioTabs';
 import TransitForecast from '../components/dashboard/TransitForecast';
 import ParkingForecast from '../components/dashboard/ParkingForecast';
-import NearbyParkingOptions from '../components/dashboard/NearbyParkingOptions';
 import VenueLayoutEditor, { VenueLayoutEditorData } from '../components/venue/VenueLayoutEditor';
 import { useEventStore } from '../store/eventStore';
 import { useAuth } from '../contexts/AuthContext';
@@ -480,23 +479,35 @@ const EventDetails: React.FC = () => {
       )}
 
       {/* Event Details Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <Card>
           <div className="flex items-center">
             <Calendar className="h-8 w-8 text-primary-500" />
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-500">Event Date</p>
-              <p className="text-lg font-semibold text-gray-900">
-                {new Date(currentEvent.dateStart).toLocaleString('en-MY', {
-                  timeZone: 'Asia/Kuala_Lumpur',
-                  month: 'short',
-                  day: 'numeric',
-                  year: 'numeric',
-                  hour: '2-digit',
-                  minute: '2-digit',
-                })}
-              </p>
-            </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-500">Event Time</p>
+                <div className="flex flex-row items-center space-x-2">
+                  <div className="text-sm font-semibold text-gray-900">
+                    {new Date(currentEvent.dateStart).toLocaleString('en-MY', {
+                      timeZone: 'Asia/Kuala_Lumpur',
+                      month: 'short',
+                      day: 'numeric',
+                      year: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                      hour12: true,
+                    })}
+                  </div>
+                  <div className="text-gray-400 font-medium">-</div>
+                  <div className="text-sm font-semibold text-gray-900">
+                    {new Date(currentEvent.dateEnd).toLocaleString('en-MY', {
+                      timeZone: 'Asia/Kuala_Lumpur',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                      hour12: true,
+                    })}
+                  </div>
+                </div>
+              </div>
           </div>
         </Card>
 
@@ -512,29 +523,18 @@ const EventDetails: React.FC = () => {
 
         <Card>
           <div className="flex items-center">
-            <TrendingUp className="h-8 w-8 text-blue-500" />
+            <CheckCircle className="h-8 w-8 text-purple-500" />
             <div className="ml-4">
-              <p className="text-sm font-medium text-gray-500">Status</p>
+              <p className="text-sm font-medium text-gray-500">Hotspots</p>
               <p className="text-lg font-semibold text-gray-900">
-                {currentEvent.status === 'active' ? 'Active' : 'N/A'}
+                {forecastResult && Object.keys(forecastResult).length > 0
+                  ? (forecastResult?.hotspots?.length || simulationResult?.hotspots?.length || 0)
+                  : 'N/A'
+                }
               </p>
             </div>
           </div>
         </Card>
-
-        {forecastResult && Object.keys(forecastResult).length > 0 && (
-          <Card>
-            <div className="flex items-center">
-              <CheckCircle className="h-8 w-8 text-purple-500" />
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-500">Hotspots</p>
-                <p className="text-lg font-semibold text-gray-900">
-                  {forecastResult?.hotspots?.length || simulationResult?.hotspots?.length || 0}
-                </p>
-              </div>
-            </div>
-          </Card>
-        )}
       </div>
 
       {/* Show venue layout configuration when no forecast is available */}
@@ -652,18 +652,14 @@ const EventDetails: React.FC = () => {
                 congestion: {}
               }}
             />
-          </div>
-        </div>
-      )}
 
-      {/* Bottom Row - Transit and Parking Forecasts */}
-      {forecastResult && Object.keys(forecastResult).length > 0 && currentEvent.venueLocation && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-          <div className="h-fit">
-            <TransitForecast venueLocation={currentEvent.venueLocation} />
-          </div>
-          <div className="h-fit">
-            <ParkingForecast venueLocation={currentEvent.venueLocation} />
+            {/* Transit and Parking Forecasts in Right Column */}
+            {currentEvent.venueLocation && (
+              <div className="space-y-6">
+                <TransitForecast venueLocation={currentEvent.venueLocation} />
+                <ParkingForecast venueLocation={currentEvent.venueLocation} />
+              </div>
+            )}
           </div>
         </div>
       )}

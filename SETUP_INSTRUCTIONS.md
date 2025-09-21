@@ -1,4 +1,4 @@
-# Setup Instructions for EventAI Frontend
+# Setup Instructions for Event Buddy Frontend
 
 ## Environment Variables Setup
 

@@ -425,20 +425,7 @@ const ParkingForecast: React.FC<ParkingForecastProps> = ({
         </Card>
       )}
 
-      {/* Recommended Actions */}
-      {forecastData && (
-        <Card>
-          <h3 className="text-sm font-semibold text-gray-900 mb-3">Recommended Actions</h3>
-          <div className="space-y-1">
-            {forecastData.recommendedActions.map((action: string, index: number) => (
-              <div key={index} className="flex items-center p-2 bg-gray-50 rounded text-xs">
-                <div className="w-1.5 h-1.5 bg-blue-500 rounded-full mr-2"></div>
-                <span className="text-gray-700">{action}</span>
-              </div>
-            ))}
-          </div>
-        </Card>
-      )}
+   
 
     </div>
   );

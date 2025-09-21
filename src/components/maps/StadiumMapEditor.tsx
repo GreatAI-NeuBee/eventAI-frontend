@@ -1123,8 +1123,28 @@ const StadiumMapEditor: React.FC<{
                     step={50}
                     value={e.capacity ?? EXIT_DEFAULT_CAP}
                     onChange={(ev) => {
+                      const inputValue = ev.target.value;
+                      if (inputValue === '') {
+                        // Allow empty string temporarily while user is typing
+                        setExits((prev) =>
+                          prev.map((x) =>
+                            x.id === e.id ? { ...x, capacity: '' as any } : x
+                          )
+                        );
+                      } else {
+                        const raw = parseInt(inputValue, 10);
+                        const val = Number.isFinite(raw) ? Math.max(0, raw) : EXIT_DEFAULT_CAP;
+                        setExits((prev) =>
+                          prev.map((x) =>
+                            x.id === e.id ? { ...x, capacity: val } : x
+                          )
+                        );
+                      }
+                    }}
+                    onBlur={(ev) => {
+                      // On blur, ensure we have a valid number
                       const raw = parseInt(ev.target.value, 10);
-                      const val = Number.isFinite(raw) ? Math.max(0, raw) : 0;
+                      const val = Number.isFinite(raw) && raw > 0 ? raw : EXIT_DEFAULT_CAP;
                       setExits((prev) =>
                         prev.map((x) =>
                           x.id === e.id ? { ...x, capacity: val } : x
@@ -1143,7 +1163,6 @@ const StadiumMapEditor: React.FC<{
           </div>
         </div>
       )}
-
       {/* JSON preview */}
    
     </div>

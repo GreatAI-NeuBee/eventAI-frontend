@@ -29,7 +29,7 @@ const Logo: React.FC<LogoProps> = ({
       
       <img 
         src="/logo.png" 
-        alt="EventAI Logo" 
+        alt="Event Buddy Logo" 
         className={currentSize.icon}
       />
      
@@ -40,7 +40,7 @@ const Logo: React.FC<LogoProps> = ({
       {/* Company name */}
       {showText && (
         <span className={`${currentSize.text} font-bold ${textColor}`}>
-          EventAI
+          Event Buddy
         </span>
       )}
     </div>
