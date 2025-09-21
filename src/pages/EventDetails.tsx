@@ -475,34 +475,31 @@ const EventDetails: React.FC = () => {
         <Card>
           <div className="flex items-center">
             <Calendar className="h-8 w-8 text-primary-500" />
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-500">Event Time</p>
-              <div className="flex flex-col items-start space-y-1">
-                <div className="text-sm font-semibold text-gray-900">
-                  {new Date(currentEvent.dateStart).toLocaleString('en-MY', {
-                    timeZone: 'Asia/Kuala_Lumpur',
-                    month: 'short',
-                    day: 'numeric',
-                    year: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    hour12: true,
-                  })}
-                </div>
-                <div className="text-gray-400 font-medium">—</div>
-                <div className="text-sm font-semibold text-gray-900">
-                  {new Date(currentEvent.dateEnd).toLocaleString('en-MY', {
-                    timeZone: 'Asia/Kuala_Lumpur',
-                    month: 'short',
-                    day: 'numeric',
-                    year: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    hour12: true,
-                  })}
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-500">Event Time</p>
+                <div className="flex flex-row items-center space-x-2">
+                  <div className="text-sm font-semibold text-gray-900">
+                    {new Date(currentEvent.dateStart).toLocaleString('en-MY', {
+                      timeZone: 'Asia/Kuala_Lumpur',
+                      month: 'short',
+                      day: 'numeric',
+                      year: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                      hour12: true,
+                    })}
+                  </div>
+                  <div className="text-gray-400 font-medium">-</div>
+                  <div className="text-sm font-semibold text-gray-900">
+                    {new Date(currentEvent.dateEnd).toLocaleString('en-MY', {
+                      timeZone: 'Asia/Kuala_Lumpur',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                      hour12: true,
+                    })}
+                  </div>
                 </div>
               </div>
-            </div>
           </div>
         </Card>
 
