@@ -369,12 +369,12 @@ const ParkingForecast: React.FC<ParkingForecastProps> = ({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="h-full">
       {/* Forecast Summary */}
       {forecastData && (
-        <Card>
+        <Card className="mb-6">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-900">Parking Forecast Summary</h3>
+            <h3 className="text-lg font-semibold text-gray-900">🚗 Parking Forecast</h3>
             <div className={`px-3 py-1 rounded-full text-sm font-medium ${
               forecastData.availabilityLevel === 'CRITICAL' ? 'bg-red-100 text-red-800' :
               forecastData.availabilityLevel === 'HIGH' ? 'bg-yellow-100 text-yellow-800' :

@@ -512,8 +512,12 @@ const EventDetails: React.FC = () => {
       {/* Bottom Row - Transit and Parking Forecasts */}
       {forecastResult && currentEvent.venueLocation && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-          <TransitForecast venueLocation={currentEvent.venueLocation} />
-          <ParkingForecast venueLocation={currentEvent.venueLocation} />
+          <div className="h-fit">
+            <TransitForecast venueLocation={currentEvent.venueLocation} />
+          </div>
+          <div className="h-fit">
+            <ParkingForecast venueLocation={currentEvent.venueLocation} />
+          </div>
         </div>
       )}
     </div>

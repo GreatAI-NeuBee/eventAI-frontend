@@ -267,12 +267,12 @@ Please contact Rapid KL to request increased frequency for this event.`;
   }
 
   return (
-    <div className="space-y-6">
+    <div className="h-full">
       {/* Forecast Summary */}
       {forecastData && (
-        <Card>
+        <Card className="mb-6">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-900">Transit Forecast Summary</h3>
+            <h3 className="text-lg font-semibold text-gray-900">🚌 Transit Forecast</h3>
             <Button
               onClick={loadTransitForecast}
               variant="outline"
