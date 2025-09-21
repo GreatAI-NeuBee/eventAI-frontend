@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Users, BarChart3, Zap, ArrowRight, Play } from 'lucide-react';
+import { Users, BarChart3, Zap, ArrowRight } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import Button from '../components/common/Button';
 import Logo from '../components/common/Logo';
