@@ -149,14 +149,14 @@ const Landing: React.FC = () => {
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
               
-              <Button
+              {/* <Button
                 size="lg"
                 variant="outline"
                 className="border-gray-400 text-gray-300 hover:bg-white hover:text-gray-900 px-8 py-4"
               >
                 <Play className="mr-2 h-5 w-5" />
                 Watch Demo
-              </Button>
+              </Button> */}
             </motion.div>
 
             {/* Stats */}
