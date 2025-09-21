@@ -1,5 +1,7 @@
 # Event Buddy Frontend
 
+Deployed Live: **https://eventai.munymunyhom.tech/**
+
 A React-based frontend application for intelligent crowd simulation and event planning. This application allows event organizers to upload event data and venue layouts to receive smart crowd flow predictions and actionable recommendations.
 
 ## 🚀 Features
@@ -171,4 +173,3 @@ This project is part of the Event Buddy platform for intelligent event planning 
 
 A modern event-ops dashboard for venues and organizers — real-time crowd forecasts, zone layouts, and operational tools.
 
-Live: http://eventai.munymunyhom.tech/
