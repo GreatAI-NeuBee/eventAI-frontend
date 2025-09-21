@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Save, Phone, Users, MapPin, Settings, Upload, FileText, ExternalLink } from 'lucide-react';
+import { Save, Phone, Users, MapPin, Settings, Upload, FileText, ExternalLink, CheckCircle, Bot } from 'lucide-react';
 import Card from '../common/Card';
 import Button from '../common/Button';
 import FileUpload from '../common/FileUpload';
@@ -49,6 +49,12 @@ const VenueLayoutEditor: React.FC<VenueLayoutEditorProps> = ({
     context: string;
     analyses: ComprehendAnalysis[];
   }>({ links: [], context: '', analyses: [] });
+  const [showUpdateNotification, setShowUpdateNotification] = useState<{
+    show: boolean;
+    gateName: string;
+    picName: string;
+    picPhone: string;
+  }>({ show: false, gateName: '', picName: '', picPhone: '' });
 
   // Initialize gate configuration from venue layout
   useEffect(() => {
@@ -136,6 +142,30 @@ const VenueLayoutEditor: React.FC<VenueLayoutEditorProps> = ({
     return phoneRegex.test(phone.replace(/\s|-/g, ''));
   };
 
+  const handleUpdateGate = (exitId: string, exitName: string) => {
+    const config = gateConfig[exitId];
+    if (!config) return;
+
+    // Validate required fields
+    if (!config.picPhoneNumber || !validatePhoneNumber(config.picPhoneNumber)) {
+      alert('Please enter a valid phone number before updating.');
+      return;
+    }
+
+    // Show success notification
+    setShowUpdateNotification({
+      show: true,
+      gateName: exitName,
+      picName: config.picName || 'PIC',
+      picPhone: config.picPhoneNumber
+    });
+
+    // Auto-hide notification after 5 seconds
+    setTimeout(() => {
+      setShowUpdateNotification(prev => ({ ...prev, show: false }));
+    }, 5000);
+  };
+
   if (!venueLayout) {
     return (
       <Card className="p-6">
@@ -221,6 +251,21 @@ const VenueLayoutEditor: React.FC<VenueLayoutEditorProps> = ({
                     </div>
                     <div className="text-sm text-gray-500">
                       Gate #{index + 1}
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {/* Update Button */}
+                    <div className="md:col-span-3 flex justify-end mb-4">
+                      <Button
+                        onClick={() => handleUpdateGate(exit.id, exit.name)}
+                        disabled={readOnly || !config.picPhoneNumber || !validatePhoneNumber(config.picPhoneNumber)}
+                        className="flex items-center gap-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400"
+                        size="sm"
+                      >
+                        <CheckCircle className="h-4 w-4" />
+                        Update PIC
+                      </Button>
                     </div>
                   </div>
                   
@@ -473,6 +518,66 @@ const VenueLayoutEditor: React.FC<VenueLayoutEditorProps> = ({
             </ul>
           </div>
         </Card>
+      )}
+
+      {/* Modern Update Notification Popup */}
+      {showUpdateNotification.show && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-md bg-white bg-opacity-20">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full transform transition-all duration-300 scale-100 animate-in">
+            <div className="p-6">
+              {/* Header */}
+              <div className="flex items-center justify-center mb-4">
+                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
+                  <Bot className="h-8 w-8 text-green-600" />
+                </div>
+              </div>
+              
+              {/* Title */}
+              <h3 className="text-xl font-semibold text-gray-900 text-center mb-2">
+                🤖 AI Chatbot Linked!
+              </h3>
+              
+              {/* Success Message */}
+              <div className="text-center space-y-3 mb-6">
+                <p className="text-gray-600">
+                  <strong>{showUpdateNotification.picName}</strong> at <strong>{showUpdateNotification.gateName}</strong> has been successfully linked to our AI chatbot.
+                </p>
+                
+                <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                  <div className="flex items-center justify-center space-x-2 text-sm text-green-800">
+                    <Phone className="h-4 w-4" />
+                    <span className="font-medium">{showUpdateNotification.picPhone}</span>
+                  </div>
+                  <p className="text-xs text-green-700 mt-1 text-center">
+                    Will receive WhatsApp notifications and AI assistance during the event
+                  </p>
+                </div>
+              </div>
+              
+              {/* Features List */}
+              <div className="bg-blue-50 rounded-lg p-4 mb-6">
+                <h4 className="text-sm font-medium text-blue-900 mb-2">✨ AI Chatbot Features:</h4>
+                <ul className="text-xs text-blue-800 space-y-1">
+                  <li>• Real-time crowd density alerts</li>
+                  <li>• Emergency response guidance</li>
+                  <li>• Gate capacity monitoring</li>
+                  <li>• Instant communication with event control</li>
+                </ul>
+              </div>
+              
+              {/* Close Button */}
+              <div className="flex justify-center">
+                <Button
+                  onClick={() => setShowUpdateNotification(prev => ({ ...prev, show: false }))}
+                  className="bg-green-600 hover:bg-green-700 text-white px-8 py-2 rounded-lg font-medium"
+                >
+                  <CheckCircle className="h-4 w-4 mr-2" />
+                  Got it!
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
