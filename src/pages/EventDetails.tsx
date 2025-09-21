@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { AlertTriangle, CheckCircle, TrendingUp, Calendar, MapPin } from 'lucide-react';
+import { AlertTriangle, CheckCircle, TrendingUp, Calendar, MapPin, Play } from 'lucide-react';
 import Card from '../components/common/Card';
 import Button from '../components/common/Button';
 import Spinner from '../components/common/Spinner';
@@ -256,6 +256,13 @@ const EventDetails: React.FC = () => {
     navigate('/dashboard');
   };
 
+  // Handle navigation to ongoing event
+  const handleViewOngoingEvent = () => {
+    if (eventId) {
+      navigate(`/event/ongoing-event/${eventId}`);
+    }
+  };
+
   // Handle forecast generation
   const handleGenerateForecast = async () => {
     if (!eventId || !currentEvent) return;
@@ -452,6 +459,16 @@ const EventDetails: React.FC = () => {
                 {isForecastLoading ? 'Generating...' : 'Forecast'}
               </Button>
             )}
+            {forecastResult && Object.keys(forecastResult).length > 0 && (
+              <Button 
+                onClick={handleViewOngoingEvent}
+                variant="primary"
+                className="bg-green-600 hover:bg-green-700"
+              >
+                <Play className="h-4 w-4 mr-2" />
+                View Ongoing Event
+              </Button>
+            )}
           </div>
         </div>
       </div>
@@ -561,6 +578,7 @@ const EventDetails: React.FC = () => {
           {currentEvent?.venueLayout && (
             <VenueLayoutEditor
               venueLayout={currentEvent.venueLayout}
+              eventId={eventId}
               onSave={handleVenueConfigSave}
               readOnly={false}
             />

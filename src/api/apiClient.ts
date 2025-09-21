@@ -139,4 +139,21 @@ export const eventAPI = {
       headers: { 'Content-Type': 'application/json' }
     });
   },
+
+  // Update event with attachment data
+  updateEventAttachments: (eventId: string, attachmentData: {
+    attachmentLinks: string[];
+    attachmentContext: string;
+  }) => {
+    console.log('🌐 Using real API for updateEventAttachments:', `${apiClient.defaults.baseURL}/events/${eventId}/attachments`);
+    return apiClient.patch(`/events/${eventId}/attachments`, attachmentData, {
+      headers: { 'Content-Type': 'application/json' }
+    });
+  },
+
+  // Get event attachments
+  getEventAttachments: (eventId: string) => {
+    console.log('🌐 Using real API for getEventAttachments:', `${apiClient.defaults.baseURL}/events/${eventId}/attachments`);
+    return apiClient.get(`/events/${eventId}/attachments`);
+  },
 };
