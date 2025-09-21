@@ -2,7 +2,6 @@ import type { UserProfile, UserProfileUpdate, PasswordChange } from '../types/us
 
 // Mock user profiles storage
 let mockProfiles: UserProfile[] = [];
-let nextId = 1;
 
 // Initialize with some sample data
 const initializeMockData = () => {

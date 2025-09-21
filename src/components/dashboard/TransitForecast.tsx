@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { MapPin, Train, Bus, Clock, Phone, ExternalLink, RefreshCw } from 'lucide-react';
+import { MapPin, Train, Bus, Phone, ExternalLink, RefreshCw } from 'lucide-react';
 import Card from '../common/Card';
 import Button from '../common/Button';
 import Spinner from '../common/Spinner';
@@ -267,130 +267,130 @@ Please contact Rapid KL to request increased frequency for this event.`;
   }
 
   return (
-    <div className="h-full">
+    <div className="h-full animate-fade-in">
       {/* Forecast Summary */}
       {forecastData && (
-        <Card className="mb-6">
+        <Card className="mb-4">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-900">🚌 Transit Forecast</h3>
+            <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+              <span className="mr-2 text-lg">🚌</span>
+              Transit Forecast
+            </h3>
             <Button
               onClick={loadTransitForecast}
               variant="outline"
               size="sm"
-              className="flex items-center"
+              className="text-xs px-2 py-1"
             >
-              <RefreshCw className="w-4 h-4 mr-1" />
+              <RefreshCw className="w-3 h-3 mr-1" />
               Refresh
             </Button>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-            <div className="text-center p-4 bg-blue-50 rounded-lg">
-              <div className="text-2xl font-bold text-blue-600">{forecastData.totalStations}</div>
-              <div className="text-sm text-blue-800">Nearby Stations</div>
+          <div className="grid grid-cols-3 gap-3 mb-4">
+            <div className="text-center p-3 bg-gray-50 rounded border">
+              <div className="text-xl font-bold text-gray-800 mb-1">{forecastData.totalStations}</div>
+              <div className="text-xs text-gray-600">Stations</div>
             </div>
-            <div className="text-center p-4 bg-green-50 rounded-lg">
-              <div className="text-2xl font-bold text-green-600">{forecastData.estimatedTransitUsers}</div>
-              <div className="text-sm text-green-800">Expected Transit Users</div>
+            <div className="text-center p-3 bg-gray-50 rounded border">
+              <div className="text-xl font-bold text-gray-800 mb-1">{forecastData.estimatedTransitUsers}</div>
+              <div className="text-xs text-gray-600">Users</div>
             </div>
-            <div className="text-center p-4 bg-orange-50 rounded-lg">
-              <div className="text-2xl font-bold text-orange-600">{forecastData.congestionForecast.level}</div>
-              <div className="text-sm text-orange-800">Congestion Level</div>
+            <div className="text-center p-3 bg-gray-50 rounded border">
+              <div className="text-xl font-bold text-gray-800 mb-1">{forecastData.congestionForecast.level}</div>
+              <div className="text-xs text-gray-600">Congestion</div>
             </div>
           </div>
 
-          <div className="p-4 bg-yellow-50 rounded-lg">
-            <h4 className="font-medium text-yellow-900 mb-2">Forecast Alert</h4>
-            <p className="text-sm text-yellow-800">
-              Expected wait time: {forecastData.congestionForecast.estimatedWaitTime}
-            </p>
+          <div className="p-3 bg-yellow-50 rounded text-xs">
+            <span className="font-medium text-yellow-900">Alert: </span>
+            <span className="text-yellow-800">Wait time: {forecastData.congestionForecast.estimatedWaitTime}</span>
           </div>
         </Card>
       )}
 
       {/* Nearby Stations */}
       <Card>
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between mb-3">
           <div>
-            <h3 className="text-lg font-semibold text-gray-900">Nearby Transit Stations</h3>
-            <p className="text-sm text-gray-600">
-              Found {stations.length} station{stations.length !== 1 ? 's' : ''} within 3km
+            <h3 className="text-sm font-semibold text-gray-900">Nearby Transit Stations</h3>
+            <p className="text-xs text-gray-600">
+              {stations.length} station{stations.length !== 1 ? 's' : ''} within 3km
             </p>
           </div>
           <Button
             onClick={handleContactRapidKl}
             variant="outline"
             size="sm"
-            className="flex items-center"
+            className="text-xs px-2 py-1"
           >
-            <Phone className="w-4 h-4 mr-1" />
-            Contact Rapid KL
+            <Phone className="w-3 h-3 mr-1" />
+            Contact
           </Button>
         </div>
 
-        <div className="space-y-3">
+        <div className="space-y-2">
           {stations.map((station) => {
             const frequency = frequencies[station.id];
             const forecast = forecastData?.recommendedFrequencies.find(f => f.stationId === station.id);
             
             return (
-              <div key={station.id} className="p-4 border border-gray-200 rounded-lg">
+              <div key={station.id} className="p-2 border border-gray-200 rounded">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
-                    <div className="flex items-center mb-2">
-                      <h4 className="font-medium text-gray-900 mr-2">{station.name}</h4>
+                    <div className="flex items-center mb-1">
+                      <h4 className="font-medium text-gray-900 mr-2 text-sm">{station.name}</h4>
                       {station.agency && (
                         <span
-                          className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getAgencyColor(station.agency)}`}
+                          className={`inline-flex items-center px-1 py-0.5 rounded text-xs font-medium ${getAgencyColor(station.agency)}`}
                         >
                           {getAgencyIcon(station.agency)}
-                          <span className="ml-1 uppercase">{station.agency}</span>
+                          <span className="ml-1 uppercase text-xs">{station.agency}</span>
                         </span>
                       )}
                       {forecast?.priority === 'HIGH' && (
-                        <span className="ml-2 px-2 py-1 bg-red-100 text-red-800 text-xs font-medium rounded-full">
-                          HIGH PRIORITY
+                        <span className="ml-1 px-1 py-0.5 bg-red-100 text-red-800 text-xs font-medium rounded">
+                          HIGH
                         </span>
                       )}
                     </div>
                     
-                    <div className="flex items-center text-sm text-gray-600 mb-2">
-                      <MapPin className="w-4 h-4 mr-1" />
+                    <div className="flex items-center text-xs text-gray-600 mb-1">
+                      <MapPin className="w-3 h-3 mr-1" />
                       <span>{formatDistance(station.distance || 0)} away</span>
                     </div>
 
                     {frequency && forecast && (
-                      <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div className="grid grid-cols-2 gap-2 text-xs">
                         <div>
-                          <span className="text-gray-500">Current Frequency:</span>
-                          <span className="ml-1 font-medium">{frequency.currentFrequency} trains/hour</span>
+                          <span className="text-gray-500">Current:</span>
+                          <span className="ml-1 font-medium">{frequency.currentFrequency}/hr</span>
                         </div>
                         <div>
                           <span className="text-gray-500">Recommended:</span>
-                          <span className="ml-1 font-medium text-green-600">{forecast.recommendedFrequency} trains/hour</span>
+                          <span className="ml-1 font-medium text-green-600">{forecast.recommendedFrequency}/hr</span>
                         </div>
                       </div>
                     )}
                   </div>
 
-                  <div className="flex flex-col space-y-1 ml-4">
+                  <div className="flex gap-1 ml-2">
                     <Button
                       onClick={() => handleRequestFrequencyIncrease(station)}
                       variant="outline"
                       size="sm"
-                      className="text-xs"
+                      className="text-xs px-2 py-1"
                     >
-                      Request More Trains
+                      Request
                     </Button>
                     
                     <Button
                       onClick={() => window.open(`https://www.google.com/maps/dir/?api=1&destination=${station.latitude},${station.longitude}`, '_blank')}
                       variant="outline"
                       size="sm"
-                      className="text-xs flex items-center"
+                      className="text-xs px-2 py-1"
                     >
-                      <ExternalLink className="w-3 h-3 mr-1" />
-                      Directions
+                      <ExternalLink className="w-3 h-3" />
                     </Button>
                   </div>
                 </div>

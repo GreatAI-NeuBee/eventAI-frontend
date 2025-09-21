@@ -369,63 +369,57 @@ const ParkingForecast: React.FC<ParkingForecastProps> = ({
   }
 
   return (
-    <div className="h-full">
+    <div className="h-full animate-fade-in">
       {/* Forecast Summary */}
       {forecastData && (
-        <Card className="mb-6">
+        <Card className="mb-4">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-900">🚗 Parking Forecast</h3>
-            <div className={`px-3 py-1 rounded-full text-sm font-medium ${
-              forecastData.availabilityLevel === 'CRITICAL' ? 'bg-red-100 text-red-800' :
-              forecastData.availabilityLevel === 'HIGH' ? 'bg-yellow-100 text-yellow-800' :
-              'bg-green-100 text-green-800'
+            <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+              <span className="mr-2 text-lg">🚗</span>
+              Parking Forecast
+            </h3>
+            <div className={`px-2 py-1 rounded text-xs font-medium border ${
+              forecastData.availabilityLevel === 'CRITICAL' ? 'bg-red-100 text-red-700 border-red-300' :
+              forecastData.availabilityLevel === 'HIGH' ? 'bg-yellow-100 text-yellow-700 border-yellow-300' :
+              'bg-green-100 text-green-700 border-green-300'
             }`}>
               {forecastData.availabilityLevel} DEMAND
             </div>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-            <div className="text-center p-4 bg-blue-50 rounded-lg">
-              <div className="text-2xl font-bold text-blue-600">{forecastData.totalSpaces.toLocaleString()}</div>
-              <div className="text-sm text-blue-800">Total Parking Spaces</div>
+          <div className="grid grid-cols-3 gap-3 mb-4">
+            <div className="text-center p-3 bg-gray-50 rounded border">
+              <div className="text-xl font-bold text-gray-800 mb-1">{forecastData.totalSpaces.toLocaleString()}</div>
+              <div className="text-xs text-gray-600">Spaces</div>
             </div>
-            <div className="text-center p-4 bg-green-50 rounded-lg">
-              <div className="text-2xl font-bold text-green-600">{forecastData.estimatedCars.toLocaleString()}</div>
-              <div className="text-sm text-green-800">Expected Vehicles</div>
+            <div className="text-center p-3 bg-gray-50 rounded border">
+              <div className="text-xl font-bold text-gray-800 mb-1">{forecastData.estimatedCars.toLocaleString()}</div>
+              <div className="text-xs text-gray-600">Vehicles</div>
             </div>
-            <div className="text-center p-4 bg-orange-50 rounded-lg">
-              <div className="text-2xl font-bold text-orange-600">{Math.round(forecastData.capacityRatio * 100)}%</div>
-              <div className="text-sm text-orange-800">Capacity Utilization</div>
+            <div className="text-center p-3 bg-gray-50 rounded border">
+              <div className="text-xl font-bold text-gray-800 mb-1">{Math.round(forecastData.capacityRatio * 100)}%</div>
+              <div className="text-xs text-gray-600">Utilization</div>
             </div>
           </div>
 
-          <div className={`p-4 rounded-lg ${
+          <div className={`p-3 rounded text-xs ${
             forecastData.availabilityLevel === 'CRITICAL' ? 'bg-red-50 border border-red-200' :
             forecastData.availabilityLevel === 'HIGH' ? 'bg-yellow-50 border border-yellow-200' :
             'bg-green-50 border border-green-200'
           }`}>
-            <div className="flex items-start">
+            <div className="flex items-center">
               {forecastData.availabilityLevel === 'CRITICAL' ? (
-                <AlertTriangle className="w-5 h-5 text-red-600 mt-0.5 mr-3" />
+                <AlertTriangle className="w-3 h-3 text-red-600 mr-2" />
               ) : (
-                <CheckCircle className="w-5 h-5 text-green-600 mt-0.5 mr-3" />
+                <CheckCircle className="w-3 h-3 text-green-600 mr-2" />
               )}
-              <div>
-                <h4 className={`font-medium ${
-                  forecastData.availabilityLevel === 'CRITICAL' ? 'text-red-900' :
-                  forecastData.availabilityLevel === 'HIGH' ? 'text-yellow-900' :
-                  'text-green-900'
-                }`}>
-                  Forecast Alert
-                </h4>
-                <p className={`text-sm mt-1 ${
-                  forecastData.availabilityLevel === 'CRITICAL' ? 'text-red-800' :
-                  forecastData.availabilityLevel === 'HIGH' ? 'text-yellow-800' :
-                  'text-green-800'
-                }`}>
-                  Expected wait time: {forecastData.estimatedWaitTime}
-                </p>
-              </div>
+              <span className={`font-medium ${
+                forecastData.availabilityLevel === 'CRITICAL' ? 'text-red-900' :
+                forecastData.availabilityLevel === 'HIGH' ? 'text-yellow-900' :
+                'text-green-900'
+              }`}>
+                Wait time: {forecastData.estimatedWaitTime}
+              </span>
             </div>
           </div>
         </Card>
@@ -434,84 +428,18 @@ const ParkingForecast: React.FC<ParkingForecastProps> = ({
       {/* Recommended Actions */}
       {forecastData && (
         <Card>
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Recommended Actions</h3>
-          <div className="space-y-2">
+          <h3 className="text-sm font-semibold text-gray-900 mb-3">Recommended Actions</h3>
+          <div className="space-y-1">
             {forecastData.recommendedActions.map((action: string, index: number) => (
-              <div key={index} className="flex items-center p-3 bg-gray-50 rounded-lg">
-                <div className="w-2 h-2 bg-blue-500 rounded-full mr-3"></div>
-                <span className="text-sm text-gray-700">{action}</span>
+              <div key={index} className="flex items-center p-2 bg-gray-50 rounded text-xs">
+                <div className="w-1.5 h-1.5 bg-blue-500 rounded-full mr-2"></div>
+                <span className="text-gray-700">{action}</span>
               </div>
             ))}
           </div>
         </Card>
       )}
 
-      {/* Parking Locations */}
-      <Card>
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900">Nearby Parking Options</h3>
-            <p className="text-sm text-gray-600">
-              Found {parkingLocations.length} parking location{parkingLocations.length !== 1 ? 's' : ''} within 1km
-            </p>
-          </div>
-        </div>
-
-        <div className="space-y-4">
-          {parkingLocations.map((parking) => (
-            <div key={parking.id} className="p-4 border border-gray-200 rounded-lg">
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <div className="flex items-center mb-2">
-                    <h4 className="font-medium text-gray-900 mr-2">{parking.name}</h4>
-                    <span
-                      className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getParkingTypeColor(parking.type)}`}
-                    >
-                      {getParkingTypeIcon(parking.type)}
-                      <span className="ml-1 capitalize">{parking.type}</span>
-                    </span>
-                    <span
-                      className={`ml-2 px-2 py-1 rounded-full text-xs font-medium ${getAvailabilityColor(parking.availability)}`}
-                    >
-                      {parking.availability.toUpperCase()} AVAILABILITY
-                    </span>
-                  </div>
-                  
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-gray-600 mb-3">
-                    <div className="flex items-center">
-                      <MapPin className="w-4 h-4 mr-1" />
-                      <span>{formatDistance(parking.distance)} away</span>
-                    </div>
-                    <div className="flex items-center">
-                      <Car className="w-4 h-4 mr-1" />
-                      <span>{parking.capacity} spaces</span>
-                    </div>
-                    <div className="flex items-center">
-                      <Clock className="w-4 h-4 mr-1" />
-                      <span>{parking.price}</span>
-                    </div>
-                    <div className="text-gray-500">
-                      {parking.features.join(', ')}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="ml-4">
-                  <Button
-                    onClick={() => window.open(`https://www.google.com/maps/dir/?api=1&destination=${parking.coordinates.lat},${parking.coordinates.lng}`, '_blank')}
-                    variant="outline"
-                    size="sm"
-                    className="text-xs flex items-center"
-                  >
-                    <ExternalLink className="w-3 h-3 mr-1" />
-                    Directions
-                  </Button>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </Card>
     </div>
   );
 };

@@ -9,6 +9,7 @@ import VenueMap from '../components/dashboard/VenueMap';
 import ScenarioTabs from '../components/dashboard/ScenarioTabs';
 import TransitForecast from '../components/dashboard/TransitForecast';
 import ParkingForecast from '../components/dashboard/ParkingForecast';
+import NearbyParkingOptions from '../components/dashboard/NearbyParkingOptions';
 import VenueLayoutEditor, { VenueLayoutEditorData } from '../components/venue/VenueLayoutEditor';
 import { useEventStore } from '../store/eventStore';
 import { useAuth } from '../contexts/AuthContext';
@@ -596,6 +597,11 @@ const EventDetails: React.FC = () => {
                 venueLocation={currentEvent.venueLocation}
               />
             </Card>
+
+            {/* Nearby Parking Options below Venue Layout */}
+            {currentEvent.venueLocation && (
+              <NearbyParkingOptions venueLocation={currentEvent.venueLocation} />
+            )}
           </div>
 
           {/* Right Column - Recommendations and Forecasts */}
