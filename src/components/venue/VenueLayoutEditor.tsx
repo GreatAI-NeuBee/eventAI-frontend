@@ -180,14 +180,31 @@ const VenueLayoutEditor: React.FC<VenueLayoutEditorProps> = ({
                         type="number"
                         min="0"
                         max="10000"
-                        value={config.capacity}
-                        onChange={(e) => updateGateConfig(exit.id, 'capacity', parseInt(e.target.value) || 0)}
+                        value={config.capacity || ''}
+                        onChange={(e) => {
+                          const inputValue = e.target.value;
+                          if (inputValue === '') {
+                            // Allow empty string temporarily while user is typing
+                            updateGateConfig(exit.id, 'capacity', '' as any);
+                          } else {
+                            const parsed = parseInt(inputValue, 10);
+                            const value = Number.isFinite(parsed) ? Math.max(0, parsed) : 800;
+                            updateGateConfig(exit.id, 'capacity', value);
+                          }
+                        }}
+                        onBlur={(e) => {
+                          // On blur, ensure we have a valid number
+                          const inputValue = e.target.value;
+                          const parsed = parseInt(inputValue, 10);
+                          const value = Number.isFinite(parsed) && parsed > 0 ? parsed : 800;
+                          updateGateConfig(exit.id, 'capacity', value);
+                        }}
                         disabled={readOnly}
                         className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 disabled:bg-gray-100"
                         placeholder="800"
                       />
                       <p className="text-xs text-gray-500 mt-1">
-                        ~{Math.round(config.capacity / 60)} people/minute
+                        ~{Math.round((config.capacity || 800) / 60)} people/minute
                       </p>
                     </div>
 
