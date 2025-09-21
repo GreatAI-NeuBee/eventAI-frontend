@@ -19,8 +19,9 @@ const NewEvent: React.FC = () => {
 
   const [formData, setFormData] = useState({
     name: '',
-    dateStart: '',
-    dateEnd: '',
+    eventDate: '',
+    startTime: '',
+    endTime: '',
     venue: '',
     description: '',
   });
@@ -63,26 +64,34 @@ const NewEvent: React.FC = () => {
       newErrors.name = 'Event name is required';
     }
 
-    if (!formData.dateStart) {
-      newErrors.dateStart = 'Event start date is required';
+    if (!formData.eventDate) {
+      newErrors.eventDate = 'Event date is required';
     } else {
-      const startDate = new Date(formData.dateStart);
+      const eventDate = new Date(formData.eventDate);
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       
-      if (startDate < today) {
-        newErrors.dateStart = 'Event start date cannot be in the past';
+      if (eventDate < today) {
+        newErrors.eventDate = 'Event date cannot be in the past';
       }
     }
 
-    if (!formData.dateEnd) {
-      newErrors.dateEnd = 'Event end date is required';
-    } else if (formData.dateStart) {
-      const startDate = new Date(formData.dateStart);
-      const endDate = new Date(formData.dateEnd);
+    if (!formData.startTime) {
+      newErrors.startTime = 'Start time is required';
+    }
+
+    if (!formData.endTime) {
+      newErrors.endTime = 'End time is required';
+    } else if (formData.startTime && formData.endTime) {
+      // Compare times within the same day
+      const [startHour, startMin] = formData.startTime.split(':').map(Number);
+      const [endHour, endMin] = formData.endTime.split(':').map(Number);
       
-      if (endDate <= startDate) {
-        newErrors.dateEnd = 'Event end date must be after start date';
+      const startMinutes = startHour * 60 + startMin;
+      const endMinutes = endHour * 60 + endMin;
+      
+      if (endMinutes <= startMinutes) {
+        newErrors.endTime = 'End time must be after start time';
       }
     }
 
@@ -120,10 +129,14 @@ const NewEvent: React.FC = () => {
 
     try {
       // Create JSON payload for API submission (using server-expected field names)
+      // Combine date and time fields into datetime format for API
+      const dateOfEventStart = `${formData.eventDate}T${formData.startTime}:00Z`;
+      const dateOfEventEnd = `${formData.eventDate}T${formData.endTime}:00Z`;
+      
       const submitData: any = {
         name: formData.name,
-        dateOfEventStart: formData.dateStart + ':00Z', // Add seconds and UTC timezone
-        dateOfEventEnd: formData.dateEnd + ':00Z', // Add seconds and UTC timezone
+        dateOfEventStart: dateOfEventStart,
+        dateOfEventEnd: dateOfEventEnd,
         venue: formData.venue,
         description: formData.description,
       };
@@ -169,8 +182,8 @@ const NewEvent: React.FC = () => {
       const newEvent = {
         id: backendEvent.eventId || backendEvent.id,
         name: backendEvent.name || formData.name,
-        dateStart: backendEvent.dateOfEventStart || submitData.dateOfEventStart,
-        dateEnd: backendEvent.dateOfEventEnd || submitData.dateOfEventEnd,
+        dateStart: backendEvent.dateOfEventStart || dateOfEventStart,
+        dateEnd: backendEvent.dateOfEventEnd || dateOfEventEnd,
         venue: backendEvent.venue || venueLocation?.name || venueLocation?.address || 'Event Venue',
         description: backendEvent.description || formData.description,
         venueLocation: venueLocation || undefined,
@@ -236,24 +249,60 @@ const NewEvent: React.FC = () => {
             />
 
             <Input
-              label="Event Start Date & Time"
-              name="dateStart"
-              type="datetime-local"
-              value={formData.dateStart}
+              label="Event Date"
+              name="eventDate"
+              type="date"
+              value={formData.eventDate}
               onChange={handleInputChange}
-              error={errors.dateStart}
+              error={errors.eventDate}
               required
             />
 
-            <Input
-              label="Event End Date & Time"
-              name="dateEnd"
-              type="datetime-local"
-              value={formData.dateEnd}
-              onChange={handleInputChange}
-              error={errors.dateEnd}
-              required
-            />
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Event Time Range *
+              </label>
+              <div className="flex items-center space-x-3">
+                <div className="flex-1">
+                  <input
+                    type="time"
+                    name="startTime"
+                    value={formData.startTime}
+                    onChange={handleInputChange}
+                    className={`block w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-1 ${
+                      errors.startTime || errors.endTime
+                        ? 'border-red-300 focus:border-red-500 focus:ring-red-500'
+                        : 'border-gray-300 focus:border-primary-500 focus:ring-primary-500'
+                    }`}
+                    placeholder="Start time"
+                    required
+                  />
+                </div>
+                <div className="flex-shrink-0 text-gray-500 font-medium">
+                  to
+                </div>
+                <div className="flex-1">
+                  <input
+                    type="time"
+                    name="endTime"
+                    value={formData.endTime}
+                    onChange={handleInputChange}
+                    className={`block w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-1 ${
+                      errors.startTime || errors.endTime
+                        ? 'border-red-300 focus:border-red-500 focus:ring-red-500'
+                        : 'border-gray-300 focus:border-primary-500 focus:ring-primary-500'
+                    }`}
+                    placeholder="End time"
+                    required
+                  />
+                </div>
+              </div>
+              {(errors.startTime || errors.endTime) && (
+                <p className="mt-1 text-sm text-red-600">
+                  {errors.startTime || errors.endTime}
+                </p>
+              )}
+            </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">

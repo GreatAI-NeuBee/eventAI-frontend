@@ -639,18 +639,14 @@ const EventDetails: React.FC = () => {
                 congestion: {}
               }}
             />
-          </div>
-        </div>
-      )}
 
-      {/* Bottom Row - Transit and Parking Forecasts */}
-      {forecastResult && Object.keys(forecastResult).length > 0 && currentEvent.venueLocation && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-          <div className="h-fit">
-            <TransitForecast venueLocation={currentEvent.venueLocation} />
-          </div>
-          <div className="h-fit">
-            <ParkingForecast venueLocation={currentEvent.venueLocation} />
+            {/* Transit and Parking Forecasts in Right Column */}
+            {currentEvent.venueLocation && (
+              <div className="space-y-6">
+                <TransitForecast venueLocation={currentEvent.venueLocation} />
+                <ParkingForecast venueLocation={currentEvent.venueLocation} />
+              </div>
+            )}
           </div>
         </div>
       )}
