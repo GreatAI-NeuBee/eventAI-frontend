@@ -1,6 +1,6 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { Activity, AlertTriangle, CheckCircle2, Map, DoorOpen } from "lucide-react";
+import { Activity, AlertTriangle, CheckCircle2, Map, DoorOpen, RefreshCw } from "lucide-react";
 import Card from "../components/common/Card";
 import Button from "../components/common/Button";
 import Spinner from "../components/common/Spinner";
@@ -32,21 +32,6 @@ export type FloorZonePolygon = {
 const COLORS = { red: "#DA5C53", blue: "#4AA3BA", green: "#A8E4B1" };
 const bandedColor = (p: number) => (p >= 67 ? COLORS.red : p >= 34 ? COLORS.blue : COLORS.green);
 
-// Little gate polygon at angle θ (used to draw exits as “tabs”)
-function gateRectPoints(
-  cx: number, cy: number, r: number, thetaDeg: number, width = 4, depth = 2
-): Array<[number, number]> {
-  const theta = (thetaDeg * Math.PI) / 180;
-  const tx = -Math.sin(theta), ty = Math.cos(theta);
-  const nx = Math.cos(theta), ny = Math.sin(theta);
-  const cxp = cx + r * nx, cyp = cy + r * ny;
-  const hw = width / 2;
-  const p1: [number, number] = [cxp - hw * tx, cyp - hw * ty];
-  const p2: [number, number] = [cxp + hw * tx, cyp + hw * ty];
-  const p3: [number, number] = [p2[0] + depth * nx, p2[1] + depth * ny];
-  const p4: [number, number] = [p1[0] + depth * nx, p1[1] + depth * ny];
-  return [p1, p2, p3, p4];
-}
 
 // ---- Demo fallback (your provided JSON) ----
 const FALLBACK_PLAN: StadiumMapJSON = /* paste of your JSON */ {
@@ -292,6 +277,8 @@ const OngoingEvent: React.FC = () => {
   const navigate = useNavigate();
   const { eventId: paramId } = useParams();
   const [searchParams] = useSearchParams();
+  const [refreshCounter, setRefreshCounter] = useState(0);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Resolve eventId (fallback)
   const eventId =
@@ -322,22 +309,52 @@ const OngoingEvent: React.FC = () => {
       const liveById: Record<string, number> = {};
       (simulationResult as any)?.zones?.forEach?.((z: any) => (liveById[z.id] = z.congestion));
       const sectionIdx: Record<number, number> = {};
-      return plan.zones.map((z) => {
+      return plan.zones.map((z, index) => {
         const prev = sectionIdx[z.layer] ?? 0;
         const next = prev + 1;
         sectionIdx[z.layer] = next;
+        
+        // Generate mock real-time congestion data with some patterns
+        let mockCongestion;
+        if (Number.isFinite(liveById[z.id])) {
+          mockCongestion = Math.max(0, Math.min(100, liveById[z.id]));
+        } else {
+          // Create more realistic mock data with some zones being busier
+          const basePattern = index % 3 === 0 ? 70 : index % 3 === 1 ? 45 : 25;
+          const randomVariation = (Math.random() - 0.5) * 30;
+          const timeInfluence = Math.sin((refreshCounter + index) * 0.3) * 15;
+          mockCongestion = Math.max(0, Math.min(100, basePattern + randomVariation + timeInfluence));
+        }
+        
         return {
           id: z.id,
           name: z.name,
           layer: z.layer,
           section: next,
           points: z.points,
-          congestion: Number.isFinite(liveById[z.id]) ? Math.max(0, Math.min(100, liveById[z.id])) : 0,
+          congestion: mockCongestion,
         };
       });
     }
     return [];
-  }, [plan, simulationResult]);
+  }, [plan, simulationResult, refreshCounter]);
+
+  // Auto-refresh every 10 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setRefreshCounter(prev => prev + 1);
+    }, 10000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  // Manual refresh function
+  const handleManualRefresh = async () => {
+    setIsRefreshing(true);
+    await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
+    setRefreshCounter(prev => prev + 1);
+    setIsRefreshing(false);
+  };
 
   const avgCongestion = useMemo(
     () => (zones.length ? Math.round(zones.reduce((s, z) => s + z.congestion, 0) / zones.length) : 0),
@@ -392,11 +409,24 @@ const OngoingEvent: React.FC = () => {
           <h1 className="text-3xl font-bold text-gray-900">{activeEvent?.name || "On-going Event"}</h1>
           <p className="mt-2 text-gray-600 flex items-center gap-2">
             <Activity className="h-4 w-4 text-green-600" /> Live congestion monitoring
+            <span className="text-xs text-gray-500">• Auto-refresh every 10s</span>
           </p>
         </div>
-        <div className="flex items-center gap-2 text-green-700">
-          <CheckCircle2 className="h-5 w-5" />
-          <span className="text-sm font-medium">Event in progress</span>
+        <div className="flex items-center gap-4">
+          <Button
+            onClick={handleManualRefresh}
+            disabled={isRefreshing}
+            variant="outline"
+            size="sm"
+            className="flex items-center gap-2"
+          >
+            <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+            {isRefreshing ? 'Refreshing...' : 'Refresh'}
+          </Button>
+          <div className="flex items-center gap-2 text-green-700">
+            <CheckCircle2 className="h-5 w-5" />
+            <span className="text-sm font-medium">Event in progress</span>
+          </div>
         </div>
       </div>
 
