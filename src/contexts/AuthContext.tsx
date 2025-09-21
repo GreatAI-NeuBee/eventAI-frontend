@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
 import { supabase, type User, type AuthState } from '../lib/supabase';
 import type { Session } from '@supabase/supabase-js';
-import { UserService, type ApiError, type BackendUserData } from '../services/userService';
+import { UserService, type BackendUserData } from '../services/userService';
 
 interface AuthContextType extends AuthState {
   signInWithGoogle: () => Promise<void>;
