@@ -1,4 +1,3 @@
-// EventDetails.tsx — render <VenueLayoutCard />
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import Card from "../components/common/Card";
 import { DUMMY_FORECAST } from "../data/DUMMY_FORECAST";
@@ -286,220 +285,6 @@ function spawnExitDots(
   return out;
 }
 
-/* ========= Inline StadiumPlanSVG ========= */
-const StadiumPlanSVG: React.FC<{
-  plan: StadiumMapJSON;
-  zones: FloorZonePolygon[];
-  phase: Phase;
-  dsKey: string;
-  gateLoads: Record<string, number>;
-  particles: Particle[];
-}> = ({ plan, zones, phase, gateLoads, particles }) => {
-  const vbW = 100, vbH = 62.5;
-  const cx = 50, cy = 31.25;
-  const MARGIN = 3;
-  const R = Math.min(vbW / 2 - MARGIN, vbH / 2 - MARGIN);
-  const isExitPhase = phase === "exits";
-
-  const RINGS = Math.max(1, plan.layers || 1);
-  const GAP = 1.6;
-  const voidRatio = 0.35;
-  const rVoid = Math.max(4, R * voidRatio);
-  const usable = R - rVoid - Math.max(0, RINGS - 1) * GAP;
-  const ringThick = Math.max(1, usable / RINGS);
-
-  const sectionAngles = Array.from({ length: Math.max(1, plan.sections) }, (_, i) => (i * 360) / Math.max(1, plan.sections));
-
-  const [centerZone, setCenterZone] = useState<FloorZonePolygon | null>(null);
-
-  return (
-    <div className="relative w-full aspect-[16/10] rounded-xl overflow-hidden border border-gray-300 bg-white">
-      <svg viewBox={`0 0 ${vbW} ${vbH}`} preserveAspectRatio="xMidYMid meet" className="h-full w-full">
-        <defs>
-          <clipPath id="stadiumClip"><circle cx={cx} cy={cy} r={R} /></clipPath>
-          <pattern id="exitHatch" width="4" height="4" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-            <rect width="2" height="4" fill="rgba(244,63,94,0.12)" />
-          </pattern>
-        </defs>
-
-        <circle cx={cx} cy={cy} r={R} fill="#ffffff" stroke="#e5e7eb" strokeWidth={0.8} />
-
-        <g clipPath="url(#stadiumClip)">
-          {/* rings */}
-          {Array.from({ length: RINGS }, (_, li) => {
-            const rIn = rVoid + li * (ringThick + GAP);
-            const rOut = rIn + ringThick;
-            return (
-              <g key={`ring-${li}`}>
-                <circle cx={cx} cy={cy} r={rIn} fill="none" stroke="#cbd5e1" strokeOpacity={0.35} strokeWidth={0.5} strokeDasharray="1,1" />
-                <circle cx={cx} cy={cy} r={rOut} fill="none" stroke="#cbd5e1" strokeOpacity={0.6} strokeWidth={0.5} />
-              </g>
-            );
-          })}
-
-          {/* section dividers + labels */}
-          {sectionAngles.map((angle, i) => {
-            const rad = (angle * Math.PI) / 180;
-            const x1 = cx + (rVoid - 0.5) * Math.cos(rad);
-            const y1 = cy + (rVoid - 0.5) * Math.sin(rad);
-            const x2 = cx + (R - 0.5) * Math.cos(rad);
-            const y2 = cy + (R - 0.5) * Math.sin(rad);
-            const lx = cx + (R + 1.2) * Math.cos(rad + Math.PI / (plan.sections || 1));
-            const ly = cy + (R + 1.2) * Math.sin(rad + Math.PI / (plan.sections || 1));
-            return (
-              <g key={`sec-${i}`}>
-                <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="#cbd5e1" strokeOpacity={0.5} strokeWidth={0.4} strokeDasharray="2,1" />
-                {i % 2 === 0 ? (
-                  <text x={lx} y={ly} fontSize={2.2} textAnchor="middle" dominantBaseline="middle" fill="#64748b">
-                    {i + 1}
-                  </text>
-                ) : null}
-              </g>
-            );
-          })}
-
-          {/* zones */}
-          {zones.map((z) => {
-            const pts = z.points.map(([x, y]) => `${x},${y}`).join(" ");
-            const fillBase = bandedColor(z.congestion);
-            const fillOpacity = 0.45 + (z.congestion / 100) * 0.25;
-            const strokeProps = isExitPhase
-              ? { stroke: "#7f1d1d", strokeOpacity: 0.35, strokeWidth: 0.35, strokeDasharray: "1.2 1" }
-              : { stroke: "#0b1220", strokeOpacity: 0.25, strokeWidth: 0.25 };
-
-            return (
-              <g key={z.id}>
-                <polygon
-                  points={pts}
-                  fill={fillBase}
-                  opacity={fillOpacity}
-                  {...strokeProps}
-                  onMouseEnter={() => setCenterZone(z)}
-                  onMouseMove={() => setCenterZone(z)}
-                  onMouseLeave={() => setCenterZone(null)}
-                  style={{ cursor: "pointer" }}
-                />
-                {isExitPhase ? <polygon points={pts} fill="url(#exitHatch)" opacity={0.9} pointerEvents="none" /> : null}
-              </g>
-            );
-          })}
-
-          {/* toilets */}
-          {(plan.toiletsList ?? []).map((t) => (
-            <g key={t.id}>
-              <text x={t.position[0]} y={t.position[1]} fontSize={3} textAnchor="middle" dominantBaseline="central">🚻</text>
-              {t.label ? (
-                <text x={t.position[0] + 2.2} y={t.position[1]} fontSize={1.8} fill="#0f172a" dominantBaseline="middle">
-                  {t.label}
-                </text>
-              ) : null}
-            </g>
-          ))}
-
-          {/* particles */}
-          <g>
-            {particles.map((p) => (
-              <circle key={p.id} cx={p.x} cy={p.y} r={0.5} fill={p.phase === "exits" ? "#ef4444" : "#2563eb"} opacity={0.9} />
-            ))}
-          </g>
-        </g>
-
-        {/* exits pins + current loads */}
-        {(plan.exitsList ?? []).map((e) => {
-          const trailing = (e.name?.match(/\b(\w+)\b$/)?.[1] ?? e.id);
-          const exitNum = parseInt(String(trailing).replace(/\D/g, ""), 10);
-          const letter = exitNum ? String.fromCharCode("A".charCodeAt(0) + (exitNum - 1)) : null;
-          const ppl = Math.round((gateLoads[trailing] ?? (letter ? gateLoads[letter] : 0) ?? 0));
-          const dotFill = isExitPhase ? "#ef4444" : "#10b981";
-          return (
-            <g key={e.id}>
-              <circle cx={e.position[0]} cy={e.position[1]} r={0.95} fill={dotFill} stroke="#0b1220" strokeOpacity={0.25} strokeWidth={0.2} />
-              {isExitPhase ? <circle cx={e.position[0]} cy={e.position[1]} r={0.95} className="animate-ping" fill="#ef4444" opacity={0.35} /> : null}
-
-              {/* people count badge */}
-              <g transform={`translate(${e.position[0] + 1.8}, ${e.position[1] - 1.8})`}>
-                <rect rx={0.8} ry={0.8} width={12} height={4} fill="#111827" opacity={0.85} />
-                <text x={6} y={2.6} textAnchor="middle" fontSize={1.8} fill="#f9fafb">
-                  {ppl.toLocaleString()}
-                </text>
-              </g>
-            </g>
-          );
-        })}
-
-      </svg>
-
-      {/* hover tooltip */}
-      {centerZone ? (
-        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-[48%] bg-white/90 backdrop-blur rounded-lg px-3 py-2 text-sm shadow">
-          <div className="font-semibold">{centerZone.name}</div>
-          <div>
-            Congestion:{" "}
-            <span style={{ color: bandedColor(centerZone.congestion) }}>{Math.round(centerZone.congestion)}%</span>
-          </div>
-        </div>
-      ) : null}
-    </div>
-  );
-};
-
-/* ========= tiny inline parser to “filter from the event value” ========= */
-function coerceForecast(raw: unknown, fallback: InOutForecast): InOutForecast {
-  try {
-    const obj: any = typeof raw === "string" ? JSON.parse(raw) : raw;
-    if (!obj) return fallback;
-
-    if (obj.arrivals && obj.exits) {
-      return obj as InOutForecast;
-    }
-
-    if (obj.forecast) {
-      const arrivals: GateSeries = {};
-      const exits: GateSeries = {};
-
-      const start = obj.summary?.forecastPeriod?.start
-        ? new Date((obj.summary.forecastPeriod.start + "Z").replace(" ", "T")).getTime()
-        : undefined;
-      const end = obj.summary?.forecastPeriod?.end
-        ? new Date((obj.summary.forecastPeriod.end + "Z").replace(" ", "T")).getTime()
-        : undefined;
-      const mid = (start !== undefined && end !== undefined) ? start + (end - start) / 2 : undefined;
-
-      const push = (bucket: GateSeries, gate: string, f: any) => {
-        (bucket[gate] ??= []).push({
-          ds: f.timestamp,
-          yhat: Math.max(0, Number(f.predicted) || 0),
-          yhat_lower: f.lower_bound ?? undefined,
-          yhat_upper: f.upper_bound ?? undefined,
-        });
-      };
-
-      for (const [gate, g] of Object.entries<any>(obj.forecast)) {
-        for (const f of (g?.timeFrames ?? [])) {
-          if (f.dataSource === "arrivals") push(arrivals, gate, f);
-          else if (f.dataSource === "exits") push(exits, gate, f);
-          else {
-            if (mid !== undefined) {
-              const t = new Date((f.timestamp + "Z").replace(" ", "T")).getTime();
-              (t <= mid ? push(arrivals, gate, f) : push(exits, gate, f));
-            } else {
-              push(arrivals, gate, f);
-            }
-          }
-        }
-      }
-
-      const sort = (gs: GateSeries) => Object.values(gs).forEach(arr => arr.sort((a,b) => (a.ds < b.ds ? -1 : a.ds > b.ds ? 1 : 0)));
-      sort(arrivals); sort(exits);
-
-      return { arrivals, exits };
-    }
-  } catch {
-    // ignore
-  }
-  return fallback;
-}
-
 /* ========= Card ========= */
 export const VenueLayoutCard: React.FC<{ event: EventData | null }> = ({ event }) => {
   // parse venueLayout
@@ -544,6 +329,17 @@ export const VenueLayoutCard: React.FC<{ event: EventData | null }> = ({ event }
 
   // dynamic dot scale
   const dotScale = useMemo(() => getDotScale(totalPeopleNow), [totalPeopleNow]);
+
+  // Mock toilet congestion data (one value per toilet)
+  const toiletCongestions = useMemo(() => {
+    const toilets = plan.toiletsList ?? [];
+    // Example: cycle through congestion levels for demo
+    return toilets.map((_, i) => {
+      // 0: green, 1: blue, 2: red
+      const levels = [15, 50, 85];
+      return levels[i % levels.length];
+    });
+  }, [plan.toiletsList]);
 
   /* ========== playback controls + slider fix ========== */
   const [playing, setPlaying] = useState(false);
@@ -665,6 +461,7 @@ export const VenueLayoutCard: React.FC<{ event: EventData | null }> = ({ event }
           dsKey={frame.dsKey}
           gateLoads={gateLoads}
           particles={particles}
+          toiletCongestions={toiletCongestions}
         />
       </div>
 
@@ -764,6 +561,238 @@ export const VenueLayoutCard: React.FC<{ event: EventData | null }> = ({ event }
     </Card>
   );
 };
+
+/* ========= tiny inline parser to “filter from the event value” ========= */
+function coerceForecast(raw: unknown, fallback: InOutForecast): InOutForecast {
+  try {
+    const obj: any = typeof raw === "string" ? JSON.parse(raw) : raw;
+    if (!obj) return fallback;
+
+    if (obj.arrivals && obj.exits) {
+      return obj as InOutForecast;
+    }
+
+    if (obj.forecast) {
+      const arrivals: GateSeries = {};
+      const exits: GateSeries = {};
+
+      const start = obj.summary?.forecastPeriod?.start
+        ? new Date((obj.summary.forecastPeriod.start + "Z").replace(" ", "T")).getTime()
+        : undefined;
+      const end = obj.summary?.forecastPeriod?.end
+        ? new Date((obj.summary.forecastPeriod.end + "Z").replace(" ", "T")).getTime()
+        : undefined;
+      const mid = (start !== undefined && end !== undefined) ? start + (end - start) / 2 : undefined;
+
+      const push = (bucket: GateSeries, gate: string, f: any) => {
+        (bucket[gate] ??= []).push({
+          ds: f.timestamp,
+          yhat: Math.max(0, Number(f.predicted) || 0),
+          yhat_lower: f.lower_bound ?? undefined,
+          yhat_upper: f.upper_bound ?? undefined,
+        });
+      };
+
+      for (const [gate, g] of Object.entries<any>(obj.forecast)) {
+        for (const f of (g?.timeFrames ?? [])) {
+          if (f.dataSource === "arrivals") push(arrivals, gate, f);
+          else if (f.dataSource === "exits") push(exits, gate, f);
+          else {
+            if (mid !== undefined) {
+              const t = new Date((f.timestamp + "Z").replace(" ", "T")).getTime();
+              (t <= mid ? push(arrivals, gate, f) : push(exits, gate, f));
+            } else {
+              push(arrivals, gate, f);
+            }
+          }
+        }
+      }
+
+      const sort = (gs: GateSeries) => Object.values(gs).forEach(arr => arr.sort((a,b) => (a.ds < b.ds ? -1 : a.ds > b.ds ? 1 : 0)));
+      sort(arrivals); sort(exits);
+
+      return { arrivals, exits };
+    }
+  } catch {
+    // ignore
+  }
+  return fallback;
+}
+
+/* ========= Inline StadiumPlanSVG ========= */
+const StadiumPlanSVG: React.FC<{
+  plan: StadiumMapJSON;
+  zones: FloorZonePolygon[];
+  phase: Phase;
+  dsKey: string;
+  gateLoads: Record<string, number>;
+  particles: Particle[];
+  toiletCongestions: number[];
+}> = ({ plan, zones, phase, gateLoads, particles, toiletCongestions }) => {
+  const vbW = 100, vbH = 62.5;
+  const cx = 50, cy = 31.25;
+  const MARGIN = 3;
+  const R = Math.min(vbW / 2 - MARGIN, vbH / 2 - MARGIN);
+  const isExitPhase = phase === "exits";
+
+  const RINGS = Math.max(1, plan.layers || 1);
+  const GAP = 1.6;
+  const voidRatio = 0.35;
+  const rVoid = Math.max(4, R * voidRatio);
+  const usable = R - rVoid - Math.max(0, RINGS - 1) * GAP;
+  const ringThick = Math.max(1, usable / RINGS);
+
+  const sectionAngles = Array.from({ length: Math.max(1, plan.sections) }, (_, i) => (i * 360) / Math.max(1, plan.sections));
+
+  // unified hover info for zones and toilets
+  const [hoverInfo, setHoverInfo] = useState<{ name: string; congestion: number } | null>(null);
+  
+  return (
+    <div className="relative w-full aspect-[16/10] rounded-xl overflow-hidden border border-gray-300 bg-white">
+      <svg viewBox={`0 0 ${vbW} ${vbH}`} preserveAspectRatio="xMidYMid meet" className="h-full w-full">
+        <defs>
+          <clipPath id="stadiumClip"><circle cx={cx} cy={cy} r={R} /></clipPath>
+          <pattern id="exitHatch" width="4" height="4" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+            <rect width="2" height="4" fill="rgba(244,63,94,0.12)" />
+          </pattern>
+        </defs>
+
+        <circle cx={cx} cy={cy} r={R} fill="#ffffff" stroke="#e5e7eb" strokeWidth={0.8} />
+
+        <g clipPath="url(#stadiumClip)">
+          {/* rings */}
+          {Array.from({ length: RINGS }, (_, li) => {
+            const rIn = rVoid + li * (ringThick + GAP);
+            const rOut = rIn + ringThick;
+            return (
+              <g key={`ring-${li}`}>
+                <circle cx={cx} cy={cy} r={rIn} fill="none" stroke="#cbd5e1" strokeOpacity={0.35} strokeWidth={0.5} strokeDasharray="1,1" />
+                <circle cx={cx} cy={cy} r={rOut} fill="none" stroke="#cbd5e1" strokeOpacity={0.6} strokeWidth={0.5} />
+              </g>
+            );
+          })}
+
+          {/* section dividers + labels */}
+          {sectionAngles.map((angle, i) => {
+            const rad = (angle * Math.PI) / 180;
+            const x1 = cx + (rVoid - 0.5) * Math.cos(rad);
+            const y1 = cy + (rVoid - 0.5) * Math.sin(rad);
+            const x2 = cx + (R - 0.5) * Math.cos(rad);
+            const y2 = cy + (R - 0.5) * Math.sin(rad);
+            const lx = cx + (R + 1.2) * Math.cos(rad + Math.PI / (plan.sections || 1));
+            const ly = cy + (R + 1.2) * Math.sin(rad + Math.PI / (plan.sections || 1));
+            return (
+              <g key={`sec-${i}`}>
+                <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="#cbd5e1" strokeOpacity={0.5} strokeWidth={0.4} strokeDasharray="2,1" />
+                {i % 2 === 0 ? (
+                  <text x={lx} y={ly} fontSize={2.2} textAnchor="middle" dominantBaseline="middle" fill="#64748b">
+                    {i + 1}
+                  </text>
+                ) : null}
+              </g>
+            );
+          })}
+
+          {/* zones */}
+          {zones.map((z) => {
+             const pts = z.points.map(([x, y]) => `${x},${y}`).join(" ");
+             const fillBase = bandedColor(z.congestion);
+             const fillOpacity = 0.45 + (z.congestion / 100) * 0.25;
+             const strokeProps = isExitPhase
+               ? { stroke: "#7f1d1d", strokeOpacity: 0.35, strokeWidth: 0.35, strokeDasharray: "1.2 1" }
+               : { stroke: "#0b1220", strokeOpacity: 0.25, strokeWidth: 0.25 };
+ 
+             return (
+               <g key={z.id}>
+                 <polygon
+                   points={pts}
+                   fill={fillBase}
+                   opacity={fillOpacity}
+                   {...strokeProps}
+                   onMouseEnter={() => setHoverInfo({ name: z.name, congestion: z.congestion })}
+                   onMouseMove={() => setHoverInfo({ name: z.name, congestion: z.congestion })}
+                   onMouseLeave={() => setHoverInfo(null)}
+                   style={{ cursor: "pointer" }}
+                 />
+                 {isExitPhase ? <polygon points={pts} fill="url(#exitHatch)" opacity={0.9} pointerEvents="none" /> : null}
+               </g>
+             );
+           })}
+
+           {/* toilets */}
+           {(plan.toiletsList ?? []).map((t, i) => (
+             <g
+               key={t.id}
+               onMouseEnter={() => setHoverInfo({ name: t.label ?? t.id, congestion: toiletCongestions[i] ?? 0 })}
+               onMouseMove={() => setHoverInfo({ name: t.label ?? t.id, congestion: toiletCongestions[i] ?? 0 })}
+               onMouseLeave={() => setHoverInfo(null)}
+               style={{ cursor: "default" }}
+             >
+              {/* Congestion circle */}
+              <circle
+                cx={t.position[0]}
+                cy={t.position[1]}
+                r={2.2}
+                fill="none"
+                stroke={bandedColor(toiletCongestions[i])}
+                strokeWidth={0.5}
+                opacity={0.8}
+              />
+              <text x={t.position[0]} y={t.position[1]} fontSize={3} textAnchor="middle" dominantBaseline="central">🚻</text>
+              {t.label ? (
+                <text x={t.position[0] + 2.2} y={t.position[1]} fontSize={1.8} fill="#0f172a" dominantBaseline="middle">
+                  {t.label}
+                </text>
+              ) : null}
+            </g>
+           ))}
+ 
+           {/* particles */}
+           <g>
+             {particles.map((p) => (
+               <circle key={p.id} cx={p.x} cy={p.y} r={0.5} fill={p.phase === "exits" ? "#ef4444" : "#2563eb"} opacity={0.9} />
+             ))}
+           </g>
+         </g>
+ 
+         {/* exits pins + current loads */}
+         {(plan.exitsList ?? []).map((e) => {
+           const trailing = (e.name?.match(/\b(\w+)\b$/)?.[1] ?? e.id);
+           const exitNum = parseInt(String(trailing).replace(/\D/g, ""), 10);
+           const letter = exitNum ? String.fromCharCode("A".charCodeAt(0) + (exitNum - 1)) : null;
+           const ppl = Math.round((gateLoads[trailing] ?? (letter ? gateLoads[letter] : 0) ?? 0));
+           const dotFill = isExitPhase ? "#ef4444" : "#10b981";
+           return (
+             <g key={e.id}>
+               <circle cx={e.position[0]} cy={e.position[1]} r={0.95} fill={dotFill} stroke="#0b1220" strokeOpacity={0.25} strokeWidth={0.2} />
+               {isExitPhase ? <circle cx={e.position[0]} cy={e.position[1]} r={0.95} className="animate-ping" fill="#ef4444" opacity={0.35} /> : null}
+ 
+               {/* people count badge */}
+               <g transform={`translate(${e.position[0] + 1.8}, ${e.position[1] - 1.8})`}>
+                 <rect rx={0.8} ry={0.8} width={12} height={4} fill="#111827" opacity={0.85} />
+                 <text x={6} y={2.6} textAnchor="middle" fontSize={1.8} fill="#f9fafb">
+                   {ppl.toLocaleString()}
+                 </text>
+               </g>
+             </g>
+           );
+         })}
+ 
+       </svg>
+ 
+       {/* hover tooltip */}
+      {hoverInfo ? (
+        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-[48%] bg-white/90 backdrop-blur rounded-lg px-3 py-2 text-sm shadow">
+          <div className="font-semibold">{hoverInfo.name}</div>
+          <div>
+            Congestion:{" "}
+            <span style={{ color: bandedColor(hoverInfo.congestion) }}>{Math.round(hoverInfo.congestion)}%</span>
+          </div>
+        </div>
+      ) : null}
+    </div>
+   );
+ };
 
 /* Usage in EventDetails JSX:
    <VenueLayoutCard />
