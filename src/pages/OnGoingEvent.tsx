@@ -515,21 +515,132 @@ const OngoingEvent: React.FC = () => {
           </Card>
 
           <Card className="bg-gradient-to-b from-white to-red-50">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Alerts</h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Alerts & Suggestions</h3>
             {zones.some((z) => z.congestion >= 80) ? (
-              <div className="space-y-3">
-                {zones.filter((z) => z.congestion >= 80).map((z) => (
-                  <div key={z.id} className="flex items-center gap-3 rounded-lg border border-red-200 bg-red-50 p-3">
-                    <AlertTriangle className="h-5 w-5 text-red-600" />
-                    <div className="flex-1">
-                      <p className="text-sm font-semibold text-red-700">High congestion in {z.name}</p>
-                      <p className="text-xs text-red-700/80">Consider redirecting flow or opening adjacent gates.</p>
+              <div className="space-y-4">
+                {zones.filter((z) => z.congestion >= 80).map((z) => {
+                  // Generate specific suggestions based on zone characteristics
+                  const suggestions = [
+                    z.layer === 1 
+                      ? "Direct crowd to upper level sections" 
+                      : "Consider opening additional exits on this level",
+                    z.congestion > 90 
+                      ? "Deploy crowd control staff immediately" 
+                      : "Monitor closely and prepare intervention",
+                    z.name.includes("Section 1") || z.name.includes("Section 2")
+                      ? "Redirect entry flow to sections 3-4"
+                      : "Use alternate entry points",
+                    "Increase security presence",
+                    "Activate overflow areas if available"
+                  ];
+                  
+                  const prioritySuggestions = suggestions.slice(0, 3);
+                  
+                  return (
+                    <div key={z.id} className="rounded-lg border border-red-200 bg-red-50 p-4">
+                      <div className="flex items-start gap-3">
+                        <AlertTriangle className="h-5 w-5 text-red-600 mt-0.5 flex-shrink-0" />
+                        <div className="flex-1">
+                          <div className="flex items-center justify-between mb-2">
+                            <p className="text-sm font-semibold text-red-700">
+                              Critical: {z.name} ({Math.round(z.congestion)}% capacity)
+                            </p>
+                            <span className="text-xs bg-red-200 text-red-800 px-2 py-1 rounded-full font-medium">
+                              HIGH PRIORITY
+                            </span>
+                          </div>
+                          
+                          <div className="mb-3">
+                            <p className="text-xs text-red-600 font-medium mb-2">💡 Recommended Actions:</p>
+                            <ul className="space-y-1">
+                              {prioritySuggestions.map((suggestion, index) => (
+                                <li key={index} className="text-xs text-red-700 flex items-start gap-2">
+                                  <span className="text-red-500 font-bold">•</span>
+                                  <span>{suggestion}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                          
+                          <div className="flex items-center gap-4 text-xs text-red-600">
+                            <span className="flex items-center gap-1">
+                              <span className="w-2 h-2 bg-red-500 rounded-full"></span>
+                              Layer {z.layer}
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <span className="w-2 h-2 bg-orange-500 rounded-full"></span>
+                              Section {z.section}
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <span className="w-2 h-2 bg-yellow-500 rounded-full"></span>
+                              {z.congestion > 95 ? "CRITICAL" : z.congestion > 85 ? "URGENT" : "MONITOR"}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+                
+                {/* Overall suggestions when multiple zones are congested */}
+                {zones.filter((z) => z.congestion >= 80).length > 1 && (
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+                    <div className="flex items-start gap-3">
+                      <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5 flex-shrink-0" />
+                      <div className="flex-1">
+                        <p className="text-sm font-semibold text-amber-700 mb-2">
+                          Multiple High-Congestion Areas Detected
+                        </p>
+                        <p className="text-xs text-amber-600 font-medium mb-2">🎯 Event-Wide Recommendations:</p>
+                        <ul className="space-y-1 text-xs text-amber-700">
+                          <li className="flex items-start gap-2">
+                            <span className="text-amber-500 font-bold">•</span>
+                            <span>Consider temporary event pause for crowd redistribution</span>
+                          </li>
+                          <li className="flex items-start gap-2">
+                            <span className="text-amber-500 font-bold">•</span>
+                            <span>Activate all available exits and emergency protocols</span>
+                          </li>
+                          <li className="flex items-start gap-2">
+                            <span className="text-amber-500 font-bold">•</span>
+                            <span>Deploy additional security and medical teams</span>
+                          </li>
+                          <li className="flex items-start gap-2">
+                            <span className="text-amber-500 font-bold">•</span>
+                            <span>Notify venue management and emergency services</span>
+                          </li>
+                        </ul>
+                      </div>
                     </div>
                   </div>
-                ))}
+                )}
               </div>
             ) : (
-              <div className="flex items-center gap-2 text-green-700"><CheckCircle2 className="h-5 w-5" /> No high-congestion alerts</div>
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 text-green-700 mb-3">
+                  <CheckCircle2 className="h-5 w-5" /> 
+                  <span className="font-medium">No high-congestion alerts</span>
+                </div>
+                
+                {/* Show preventive suggestions even when no alerts */}
+                <div className="rounded-lg border border-green-200 bg-green-50 p-3">
+                  <p className="text-sm font-medium text-green-700 mb-2">✅ Preventive Measures</p>
+                  <ul className="space-y-1 text-xs text-green-600">
+                    <li className="flex items-start gap-2">
+                      <span className="text-green-500 font-bold">•</span>
+                      <span>Continue monitoring all zones regularly</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-green-500 font-bold">•</span>
+                      <span>Maintain clear pathways and exit routes</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-green-500 font-bold">•</span>
+                      <span>Keep emergency teams on standby</span>
+                    </li>
+                  </ul>
+                </div>
+              </div>
             )}
           </Card>
         </div>
