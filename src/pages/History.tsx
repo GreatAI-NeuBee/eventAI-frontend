@@ -83,7 +83,7 @@ const History: React.FC = () => {
     };
 
     fetchEventHistory();
-  }, [user?.email, setEvents, setLoading, setError]);
+  }, [user?.email]);
 
   // Filter and sort events
   const filteredAndSortedEvents = React.useMemo(() => {

@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { Save, Phone, Users, MapPin, Settings } from 'lucide-react';
+import { Save, Phone, Users, MapPin, Settings, Upload, FileText, ExternalLink } from 'lucide-react';
 import Card from '../common/Card';
 import Button from '../common/Button';
-import Input from '../common/Input';
+import FileUpload from '../common/FileUpload';
 import type { StadiumMapJSON } from '../maps/StadiumMapEditor';
+import { FileUploadResult, ComprehendAnalysis } from '../../services/awsDirectService';
+import { eventAPI } from '../../api/apiClient';
 
 interface VenueLayoutEditorProps {
   venueLayout: StadiumMapJSON;
+  eventId?: string; // Add eventId for file uploads
   onSave?: (updatedLayout: VenueLayoutEditorData) => void;
   readOnly?: boolean;
 }
@@ -20,6 +23,11 @@ export interface VenueLayoutEditorData {
       picName?: string;
     };
   };
+  attachments?: {
+    links: string[];
+    context: string;
+    analyses: ComprehendAnalysis[];
+  };
 }
 
 interface GateConfig {
@@ -30,11 +38,17 @@ interface GateConfig {
 
 const VenueLayoutEditor: React.FC<VenueLayoutEditorProps> = ({
   venueLayout,
+  eventId,
   onSave,
   readOnly = false
 }) => {
   const [gateConfig, setGateConfig] = useState<Record<string, GateConfig>>({});
   const [hasChanges, setHasChanges] = useState(false);
+  const [attachments, setAttachments] = useState<{
+    links: string[];
+    context: string;
+    analyses: ComprehendAnalysis[];
+  }>({ links: [], context: '', analyses: [] });
 
   // Initialize gate configuration from venue layout
   useEffect(() => {
@@ -62,15 +76,58 @@ const VenueLayoutEditor: React.FC<VenueLayoutEditorProps> = ({
     setHasChanges(true);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (onSave) {
       const updatedData: VenueLayoutEditorData = {
         venueLayout,
-        gateConfig
+        gateConfig,
+        attachments
       };
       onSave(updatedData);
       setHasChanges(false);
+
+      // Also save attachments to backend if eventId is provided
+      if (eventId && attachments.links.length > 0) {
+        try {
+          await eventAPI.updateEventAttachments(eventId, {
+            attachmentLinks: attachments.links,
+            attachmentContext: attachments.context
+          });
+          console.log('✅ Attachments saved to backend');
+        } catch (error) {
+          console.error('❌ Failed to save attachments to backend:', error);
+        }
+      }
     }
+  };
+
+  const handleFileUploaded = (result: FileUploadResult) => {
+    if (result.success && result.fileUrl) {
+      setAttachments(prev => ({
+        links: [...prev.links, result.fileUrl!],
+        analyses: result.analysisResult 
+          ? [...prev.analyses, result.analysisResult as ComprehendAnalysis]
+          : prev.analyses,
+        context: prev.context + (result.analysisResult 
+          ? `\n\nFile: ${result.fileUrl}\nAnalysis: ${(result.analysisResult as ComprehendAnalysis).summary}`
+          : `\n\nFile: ${result.fileUrl}`)
+      }));
+      setHasChanges(true);
+    }
+  };
+
+  const removeAttachment = (linkToRemove: string) => {
+    setAttachments(prev => {
+      const linkIndex = prev.links.indexOf(linkToRemove);
+      return {
+        links: prev.links.filter(link => link !== linkToRemove),
+        analyses: linkIndex >= 0 
+          ? prev.analyses.filter((_, index) => index !== linkIndex)
+          : prev.analyses,
+        context: prev.context.replace(new RegExp(`\\n\\nFile: ${linkToRemove}[^\\n]*(?:\\nAnalysis: [^\\n]*)?`, 'g'), '')
+      };
+    });
+    setHasChanges(true);
   };
 
   const validatePhoneNumber = (phone: string): boolean => {
@@ -160,9 +217,7 @@ const VenueLayoutEditor: React.FC<VenueLayoutEditorProps> = ({
                   <div className="flex items-center justify-between mb-3">
                     <div>
                       <h5 className="font-medium text-gray-900">{exit.name}</h5>
-                      <p className="text-sm text-gray-500">
-                        Position: ({exit.position[0].toFixed(1)}, {exit.position[1].toFixed(1)})
-                      </p>
+                      
                     </div>
                     <div className="text-sm text-gray-500">
                       Gate #{index + 1}
@@ -284,6 +339,141 @@ const VenueLayoutEditor: React.FC<VenueLayoutEditorProps> = ({
           </div>
         </Card>
       )}
+
+      {/* File Upload Section */}
+      {eventId && (
+        <Card className="p-6">
+          <h4 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+            <Upload className="h-5 w-5" />
+            Event Documents & Files
+          </h4>
+          <p className="text-sm text-gray-600 mb-6">
+            Upload relevant documents such as workflows, procedures, floor plans, or any other files related to your event. 
+            Our AI will analyze the content to provide better insights and recommendations.
+          </p>
+
+          {/* File Upload Component */}
+          <FileUpload
+            eventId={eventId}
+            onFileUploaded={handleFileUploaded}
+            disabled={readOnly}
+            maxFiles={5}
+            className="mb-6"
+          />
+
+          {/* Uploaded Files List */}
+          {attachments.links.length > 0 && (
+            <div className="space-y-4">
+              <h5 className="font-medium text-gray-900 flex items-center gap-2">
+                <FileText className="h-4 w-4" />
+                Uploaded Files ({attachments.links.length})
+              </h5>
+              
+              <div className="space-y-2">
+                {attachments.links.map((link, index) => {
+                  const fileName = link.split('/').pop() || 'Unknown file';
+                  const analysis = attachments.analyses[index];
+                  
+                  return (
+                    <div key={link} className="flex items-start space-x-3 p-3 bg-gray-50 rounded-lg">
+                      <FileText className="h-5 w-5 text-blue-500 mt-0.5" />
+                      
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between">
+                          <h6 className="text-sm font-medium text-gray-900 truncate">
+                            {fileName}
+                          </h6>
+                          <div className="flex items-center space-x-2">
+                            <a
+                              href={link}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-blue-600 hover:text-blue-800 text-sm flex items-center gap-1"
+                            >
+                              <ExternalLink className="h-3 w-3" />
+                              View
+                            </a>
+                            {!readOnly && (
+                              <button
+                                onClick={() => removeAttachment(link)}
+                                className="text-red-600 hover:text-red-800 text-sm"
+                              >
+                                Remove
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                        
+                        {analysis && (
+                          <div className="mt-2 p-2 bg-blue-50 rounded text-xs">
+                            <p className="text-blue-800 font-medium">AI Analysis:</p>
+                            <p className="text-blue-700 mt-1">{analysis.summary}</p>
+                            
+                            {analysis.keyPhrases.length > 0 && (
+                              <div className="mt-2">
+                                <span className="text-blue-800 font-medium">Key Topics: </span>
+                                <span className="text-blue-700">
+                                  {analysis.keyPhrases.slice(0, 3).map(kp => kp.text).join(', ')}
+                                </span>
+                              </div>
+                            )}
+                            
+                            {analysis.entities.length > 0 && (
+                              <div className="mt-1">
+                                <span className="text-blue-800 font-medium">Entities: </span>
+                                <span className="text-blue-700">
+                                  {analysis.entities.slice(0, 3).map(e => e.text).join(', ')}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Combined Analysis Summary */}
+              {attachments.analyses.length > 0 && (
+                <div className="mt-6 p-4 bg-green-50 rounded-lg">
+                  <h5 className="font-medium text-green-900 mb-2">Document Analysis Summary</h5>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <span className="font-medium text-green-800">Total Documents:</span>
+                      <span className="ml-2 text-green-700">{attachments.links.length}</span>
+                    </div>
+                    <div>
+                      <span className="font-medium text-green-800">Analysis Status:</span>
+                      <span className="ml-2 text-green-700">
+                        {attachments.analyses.length} analyzed
+                      </span>
+                    </div>
+                    <div className="md:col-span-2">
+                      <span className="font-medium text-green-800">Common Themes:</span>
+                      <span className="ml-2 text-green-700">
+                        {[...new Set(attachments.analyses.flatMap(a => a.keyPhrases.slice(0, 2).map(kp => kp.text)))]
+                          .slice(0, 5).join(', ')}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Help Text */}
+          <div className="mt-6 p-4 bg-blue-50 rounded-lg">
+            <h5 className="font-medium text-blue-900 mb-2">💡 Tips for Better Analysis</h5>
+            <ul className="text-sm text-blue-800 space-y-1">
+              <li>• Upload event procedures, safety protocols, or workflow documents</li>
+              <li>• Include floor plans, capacity charts, or operational guidelines</li>
+              <li>• Text-based files (PDF, Word, Excel) provide the best analysis results</li>
+              <li>• Our AI will extract key information to improve event recommendations</li>
+            </ul>
+          </div>
+        </Card>
+      )}
     </div>
   );
 };
@@ -301,7 +491,7 @@ const VenueLayoutVisualization: React.FC<{ venueLayout: StadiumMapJSON }> = ({ v
         className="w-full h-full"
       >
         {/* Render zones */}
-        {venueLayout.zones?.map((zone, index) => (
+        {venueLayout.zones?.map((zone) => (
           <g key={zone.id}>
             <polygon
               points={zone.points.map(p => `${p[0]},${p[1]}`).join(' ')}
@@ -324,7 +514,7 @@ const VenueLayoutVisualization: React.FC<{ venueLayout: StadiumMapJSON }> = ({ v
         ))}
 
         {/* Render exits */}
-        {venueLayout.exitsList?.map((exit, index) => (
+        {venueLayout.exitsList?.map((exit) => (
           <g key={exit.id}>
             <circle
               cx={exit.position[0]}

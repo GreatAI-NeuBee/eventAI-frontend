@@ -570,6 +570,7 @@ const EventDetails: React.FC = () => {
           {currentEvent?.venueLayout && (
             <VenueLayoutEditor
               venueLayout={currentEvent.venueLayout}
+              eventId={eventId}
               onSave={handleVenueConfigSave}
               readOnly={false}
             />
