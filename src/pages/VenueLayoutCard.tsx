@@ -1,7 +1,6 @@
 // EventDetails.tsx — render <VenueLayoutCard />
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import Card from "../components/common/Card";
-import { useEventStore } from "../store/eventStore";
 import { DUMMY_FORECAST } from "../data/DUMMY_FORECAST";
 
 /* ========= Types ========= */
@@ -23,7 +22,7 @@ type FloorZonePolygon = {
   congestion: number; // 0..100
 };
 type GatePoint = { ds: string; yhat: number; yhat_lower?: number; yhat_upper?: number };
-type GateSeries = Record<string, GatePoint[]>; // gateId -> points
+type GateSeries = Record<string, GatePoint[]>;
 type InOutForecast = { arrivals: GateSeries; exits: GateSeries };
 
 type Phase = "arrivals" | "exits";
@@ -62,7 +61,6 @@ const stableMul = (id: string) => {
 /* ========= Series helpers ========= */
 const toKey = (d: string | Date) => {
   const ds = typeof d === "string" ? d : d.toISOString().slice(0, 19).replace("T", " ");
-  // round to minute (incoming data already at :00 or :05 etc)
   return ds.slice(0, 16) + ":00";
 };
 
@@ -129,7 +127,7 @@ function zonesForFrame(plan: StadiumMapJSON, byId: Record<string, number>): Floo
 const DUMMY_PLAN: StadiumMapJSON = {
   exits: 4,
   zones: [
-    // ⬇️ PASTE your real zones here (L1-S1.. etc). The demo still works with an empty array.
+    // ⬇️ add real zones here
   ],
   layers: 3,
   sections: 12,
@@ -187,18 +185,26 @@ function pointInPolygon(p: PctPoint, pts: PctPoint[]): boolean {
   return inside;
 }
 
-/* ========= Particles engine ========= */
-const DOTS_PER_PEOPLE = 10;         // 1 dot ≈ 10 people (keep)
-const MIN_DOTS_PER_GATE = 30;       // ✅ lower bound per gate
-const MAX_DOTS_PER_GATE = 40;       // ✅ upper bound per gate
-const SPEED = 7.5 / 1000;
+/* ========= Particles engine (adaptive) ========= */
+const SPEED = 3.5 / 1000;
 const TTL_MS = 7000;
 
+type DotScale = {
+  peoplePerDot: number;
+  minDotsPerGate: number;
+  maxDotsPerGate: number;
+};
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
+
+function getDotScale(totalPeople: number): DotScale {
+  if (totalPeople <= 300)   return { peoplePerDot: 2,  minDotsPerGate: 10, maxDotsPerGate: 20 };
+  if (totalPeople <= 2000)  return { peoplePerDot: 8,  minDotsPerGate: 18, maxDotsPerGate: 32 };
+  if (totalPeople <= 8000)  return { peoplePerDot: 15, minDotsPerGate: 22, maxDotsPerGate: 38 };
+  return                         { peoplePerDot: 25, minDotsPerGate: 26, maxDotsPerGate: 42 };
+}
 
 let PARTICLE_ID = 1;
 
-/** Map gate letters "A..E" to exit numbers "1..5" */
 const gateLetterToExitNumber = (gateId: string): string | null => {
   if (/^[A-E]$/.test(gateId)) {
     const n = gateId.charCodeAt(0) - "A".charCodeAt(0) + 1;
@@ -210,7 +216,8 @@ const gateLetterToExitNumber = (gateId: string): string | null => {
 function spawnArrivalsDots(
   plan: StadiumMapJSON,
   zones: FloorZonePolygon[],
-  gateLoads: Record<string, number>
+  gateLoads: Record<string, number>,
+  scale: DotScale
 ): Particle[] {
   const targets = zones.length ? zones.map(z => polygonCentroid(z.points)) : [[50,31.25]];
   const pickTarget = () => targets[Math.floor(Math.random()*targets.length)];
@@ -218,17 +225,16 @@ function spawnArrivalsDots(
   const out: Particle[] = [];
   const exits = plan.exitsList ?? [];
 
-  // build a lookup for gate positions (works with "Exit 1/2/3/4" or IDs)
   const gatesById: Record<string, PctPoint> = {};
   exits.forEach(e => {
-    const key = e.name?.match(/\b(\w+)\b$/)?.[1] ?? e.id; // trailing token or id
+    const key = e.name?.match(/\b(\w+)\b$/)?.[1] ?? e.id;
     gatesById[key] = e.position;
     gatesById[e.id] = e.position;
   });
 
   Object.entries(gateLoads).forEach(([gateId, ppl]) => {
-    const raw = Math.round((ppl || 0) / DOTS_PER_PEOPLE);
-    const dots = clamp(raw, MIN_DOTS_PER_GATE, MAX_DOTS_PER_GATE);
+    const raw = Math.round((ppl || 0) / Math.max(1, scale.peoplePerDot));
+    const dots = clamp(raw, scale.minDotsPerGate, scale.maxDotsPerGate);
 
     const alias = gateLetterToExitNumber(gateId);
     const start =
@@ -253,14 +259,15 @@ function spawnArrivalsDots(
 function spawnExitDots(
   plan: StadiumMapJSON,
   zones: FloorZonePolygon[],
-  totalPpl: number
+  totalPpl: number,
+  scale: DotScale
 ): Particle[] {
   const now = performance.now();
   const exits = plan.exitsList ?? [];
   const exitCount = Math.max(1, exits.length);
 
-  const rawTotal = Math.round((totalPpl || 0) / DOTS_PER_PEOPLE);
-  const totalDots = clamp(rawTotal, exitCount * MIN_DOTS_PER_GATE, exitCount * MAX_DOTS_PER_GATE);
+  const rawTotal = Math.round((totalPpl || 0) / Math.max(1, scale.peoplePerDot));
+  const totalDots = clamp(rawTotal, exitCount * scale.minDotsPerGate, exitCount * scale.maxDotsPerGate);
 
   const out: Particle[] = [];
   const totalWeight = zones.reduce((s, z) => s + (z.congestion || 1), 0) || 1;
@@ -337,8 +344,8 @@ const StadiumPlanSVG: React.FC<{
             const y1 = cy + (rVoid - 0.5) * Math.sin(rad);
             const x2 = cx + (R - 0.5) * Math.cos(rad);
             const y2 = cy + (R - 0.5) * Math.sin(rad);
-            const lx = cx + (R + 1.2) * Math.cos(rad + Math.PI / plan.sections);
-            const ly = cy + (R + 1.2) * Math.sin(rad + Math.PI / plan.sections);
+            const lx = cx + (R + 1.2) * Math.cos(rad + Math.PI / (plan.sections || 1));
+            const ly = cy + (R + 1.2) * Math.sin(rad + Math.PI / (plan.sections || 1));
             return (
               <g key={`sec-${i}`}>
                 <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="#cbd5e1" strokeOpacity={0.5} strokeWidth={0.4} strokeDasharray="2,1" />
@@ -440,11 +447,7 @@ const StadiumPlanSVG: React.FC<{
   );
 };
 
-/* ========= tiny inline parser to “filter from the event value” =========
-   Accepts either:
-   1) Visualizer shape: { arrivals: {A:[...]}, exits:{...} }
-   2) Simulation shape: { forecast: { A: { timeFrames: [{ predicted, timestamp, dataSource }] } }, summary.forecastPeriod }
-   Produces a consistent InOutForecast. No external adapter file. */
+/* ========= tiny inline parser to “filter from the event value” ========= */
 function coerceForecast(raw: unknown, fallback: InOutForecast): InOutForecast {
   try {
     const obj: any = typeof raw === "string" ? JSON.parse(raw) : raw;
@@ -458,7 +461,6 @@ function coerceForecast(raw: unknown, fallback: InOutForecast): InOutForecast {
       const arrivals: GateSeries = {};
       const exits: GateSeries = {};
 
-      // determine a midpoint to split "simulation" frames if they’re unlabeled
       const start = obj.summary?.forecastPeriod?.start
         ? new Date((obj.summary.forecastPeriod.start + "Z").replace(" ", "T")).getTime()
         : undefined;
@@ -491,14 +493,13 @@ function coerceForecast(raw: unknown, fallback: InOutForecast): InOutForecast {
         }
       }
 
-      // sort points by time
       const sort = (gs: GateSeries) => Object.values(gs).forEach(arr => arr.sort((a,b) => (a.ds < b.ds ? -1 : a.ds > b.ds ? 1 : 0)));
       sort(arrivals); sort(exits);
 
       return { arrivals, exits };
     }
   } catch {
-    // ignore parse errors and fall back
+    // ignore
   }
   return fallback;
 }
@@ -513,7 +514,6 @@ export const VenueLayoutCard: React.FC<{ event: EventData | null }> = ({ event }
     }
     return event.venueLayout as StadiumMapJSON;
   }, [event]);
-  console.log("wbababababbab", event);
 
   // parse + filter forecast from the *event value*
   const forecast: InOutForecast = useMemo(() => {
@@ -521,7 +521,7 @@ export const VenueLayoutCard: React.FC<{ event: EventData | null }> = ({ event }
     return coerceForecast(raw, DUMMY_FORECAST);
   }, [event]);
 
-  // frames (now based on event’s forecast)
+  // frames
   const frames = useMemo(() => buildFramesFromForecast(plan, forecast), [plan, forecast]);
   const [idx, setIdx] = useState(0);
   const max = Math.max(0, frames.length - 1);
@@ -538,7 +538,16 @@ export const VenueLayoutCard: React.FC<{ event: EventData | null }> = ({ event }
   const gateLoads = useMemo(() => {
     const series = frame.phase === "arrivals" ? forecast.arrivals : forecast.exits;
     return gateLoadsAt(series, frame.dsKey);
-  }, [frame.phase, frame.dsKey, forecast]);
+  }, [forecast, frame.phase, frame.dsKey]);
+
+  // total people at this timestep for current phase
+  const totalPeopleNow = useMemo(
+    () => Object.values(gateLoads).reduce((s, v) => s + (v || 0), 0),
+    [gateLoads]
+  );
+
+  // dynamic dot scale
+  const dotScale = useMemo(() => getDotScale(totalPeopleNow), [totalPeopleNow]);
 
   /* ========== playback controls + slider fix ========== */
   const [playing, setPlaying] = useState(false);
@@ -587,7 +596,7 @@ export const VenueLayoutCard: React.FC<{ event: EventData | null }> = ({ event }
     if (wasPlayingRef.current) setPlaying(true);
   };
 
-  /* ========== particles lifecycle (independent RAF for smooth motion) ========== */
+  /* ========== particles lifecycle ========== */
   const [particles, setParticles] = useState<Particle[]>([]);
   const lastSpawnedIndexRef = useRef<number>(-1);
 
@@ -599,14 +608,20 @@ export const VenueLayoutCard: React.FC<{ event: EventData | null }> = ({ event }
       return;
     }
     if (idx === lastSpawnedIndexRef.current) return;
+
     const newly: Particle[] =
       frame.phase === "arrivals"
-        ? spawnArrivalsDots(plan, zones, gateLoads)
-        : spawnExitDots(plan, zones, Object.values(gateLoads).reduce((s, v) => s + (v || 0), 0));
+        ? spawnArrivalsDots(plan, zones, gateLoads, dotScale)
+        : spawnExitDots(
+            plan,
+            zones,
+            Object.values(gateLoads).reduce((s, v) => s + (v || 0), 0),
+            dotScale
+          );
+
     lastSpawnedIndexRef.current = idx;
-    setParticles((prev) => [...prev, ...newly].slice(-2000)); // cap
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [idx, frame.phase, frame.dsKey, zones]); // (gateLoads implied by dsKey + phase)
+    setParticles((prev) => [...prev, ...newly].slice(-2000)); // cap particle count
+  }, [idx, scrubbing, frame.phase, plan, zones, gateLoads, dotScale]);
 
   // motion RAF
   useEffect(() => {
@@ -745,7 +760,9 @@ export const VenueLayoutCard: React.FC<{ event: EventData | null }> = ({ event }
           <span className="inline-flex items-center gap-1">
             <span className="h-3 w-3 rounded-sm" style={{ background: bandedColor(85) }} /> High
           </span>
-          <span className="ml-auto text-gray-500">• 1 dot ≈ 10 people</span>
+          <span className="ml-auto text-gray-500">
+            • 1 dot ≈ {dotScale.peoplePerDot.toLocaleString()} people
+          </span>
         </div>
       </div>
     </Card>
