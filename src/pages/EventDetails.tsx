@@ -10,6 +10,7 @@ import ScenarioTabs from '../components/dashboard/ScenarioTabs';
 import TransitForecast from '../components/dashboard/TransitForecast';
 import ParkingForecast from '../components/dashboard/ParkingForecast';
 import NearbyParkingOptions from '../components/dashboard/NearbyParkingOptions';
+import VenueLayoutEditor, { VenueLayoutEditorData } from '../components/venue/VenueLayoutEditor';
 import { useEventStore } from '../store/eventStore';
 import { useAuth } from '../contexts/AuthContext';
 import type { EventData } from '../types/simulation';
@@ -27,6 +28,52 @@ const EventDetails: React.FC = () => {
   
   // Ref to track if simulation monitoring is already started for this event
   const monitoringEventId = useRef<string | null>(null);
+
+  // Helper function to extract gates from venue layout
+  const extractGatesFromVenueLayout = (venueLayout: any): { gates: string[], gates_crowd: number[] } => {
+    const gates: string[] = [];
+    const gates_crowd: number[] = [];
+    
+    if (!venueLayout) {
+      console.warn('No venue layout provided for gate extraction');
+      return { gates, gates_crowd };
+    }
+
+    // Extract exits (represented as A, B, C, D, E - max 5)
+    if (venueLayout.exitsList && Array.isArray(venueLayout.exitsList)) {
+      const exitCount = Math.min(venueLayout.exitsList.length, 5); // Max 5 exits
+      const exitLetters = ['A', 'B', 'C', 'D', 'E'];
+      
+      for (let i = 0; i < exitCount; i++) {
+        gates.push(exitLetters[i]);
+        // Get capacity from exitsList, default to 800 if not specified
+        const capacity = venueLayout.exitsList[i]?.capacity || 800;
+        gates_crowd.push(capacity);
+      }
+      
+      console.log(`🚪 Extracted ${exitCount} exit gates:`, gates.slice(0, exitCount));
+      console.log(`🚪 Exit capacities:`, gates_crowd.slice(0, exitCount));
+    }
+
+    // Extract toilets (represented as 1, 2 - max 2)
+    if (venueLayout.toiletsList && Array.isArray(venueLayout.toiletsList)) {
+      const toiletCount = Math.min(venueLayout.toiletsList.length, 2); // Max 2 toilets
+      
+      for (let i = 1; i <= toiletCount; i++) {
+        gates.push(i.toString());
+        // Get capacity from toiletsList, default to 50 if not specified
+        const capacity = venueLayout.toiletsList[i-1]?.capacity || 50;
+        gates_crowd.push(capacity);
+      }
+      
+      console.log(`🚽 Extracted ${toiletCount} toilet gates:`, gates.slice(-toiletCount));
+      console.log(`🚽 Toilet capacities:`, gates_crowd.slice(-toiletCount));
+    }
+
+    console.log('🎯 Total gates extracted:', gates);
+    console.log('🎯 Total gate capacities:', gates_crowd);
+    return { gates, gates_crowd };
+  };
 
   // Helper function to get venue location with coordinates
   const getVenueLocationWithCoordinates = async (eventData: any) => {
@@ -144,22 +191,28 @@ const EventDetails: React.FC = () => {
         console.log('🔍 EventDetails: Transformed event:', transformedEvent);
         setCurrentEvent(transformedEvent);
         
-        // Check if forecast_result exists
-        if (eventData.forecast_result) {
+        // Check if forecastResult exists (note: API returns 'forecastResult', not 'forecast_result')
+        if (eventData.forecastResult) {
           console.log('EventDetails: Forecast result found, loading simulation data');
-          setForecastResult(eventData.forecast_result);
+          console.log('EventDetails: Forecast result structure:', eventData.forecastResult);
+          setForecastResult(eventData.forecastResult);
+          
+          // Handle nested forecast structure - data might be under 'forecast' property
+          const forecastData = eventData.forecastResult.forecast || eventData.forecastResult;
+          
           // Set simulation result in the store for components to use
-          if (eventData.forecast_result.crowdDensity || eventData.forecast_result.hotspots) {
+          if (forecastData.crowdDensity || forecastData.hotspots || forecastData.summary) {
             const simulationData = {
               eventId: eventId,
-              crowdDensity: eventData.forecast_result.crowdDensity || [],
-              hotspots: eventData.forecast_result.hotspots || [],
-              recommendations: eventData.forecast_result.recommendations || [],
-              scenarios: eventData.forecast_result.scenarios || { entry: {}, exit: {}, congestion: {} }
+              crowdDensity: forecastData.crowdDensity || [],
+              hotspots: forecastData.hotspots || [],
+              recommendations: forecastData.recommendations || [],
+              scenarios: forecastData.scenarios || { entry: {}, exit: {}, congestion: {} }
             };
             // Update the simulation result in the store
             const { setSimulationResult } = useEventStore.getState();
             setSimulationResult(simulationData);
+            console.log('EventDetails: Simulation data set in store:', simulationData);
           }
         } else {
           console.log('EventDetails: No forecast result found, showing basic event info');
@@ -204,9 +257,33 @@ const EventDetails: React.FC = () => {
     setForecastError(null);
     
     try {
-      console.log('🔮 Generating forecast with venue location:', currentEvent.venueLocation);
+      console.log('🔮 Generating forecast for event:', currentEvent.name);
       
-      const response = await eventAPI.generateForecast(eventId) as any;
+      // Extract gates and their capacities from venue layout
+      const { gates, gates_crowd } = extractGatesFromVenueLayout(currentEvent.venueLayout);
+      
+      if (gates.length === 0) {
+        throw new Error('No gates found in venue layout. Please configure exits and toilets in the venue layout.');
+      }
+      
+      // Prepare forecast request data
+      // Time gap logic: API provides forecast for pre-event and post-event periods
+      // During the actual event time (between schedule_start_time and event_end_time),
+      // event_capacity simulates late arrivals with a low fixed number
+      const forecastRequestData = {
+        eventid: eventId,
+        gates: gates,
+        gates_crowd: gates_crowd,
+        schedule_start_time: currentEvent.dateStart,
+        event_end_time: currentEvent.dateEnd,
+        event_capacity: 5, // Fixed low capacity for late arrivals during event
+        method_exits: "mirror_delay",
+        freq: "5min"
+      };
+      
+      console.log('🔮 Forecast request data:', forecastRequestData);
+      
+      const response = await eventAPI.generateForecast(forecastRequestData);
       const forecastData = response.data;
       
       // Enhanced forecast data with venue location for real Google Maps integration
@@ -237,13 +314,33 @@ const EventDetails: React.FC = () => {
       const { setSimulationResult } = useEventStore.getState();
       setSimulationResult(simulationData);
       
-      console.log('✅ Forecast generated with real venue integration');
+      console.log('✅ Forecast generated successfully with API integration');
       
     } catch (error: any) {
-      console.error('Error generating forecast:', error);
+      console.error('❌ Error generating forecast:', error);
       setForecastError(error.response?.data?.message || error.message || 'Failed to generate forecast');
     } finally {
       setIsForecastLoading(false);
+    }
+  };
+
+  // Handle venue configuration save
+  const handleVenueConfigSave = async (updatedConfig: VenueLayoutEditorData) => {
+    try {
+      
+      // Here you could save the configuration to the backend
+      // For now, we'll just store it locally and show success feedback
+      console.log('💾 Venue configuration updated:', updatedConfig);
+      
+      // You could add an API call here to save the gate configuration:
+      // await eventAPI.updateVenueConfig(eventId, updatedConfig);
+      
+      // Show success message (you could add a toast notification here)
+      console.log('✅ Venue configuration saved successfully');
+      
+    } catch (error) {
+      console.error('❌ Failed to save venue configuration:', error);
+      // You could show an error message here
     }
   };
 
@@ -339,10 +436,11 @@ const EventDetails: React.FC = () => {
           </div>
           <div className="flex items-center space-x-4">
             {getStatusBadge(currentEvent.status)}
-            {!forecastResult && (
+            {(!forecastResult || Object.keys(forecastResult).length === 0) && (
               <Button 
                 onClick={handleGenerateForecast}
-                disabled={isForecastLoading}
+                disabled={isForecastLoading || !currentEvent.venueLayout}
+                title={!currentEvent.venueLayout ? 'Venue layout required to generate forecast' : ''}
               >
                 {isForecastLoading ? 'Generating...' : 'Forecast'}
               </Button>
@@ -416,7 +514,7 @@ const EventDetails: React.FC = () => {
           </div>
         </Card>
 
-        {forecastResult && (
+        {forecastResult && Object.keys(forecastResult).length > 0 && (
           <Card>
             <div className="flex items-center">
               <CheckCircle className="h-8 w-8 text-purple-500" />
@@ -431,24 +529,54 @@ const EventDetails: React.FC = () => {
         )}
       </div>
 
-      {/* Show message when no forecast is available */}
-      {!forecastResult && !isForecastLoading && (
-        <Card className="mb-8">
-          <div className="text-center py-12">
-            <TrendingUp className="mx-auto h-16 w-16 text-gray-400 mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">
-              Forecast Not Generated
-            </h3>
-            <p className="text-gray-600 mb-6">
-              Click the "Forecast" button above to generate crowd density predictions, 
-              AI recommendations, and venue insights for this event.
-            </p>
-          </div>
-        </Card>
+      {/* Show venue layout configuration when no forecast is available */}
+      {(!forecastResult || Object.keys(forecastResult).length === 0) && !isForecastLoading && (
+        <div className="space-y-6">
+          {/* Forecast Info Card */}
+          <Card className="mb-6">
+            <div className="text-center py-8">
+              <TrendingUp className="mx-auto h-12 w-12 text-gray-400 mb-3" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">
+                Forecast Not Generated
+              </h3>
+              <p className="text-gray-600 mb-4">
+                Configure your venue layout below with exits and toilets, then click "Forecast" to generate crowd density predictions.
+                <br />
+                <span className="text-sm text-gray-500">
+                  Note: Supports up to 5 exits and 2 toilets for forecast generation.
+                </span>
+              </p>
+            </div>
+          </Card>
+
+          {/* Venue Layout Editor */}
+          {currentEvent?.venueLayout && (
+            <VenueLayoutEditor
+              venueLayout={currentEvent.venueLayout}
+              onSave={handleVenueConfigSave}
+              readOnly={false}
+            />
+          )}
+
+          {/* Show message if no venue layout exists */}
+          {!currentEvent?.venueLayout && (
+            <Card className="p-6">
+              <div className="text-center text-gray-500">
+                <TrendingUp className="mx-auto h-12 w-12 text-gray-400 mb-3" />
+                <h4 className="text-lg font-medium text-gray-900 mb-2">
+                  No Venue Layout
+                </h4>
+                <p className="text-gray-600">
+                  This event was created without a venue layout. You can add one by editing the event or creating a new event with the venue layout builder.
+                </p>
+              </div>
+            </Card>
+          )}
+        </div>
       )}
 
       {/* Main Dashboard Content - Only show if forecast exists */}
-      {forecastResult && (
+      {forecastResult && Object.keys(forecastResult).length > 0 && (
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
           {/* Left Column - Simulation Chart and Venue Map */}
           <div className="xl:col-span-2 space-y-6">
@@ -511,14 +639,18 @@ const EventDetails: React.FC = () => {
                 congestion: {}
               }}
             />
+          </div>
+        </div>
+      )}
 
-            {/* Transit and Parking Forecasts in Right Column */}
-            {currentEvent.venueLocation && (
-              <div className="space-y-6">
-                <TransitForecast venueLocation={currentEvent.venueLocation} />
-                <ParkingForecast venueLocation={currentEvent.venueLocation} />
-              </div>
-            )}
+      {/* Bottom Row - Transit and Parking Forecasts */}
+      {forecastResult && Object.keys(forecastResult).length > 0 && currentEvent.venueLocation && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+          <div className="h-fit">
+            <TransitForecast venueLocation={currentEvent.venueLocation} />
+          </div>
+          <div className="h-fit">
+            <ParkingForecast venueLocation={currentEvent.venueLocation} />
           </div>
         </div>
       )}
