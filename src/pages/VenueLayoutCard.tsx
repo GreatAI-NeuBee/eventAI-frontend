@@ -427,10 +427,6 @@ const StadiumPlanSVG: React.FC<{
           );
         })}
 
-        {/* timestamp */}
-        <text x={vbW - 1.5} y={vbH - 1.5} textAnchor="end" fontSize={2.2} fill="#334155">
-          {dsKey.slice(11, 16)}
-        </text>
       </svg>
 
       {/* hover tooltip */}
@@ -733,7 +729,7 @@ export const VenueLayoutCard: React.FC<{ event: EventData | null }> = ({ event }
           step={1}
           value={idx}
           onMouseDown={onScrubStart}
-          onTouchStart={onScrubStart}
+          onTouchStart={onScrubStart} 
           onChange={(e) => onScrub(Number(e.target.value))}
           onMouseUp={onScrubEnd}
           onTouchEnd={onScrubEnd}
