@@ -79,7 +79,7 @@ const Sidebar: React.FC<SidebarProps> = ({ open, setOpen }) => {
           {/* Footer */}
           <div className="p-4 border-t border-gray-200">
             <div className="text-xs text-gray-500">
-              AI-powered crowd simulation for better event planning
+              Smart crowd simulation for better event planning
             </div>
           </div>
         </div>

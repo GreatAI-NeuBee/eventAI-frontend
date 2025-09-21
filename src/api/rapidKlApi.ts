@@ -65,7 +65,7 @@ const rapidKlClient = axios.create({
   timeout: 10000,
   headers: {
     'Accept': 'application/x-protobuf',
-    'User-Agent': 'EventAI-Frontend/1.0'
+    'User-Agent': 'Event-Buddy-Frontend/1.0'
   }
 });
 

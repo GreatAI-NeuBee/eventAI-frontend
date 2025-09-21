@@ -252,7 +252,7 @@ const Landing: React.FC = () => {
             Ready to Transform Your Events?
           </h2>
           <p className="text-xl text-gray-300 mb-8">
-            Join thousands of event organizers who trust EventAI for smarter crowd management.
+            Join thousands of event organizers who trust Event Buddy for smarter crowd management.
           </p>
           <Button
             size="lg"

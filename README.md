@@ -1,6 +1,6 @@
-# EventAI Frontend
+# Event Buddy Frontend
 
-A React-based frontend application for AI-powered crowd simulation and event planning. This application allows event organizers to upload event data and venue layouts to receive intelligent crowd flow predictions and actionable recommendations.
+A React-based frontend application for intelligent crowd simulation and event planning. This application allows event organizers to upload event data and venue layouts to receive smart crowd flow predictions and actionable recommendations.
 
 ## 🚀 Features
 
@@ -167,4 +167,4 @@ The app expects a backend API with these endpoints:
 
 ## 📄 License
 
-This project is part of the EventAI platform for intelligent event planning and crowd simulation.
+This project is part of the Event Buddy platform for intelligent event planning and crowd simulation.

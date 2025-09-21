@@ -283,7 +283,7 @@ const Dashboard: React.FC = () => {
               Event Dashboard
             </h1>
             <p className="mt-2 text-gray-600 text-lg">
-              Manage your events and view AI-powered simulation insights
+              Manage your events and view intelligent simulation insights
             </p>
           </div>
           <Button 
