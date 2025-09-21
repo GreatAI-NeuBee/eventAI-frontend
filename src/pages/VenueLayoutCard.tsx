@@ -46,7 +46,7 @@ export interface EventData {
   name: string;
   venue?: string;
   venueLayout?: unknown;     // object or JSON string
-  forecastResult?: unknown;  // object or JSON string
+  forecastResult?: unknown;  // object or JSON string (either visualizer or simulation shape)
 }
 
 /* ========= Colors / helpers ========= */
@@ -125,12 +125,7 @@ function zonesForFrame(plan: StadiumMapJSON, byId: Record<string, number>): Floo
   });
 }
 
-
-/* ========= Dummy forecast (kept from your message) ========= */
-/* ========= Your DUMMY PLAN =========
-   Paste the full "zones" array you used before.
-====================================================================== */
-
+/* ========= DUMMY PLAN ========= */
 const DUMMY_PLAN: StadiumMapJSON = {
   exits: 4,
   zones: [
@@ -153,7 +148,6 @@ const DUMMY_PLAN: StadiumMapJSON = {
 
 /* ========= Geometry helpers ========= */
 function polygonCentroid(pts: PctPoint[]): PctPoint {
-  // simple centroid (not area-weighted)
   const n = pts.length || 1;
   const x = pts.reduce((s, p) => s + p[0], 0) / n;
   const y = pts.reduce((s, p) => s + p[1], 0) / n;
@@ -169,12 +163,10 @@ function nearestExit(exits: StadiumMapJSON["exitsList"] = [], p: PctPoint): PctP
   return best;
 }
 function randomInPolygon(pts: PctPoint[]): PctPoint {
-  // quick fallback using centroid jitter if polygon missing
   if (pts.length < 3) {
     const c = polygonCentroid(pts);
     return [c[0] + (Math.random()-0.5)*2, c[1] + (Math.random()-0.5)*2];
   }
-  // bounding box rejection (good enough for convex-ish sectors)
   const xs = pts.map(p=>p[0]), ys = pts.map(p=>p[1]);
   const minX = Math.min(...xs), maxX = Math.max(...xs);
   const minY = Math.min(...ys), maxY = Math.max(...ys);
@@ -206,6 +198,15 @@ const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v
 
 let PARTICLE_ID = 1;
 
+/** Map gate letters "A..E" to exit numbers "1..5" */
+const gateLetterToExitNumber = (gateId: string): string | null => {
+  if (/^[A-E]$/.test(gateId)) {
+    const n = gateId.charCodeAt(0) - "A".charCodeAt(0) + 1;
+    return String(n);
+  }
+  return null;
+};
+
 function spawnArrivalsDots(
   plan: StadiumMapJSON,
   zones: FloorZonePolygon[],
@@ -226,11 +227,15 @@ function spawnArrivalsDots(
   });
 
   Object.entries(gateLoads).forEach(([gateId, ppl]) => {
-    // ⬇️ clamp dots per gate to [30, 40]
     const raw = Math.round((ppl || 0) / DOTS_PER_PEOPLE);
     const dots = clamp(raw, MIN_DOTS_PER_GATE, MAX_DOTS_PER_GATE);
 
-    const start = gatesById[gateId] ?? exits[0]?.position ?? [50, 2.2];
+    const alias = gateLetterToExitNumber(gateId);
+    const start =
+      gatesById[gateId] ??
+      (alias ? gatesById[alias] : undefined) ??
+      exits[0]?.position ?? [50, 2.2];
+
     for (let i = 0; i < dots; i++) {
       const [tx, ty] = pickTarget();
       const jitter = () => (Math.random() - 0.5) * 0.8;
@@ -254,11 +259,9 @@ function spawnExitDots(
   const exits = plan.exitsList ?? [];
   const exitCount = Math.max(1, exits.length);
 
-  // ⬇️ total dots ≈ ppl/10, then clamp to exitCount * [30..40]
   const rawTotal = Math.round((totalPpl || 0) / DOTS_PER_PEOPLE);
   const totalDots = clamp(rawTotal, exitCount * MIN_DOTS_PER_GATE, exitCount * MAX_DOTS_PER_GATE);
 
-  // distribute across zones weighted by congestion
   const out: Particle[] = [];
   const totalWeight = zones.reduce((s, z) => s + (z.congestion || 1), 0) || 1;
 
@@ -275,7 +278,6 @@ function spawnExitDots(
   }
   return out;
 }
-
 
 /* ========= Inline StadiumPlanSVG ========= */
 const StadiumPlanSVG: React.FC<{
@@ -340,7 +342,6 @@ const StadiumPlanSVG: React.FC<{
             return (
               <g key={`sec-${i}`}>
                 <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="#cbd5e1" strokeOpacity={0.5} strokeWidth={0.4} strokeDasharray="2,1" />
-                {/* number every other section to avoid clutter */}
                 {i % 2 === 0 ? (
                   <text x={lx} y={ly} fontSize={2.2} textAnchor="middle" dominantBaseline="middle" fill="#64748b">
                     {i + 1}
@@ -398,9 +399,10 @@ const StadiumPlanSVG: React.FC<{
 
         {/* exits pins + current loads */}
         {(plan.exitsList ?? []).map((e) => {
-          // find a reasonable key: match trailing number in exit name "Exit 1" => "1"
-          const maybeKey = (e.name?.match(/\b(\w+)\b$/)?.[1] ?? e.id);
-          const ppl = Math.round(gateLoads[maybeKey] || 0);
+          const trailing = (e.name?.match(/\b(\w+)\b$/)?.[1] ?? e.id);
+          const exitNum = parseInt(String(trailing).replace(/\D/g, ""), 10);
+          const letter = exitNum ? String.fromCharCode("A".charCodeAt(0) + (exitNum - 1)) : null;
+          const ppl = Math.round((gateLoads[trailing] ?? (letter ? gateLoads[letter] : 0) ?? 0));
           const dotFill = isExitPhase ? "#ef4444" : "#10b981";
           return (
             <g key={e.id}>
@@ -438,6 +440,69 @@ const StadiumPlanSVG: React.FC<{
   );
 };
 
+/* ========= tiny inline parser to “filter from the event value” =========
+   Accepts either:
+   1) Visualizer shape: { arrivals: {A:[...]}, exits:{...} }
+   2) Simulation shape: { forecast: { A: { timeFrames: [{ predicted, timestamp, dataSource }] } }, summary.forecastPeriod }
+   Produces a consistent InOutForecast. No external adapter file. */
+function coerceForecast(raw: unknown, fallback: InOutForecast): InOutForecast {
+  try {
+    const obj: any = typeof raw === "string" ? JSON.parse(raw) : raw;
+    if (!obj) return fallback;
+
+    if (obj.arrivals && obj.exits) {
+      return obj as InOutForecast;
+    }
+
+    if (obj.forecast) {
+      const arrivals: GateSeries = {};
+      const exits: GateSeries = {};
+
+      // determine a midpoint to split "simulation" frames if they’re unlabeled
+      const start = obj.summary?.forecastPeriod?.start
+        ? new Date((obj.summary.forecastPeriod.start + "Z").replace(" ", "T")).getTime()
+        : undefined;
+      const end = obj.summary?.forecastPeriod?.end
+        ? new Date((obj.summary.forecastPeriod.end + "Z").replace(" ", "T")).getTime()
+        : undefined;
+      const mid = (start !== undefined && end !== undefined) ? start + (end - start) / 2 : undefined;
+
+      const push = (bucket: GateSeries, gate: string, f: any) => {
+        (bucket[gate] ??= []).push({
+          ds: f.timestamp,
+          yhat: Math.max(0, Number(f.predicted) || 0),
+          yhat_lower: f.lower_bound ?? undefined,
+          yhat_upper: f.upper_bound ?? undefined,
+        });
+      };
+
+      for (const [gate, g] of Object.entries<any>(obj.forecast)) {
+        for (const f of (g?.timeFrames ?? [])) {
+          if (f.dataSource === "arrivals") push(arrivals, gate, f);
+          else if (f.dataSource === "exits") push(exits, gate, f);
+          else {
+            if (mid !== undefined) {
+              const t = new Date((f.timestamp + "Z").replace(" ", "T")).getTime();
+              (t <= mid ? push(arrivals, gate, f) : push(exits, gate, f));
+            } else {
+              push(arrivals, gate, f);
+            }
+          }
+        }
+      }
+
+      // sort points by time
+      const sort = (gs: GateSeries) => Object.values(gs).forEach(arr => arr.sort((a,b) => (a.ds < b.ds ? -1 : a.ds > b.ds ? 1 : 0)));
+      sort(arrivals); sort(exits);
+
+      return { arrivals, exits };
+    }
+  } catch {
+    // ignore parse errors and fall back
+  }
+  return fallback;
+}
+
 /* ========= Card ========= */
 export const VenueLayoutCard: React.FC<{ event: EventData | null }> = ({ event }) => {
   // parse venueLayout
@@ -448,19 +513,16 @@ export const VenueLayoutCard: React.FC<{ event: EventData | null }> = ({ event }
     }
     return event.venueLayout as StadiumMapJSON;
   }, [event]);
+  console.log("wbababababbab", event);
 
-  // parse forecast (optional)
+  // parse + filter forecast from the *event value*
   const forecast: InOutForecast = useMemo(() => {
     const raw = (event as any)?.forecastResult;
-    if (!raw) return DUMMY_FORECAST;
-    if (typeof raw === "string") {
-      try { return JSON.parse(raw) as InOutForecast; } catch { return DUMMY_FORECAST; }
-    }
-    return raw as InOutForecast;
+    return coerceForecast(raw, DUMMY_FORECAST);
   }, [event]);
 
-  // frames
-  const frames = useMemo(() => buildFramesFromForecast(plan, DUMMY_FORECAST), [plan]);
+  // frames (now based on event’s forecast)
+  const frames = useMemo(() => buildFramesFromForecast(plan, forecast), [plan, forecast]);
   const [idx, setIdx] = useState(0);
   const max = Math.max(0, frames.length - 1);
   useEffect(() => setIdx((i) => Math.min(i, max)), [max]);
@@ -474,9 +536,9 @@ export const VenueLayoutCard: React.FC<{ event: EventData | null }> = ({ event }
 
   /* ========== gate loads for badges and particle spawns ========== */
   const gateLoads = useMemo(() => {
-    const series = frame.phase === "arrivals" ? DUMMY_FORECAST.arrivals : DUMMY_FORECAST.exits;
+    const series = frame.phase === "arrivals" ? forecast.arrivals : forecast.exits;
     return gateLoadsAt(series, frame.dsKey);
-  }, [frame.phase, frame.dsKey]);
+  }, [frame.phase, frame.dsKey, forecast]);
 
   /* ========== playback controls + slider fix ========== */
   const [playing, setPlaying] = useState(false);
