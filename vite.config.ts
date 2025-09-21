@@ -13,4 +13,10 @@ export default defineConfig({
       },
     } as any,
   },
+  define: {
+    global: 'globalThis',
+  },
+  optimizeDeps: {
+    include: ['@aws-sdk/client-s3', '@aws-sdk/client-comprehend', '@aws-sdk/lib-storage']
+  }
 })

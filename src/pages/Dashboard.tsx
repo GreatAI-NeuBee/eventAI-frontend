@@ -12,7 +12,7 @@ import { eventAPI } from '../api/apiClient';
 
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, backendUser, backendUserLoading } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<'date' | 'name' | 'status'>('date');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
@@ -35,6 +35,19 @@ const Dashboard: React.FC = () => {
       if (!user?.email) {
         setLoading(false);
         setError('User not authenticated');
+        return;
+      }
+
+      // Wait for backend user to be created/loaded before fetching events
+      if (backendUserLoading) {
+        console.log('⏳ Backend user still loading, waiting...');
+        return;
+      }
+
+      // If backend user creation failed, show helpful error
+      if (!backendUser) {
+        setLoading(false);
+        setError('Account setup in progress. Please refresh the page or try again in a moment.');
         return;
       }
 
@@ -120,7 +133,7 @@ const Dashboard: React.FC = () => {
     };
 
     fetchEventHistory();
-  }, [user?.email]);
+  }, [user?.email, backendUser, backendUserLoading]); // Wait for backend user to be ready
 
   // Filter and sort events
   const filteredAndSortedEvents = React.useMemo(() => {
@@ -239,12 +252,15 @@ const Dashboard: React.FC = () => {
   };
 
   // Show loading state
-  if (isLoading) {
+  // Show loading for both event loading and backend user setup
+  if (isLoading || backendUserLoading) {
     return (
       <div className="max-w-7xl mx-auto p-6">
         <div className="text-center py-12">
           <Spinner size="lg" className="mb-4" />
-          <p className="text-gray-600">Loading your events...</p>
+          <p className="text-gray-600">
+            {backendUserLoading ? 'Setting up your account...' : 'Loading your events...'}
+          </p>
         </div>
       </div>
     );

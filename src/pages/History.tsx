@@ -12,7 +12,7 @@ import { eventAPI } from '../api/apiClient';
 
 const History: React.FC = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, backendUser, backendUserLoading } = useAuth();
   const { events, setEvents, setCurrentEvent, isLoading, setLoading, setError } = useEventStore();
   
   const [searchTerm, setSearchTerm] = useState('');
@@ -26,6 +26,19 @@ const History: React.FC = () => {
       if (!user?.email) {
         setLoading(false);
         setError('User not authenticated');
+        return;
+      }
+
+      // Wait for backend user to be created/loaded before fetching events
+      if (backendUserLoading) {
+        console.log('⏳ Backend user still loading, waiting...');
+        return;
+      }
+
+      // If backend user creation failed, show helpful error
+      if (!backendUser) {
+        setLoading(false);
+        setError('Account setup in progress. Please refresh the page or try again in a moment.');
         return;
       }
 
@@ -83,7 +96,7 @@ const History: React.FC = () => {
     };
 
     fetchEventHistory();
-  }, [user?.email]);
+  }, [user?.email, backendUser, backendUserLoading]); // Wait for backend user to be ready
 
   // Filter and sort events
   const filteredAndSortedEvents = React.useMemo(() => {

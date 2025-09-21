@@ -15,7 +15,7 @@ import { useAuth } from '../contexts/AuthContext';
 const NewEvent: React.FC = () => {
   const navigate = useNavigate();
   const { addEvent, setCurrentEvent, setLoading, setError, isLoading } = useEventStore();
-  const { user } = useAuth();
+  const { user, backendUser, backendUserLoading } = useAuth();
 
   const [formData, setFormData] = useState({
     name: '',
@@ -121,6 +121,17 @@ const NewEvent: React.FC = () => {
     e.preventDefault();
     
     if (!validateForm()) {
+      return;
+    }
+
+    // Check if backend user is ready
+    if (backendUserLoading) {
+      setError('Account setup in progress. Please wait a moment and try again.');
+      return;
+    }
+
+    if (!backendUser) {
+      setError('Account setup incomplete. Please refresh the page and try again.');
       return;
     }
 

@@ -89,38 +89,64 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     userCreationInProgress.current.add(userEmail);
     
     try {
-      // Always try to fetch first - this is a GET request and won't cause 409
-      await fetchBackendUser(userEmail);
+      console.log('🔍 Checking if user exists in backend:', userEmail);
       
-      // Mark user as processed since we successfully loaded their data
-      processedUsers.current.add(userEmail);
-      
-    } catch (fetchErr) {
-      // User doesn't exist in backend, create them (only now do we POST)
+      // Try to fetch user first
       try {
-        await UserService.createOrUpdateUser(supabaseUser);
+        const existingUser = await UserService.getUserByEmail(userEmail);
         
-        // Fetch the newly created user data
-        await fetchBackendUser(userEmail);
-        
-        // Mark user as processed since we successfully created and loaded their data
-        processedUsers.current.add(userEmail);
-        
-      } catch (createErr) {
-        // Handle creation errors
-        const apiError = createErr as ApiError & { isUserExists?: boolean };
-        
-        if (apiError.isUserExists || apiError.status === 409) {
-          // User was created by another process, just fetch the data
-          await fetchBackendUser(userEmail);
-          
-          // Mark user as processed since we successfully loaded their data
+        if (existingUser && existingUser.data) {
+          console.log('✅ User found in backend:', existingUser.data);
+          setBackendUser(existingUser.data);
           processedUsers.current.add(userEmail);
-        } else {
-          // Actual error occurred
-          console.error('❌ Failed to create user in backend:', apiError.message);
-          throw createErr;
+          return;
         }
+        
+        // If we reach here, user doesn't exist, create them
+        console.log('👤 User not found, creating new user in backend...');
+        
+      } catch (fetchErr: any) {
+        // Check if it's a 404 (user not found) - this is expected for new users
+        if (fetchErr?.response?.status !== 404) {
+          console.error('❌ Unexpected error fetching user:', fetchErr);
+          throw fetchErr;
+        }
+        console.log('👤 User not found (404), creating new user in backend...');
+      }
+      
+      // Create user in backend
+      console.log('🔨 Creating user in backend with data:', {
+        id: supabaseUser.id,
+        email: supabaseUser.email,
+        name: supabaseUser.user_metadata?.full_name || supabaseUser.user_metadata?.name
+      });
+      
+      const createResponse = await UserService.createOrUpdateUser(supabaseUser);
+      
+      if (createResponse && createResponse.data) {
+        console.log('✅ User created successfully:', createResponse.data);
+        setBackendUser(createResponse.data);
+        processedUsers.current.add(userEmail);
+      } else {
+        console.error('❌ User creation succeeded but no data returned');
+        // Try to fetch the user again
+        await fetchBackendUser(userEmail);
+        processedUsers.current.add(userEmail);
+      }
+      
+    } catch (generalErr: any) {
+      console.error('❌ General error in ensureBackendUser:', generalErr);
+      
+      // Handle creation errors specifically
+      if (generalErr?.isUserExists || generalErr?.status === 409) {
+        console.log('🔄 User already exists (409), fetching data...');
+        // User was created by another process, just fetch the data
+        await fetchBackendUser(userEmail);
+        processedUsers.current.add(userEmail);
+      } else {
+        // Actual error occurred
+        setBackendUser(null); // Ensure we clear any stale data
+        throw generalErr;
       }
     } finally {
       // Always remove from in-progress set when done
