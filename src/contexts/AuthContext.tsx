@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
 import { supabase, type User, type AuthState } from '../lib/supabase';
 import type { Session } from '@supabase/supabase-js';
 import { UserService, type ApiError, type BackendUserData } from '../services/userService';
@@ -33,6 +33,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [error, setError] = useState<string | null>(null);
   const [backendUser, setBackendUser] = useState<BackendUserData | null>(null);
   const [backendUserLoading, setBackendUserLoading] = useState(false);
+  
+  // Track ongoing user creation to prevent duplicate calls
+  const userCreationInProgress = useRef<Set<string>>(new Set());
+  // Track which users we've already processed to avoid re-processing
+  const processedUsers = useRef<Set<string>>(new Set());
 
   // Fetch backend user data by email
   const fetchBackendUser = async (email: string) => {
@@ -60,26 +65,66 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  // Handle user creation in backend database
-  const handleUserCreation = async (supabaseUser: User) => {
+  // Ensure user exists in backend database (fetch-first approach)
+  const ensureBackendUser = async (supabaseUser: User) => {
+    const userEmail = supabaseUser.email;
+    if (!userEmail) return;
+    
+    // If we've already processed this user successfully, skip everything
+    if (processedUsers.current.has(userEmail)) {
+      return;
+    }
+    
+    // If we already have backend user data for this email, mark as processed and skip
+    if (backendUser && backendUser.email === userEmail) {
+      processedUsers.current.add(userEmail);
+      return;
+    }
+    
+    // Prevent duplicate operations for the same user
+    if (userCreationInProgress.current.has(userEmail)) {
+      return;
+    }
+    
+    userCreationInProgress.current.add(userEmail);
+    
     try {
-      // Create or update user in backend database
-      await UserService.createOrUpdateUser(supabaseUser);
+      // Always try to fetch first - this is a GET request and won't cause 409
+      await fetchBackendUser(userEmail);
       
-      // Fetch the backend user data after creation/update
-      if (supabaseUser.email) {
-        await fetchBackendUser(supabaseUser.email);
-      }
-    } catch (err) {
-      // Don't block the auth flow if backend sync fails
-      // Just log the error and continue
-      const apiError = err as ApiError;
-      console.error('Failed to sync user with backend:', apiError.message);
+      // Mark user as processed since we successfully loaded their data
+      processedUsers.current.add(userEmail);
       
-      // Still try to fetch user data in case user already exists
-      if (supabaseUser.email) {
-        await fetchBackendUser(supabaseUser.email);
+    } catch (fetchErr) {
+      // User doesn't exist in backend, create them (only now do we POST)
+      try {
+        await UserService.createOrUpdateUser(supabaseUser);
+        
+        // Fetch the newly created user data
+        await fetchBackendUser(userEmail);
+        
+        // Mark user as processed since we successfully created and loaded their data
+        processedUsers.current.add(userEmail);
+        
+      } catch (createErr) {
+        // Handle creation errors
+        const apiError = createErr as ApiError & { isUserExists?: boolean };
+        
+        if (apiError.isUserExists || apiError.status === 409) {
+          // User was created by another process, just fetch the data
+          await fetchBackendUser(userEmail);
+          
+          // Mark user as processed since we successfully loaded their data
+          processedUsers.current.add(userEmail);
+        } else {
+          // Actual error occurred
+          console.error('❌ Failed to create user in backend:', apiError.message);
+          throw createErr;
+        }
       }
+    } finally {
+      // Always remove from in-progress set when done
+      userCreationInProgress.current.delete(userEmail);
     }
   };
 
@@ -97,7 +142,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           
           // If there's an existing session, ensure user exists in backend
           if (session?.user) {
-            await handleUserCreation(session.user);
+            await ensureBackendUser(session.user);
           }
         }
       } catch (err) {
@@ -120,8 +165,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
         // Handle different auth events
         if (event === 'SIGNED_IN' && session?.user) {
-          // Create or update user in backend database
-          await handleUserCreation(session.user);
+          // Ensure user exists in backend database
+          await ensureBackendUser(session.user);
         }
       }
     );
@@ -174,6 +219,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setUser(null);
       setSession(null);
       setBackendUser(null);
+      
+      // Clear processed users cache so they can be re-processed on next login
+      processedUsers.current.clear();
+      userCreationInProgress.current.clear();
     } catch (err) {
       console.error('Error signing out:', err);
       const errorMessage = err instanceof Error ? err.message : 'Failed to sign out';
