@@ -65,12 +65,8 @@ export const useSimulation = (eventId?: string) => {
     checkSimulationStatus(id);
   }, [checkSimulationStatus, setLoading, updateEvent]);
 
-  // Effect to start monitoring if eventId is provided
-  useEffect(() => {
-    if (eventId) {
-      startSimulationMonitoring(eventId);
-    }
-  }, [eventId, startSimulationMonitoring]);
+  // Note: Removed automatic effect to prevent conflicts
+  // Components should manually call startSimulationMonitoring when needed
 
   return {
     simulationResult,

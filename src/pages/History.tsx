@@ -126,20 +126,45 @@ const History: React.FC = () => {
   };
 
   const handleDeleteEvent = async (eventId: string) => {
-    if (!confirm('Are you sure you want to delete this event?')) {
+    if (!confirm('Are you sure you want to delete this event? This action cannot be undone.')) {
       return;
     }
 
     try {
-      // In a real app, you'd call an API to delete the event
-      // await eventAPI.deleteEvent(eventId);
+      setLoading(true);
       
-      // For now, just remove from local state
+      // Call API to delete the event
+      await eventAPI.deleteEvent(eventId);
+      console.log('✅ Event deleted successfully:', eventId);
+      
+      // Remove from local state after successful API call
       const updatedEvents = events.filter(event => event.id !== eventId);
       setEvents(updatedEvents);
+      
+      // Show success feedback (optional)
+      setError(null);
     } catch (error: any) {
-      console.error('Error deleting event:', error);
-      setError(error.response?.data?.message || 'Failed to delete event');
+      console.error('❌ Error deleting event:', error);
+      console.error('Error response:', error.response?.data);
+      console.error('Error status:', error.response?.status);
+      
+      let errorMessage = 'Failed to delete event';
+      
+      if (error.response?.status === 404) {
+        errorMessage = 'Event not found. It may have already been deleted.';
+      } else if (error.response?.status === 403) {
+        errorMessage = 'You do not have permission to delete this event.';
+      } else if (error.response?.status >= 500) {
+        errorMessage = 'Server error occurred. Please try again later.';
+      } else if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      setError(errorMessage);
+    } finally {
+      setLoading(false);
     }
   };
 

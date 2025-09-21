@@ -5,8 +5,6 @@ import Card from '../components/common/Card';
 import Button from '../components/common/Button';
 import Input from '../components/common/Input';
 import Spinner from '../components/common/Spinner';
-import GoogleMapPicker from '../components/maps/GoogleMapPicker';
-import VenueLayoutMap from '../components/maps/VenueLayoutMap';
 import VenueSearchInput from '../components/maps/VenueSearchInput';
 import { useEventStore } from '../store/eventStore';
 import { eventAPI } from '../api/apiClient';
@@ -158,14 +156,40 @@ const NewEvent: React.FC = () => {
       const response = await eventAPI.createEvent(submitData);
       console.log('✅ Event created successfully:', response.data);
       
-      const newEvent = response.data;
+      // Transform backend response to frontend EventData format
+      const backendEvent = response.data.data || response.data;
+      
+      // Map backend status to frontend status
+      let status: 'draft' | 'processing' | 'completed' | 'error' | 'active' = 'active';
+      if (backendEvent.status) {
+        const normalizedStatus = backendEvent.status.toLowerCase();
+        if (normalizedStatus === 'created') {
+          status = 'active';
+        } else if (['draft', 'processing', 'completed', 'error', 'active'].includes(normalizedStatus)) {
+          status = normalizedStatus as typeof status;
+        }
+      }
+      
+      const newEvent = {
+        id: backendEvent.eventId || backendEvent.id,
+        name: backendEvent.name || formData.name,
+        dateStart: backendEvent.dateOfEventStart || submitData.dateOfEventStart,
+        dateEnd: backendEvent.dateOfEventEnd || submitData.dateOfEventEnd,
+        venue: backendEvent.venue || venueLocation?.name || venueLocation?.address || 'Event Venue',
+        description: backendEvent.description || formData.description,
+        venueLocation: venueLocation || undefined,
+        venueLayout: JSON.parse(venueLayoutJson || '{}'),
+        userEmail: backendEvent.userEmail || submitData.userEmail,
+        status,
+        createdAt: backendEvent.createdAt || new Date().toISOString(),
+      };
 
       // Add event to store
       addEvent(newEvent);
       setCurrentEvent(newEvent);
 
       // Navigate to dashboard
-      navigate('/dashboard', { state: { eventId: newEvent.id } });
+      navigate(`/event/${newEvent.id}`);
     } catch (error: any) {
       console.error('❌ Error creating event:', error);
       console.error('Error response:', error.response?.data);
@@ -240,7 +264,7 @@ const NewEvent: React.FC = () => {
                 Venue *
               </label>
               <VenueSearchInput
-                placeholder="Search for venue (e.g., Moscone Center)"
+                placeholder="Search for venue (e.g., Stadium Bukit Jalil)"
                 value={formData.venue}
                 onValueChange={(value) => {
                   setFormData(prev => ({ ...prev, venue: value }));
@@ -307,7 +331,7 @@ const NewEvent: React.FC = () => {
         </Card>
 
         {/* Venue Location Picker */}
-        <GoogleMapPicker
+        {/* <GoogleMapPicker
           onLocationSelected={(location) => {
             setVenueLocation(location);
             // Auto-fill venue name if not already set
@@ -321,15 +345,8 @@ const NewEvent: React.FC = () => {
           }}
           initialLocation={venueLocation || undefined}
           title={venueLocation ? "Venue Location - Click to change" : "Select Venue Location"}
-        />
+        /> */}
 
-        {/* Venue Layout Display */}
-        {venueLocation && (
-          <VenueLayoutMap
-            venueLocation={venueLocation}
-            title="Venue Layout & Nearby Facilities"
-          />
-        )}
 
         {/* User Authentication Error */}
         {errors.userEmail && (
@@ -341,7 +358,7 @@ const NewEvent: React.FC = () => {
         )}
 
         {/* Submit */}
-        <div className="flex justify-end space-x-4">
+        <div className="flex justify-between">
           <Button
             type="button"
             variant="outline"
@@ -349,20 +366,72 @@ const NewEvent: React.FC = () => {
           >
             Cancel
           </Button>
-          <Button
-            type="submit"
-            loading={isLoading}
-            disabled={isLoading}
-          >
-            {isLoading ? (
-              <>
-                <Spinner size="sm" color="white" className="mr-2" />
-                Creating Event...
-              </>
-            ) : (
-              'Create Event & Start Simulation'
-            )}
-          </Button>
+          
+          <div className="flex space-x-4">
+            {/* <Button
+              type="button"
+              variant="outline"
+              onClick={async (e) => {
+                e.preventDefault();
+                // Navigate to dashboard to run forecast
+                if (validateForm()) {
+                  setLoading(true);
+                  setError(null);
+
+                  try {
+                    // Create FormData for file upload
+                    const submitData = new FormData();
+                    submitData.append('name', formData.name);
+                    submitData.append('capacity', formData.capacity);
+                    submitData.append('date', formData.date);
+                    submitData.append('venue', formData.venue);
+                    submitData.append('description', formData.description);
+                    
+                    if (files.ticketingData) {
+                      submitData.append('ticketingData', files.ticketingData);
+                    }
+                    
+                    if (files.venueLayout) {
+                      submitData.append('venueLayout', files.venueLayout);
+                    }
+
+                    const response = await eventAPI.createEvent(submitData);
+                    const newEvent = response.data;
+
+                    // Add event to store
+                    addEvent(newEvent);
+                    setCurrentEvent(newEvent);
+
+                    // Navigate to dashboard
+                    navigate(`/event/${newEvent.id}`);
+                  } catch (error: any) {
+                    console.error('Error creating event:', error);
+                    setError(error.response?.data?.message || 'Failed to create event');
+                  } finally {
+                    setLoading(false);
+                  }
+                }
+              }}
+              disabled={isLoading}
+            >
+              Create Event & Run Forecast
+            </Button> */}
+            
+            <Button
+              type="submit"
+              loading={isLoading}
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <>
+                  <Spinner size="sm" color="white" className="mr-2" />
+                  Creating Event...
+                </>
+              ) : (
+                'Create Event'
+              )}
+            </Button>
+          </div>
         </div>
       </form>
     </div>

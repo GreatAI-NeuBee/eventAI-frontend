@@ -8,6 +8,7 @@ interface EventStore {
   simulationResult: SimulationResult | null;
   isLoading: boolean;
   error: string | null;
+  hasRunForecast: boolean;
   
   // Actions
   setEvents: (events: EventData[]) => void;
@@ -18,6 +19,7 @@ interface EventStore {
   addEvent: (event: EventData) => void;
   updateEvent: (eventId: string, updates: Partial<EventData>) => void;
   clearError: () => void;
+  setHasRunForecast: (hasRun: boolean) => void;
   reset: () => void;
 }
 
@@ -28,6 +30,7 @@ export const useEventStore = create<EventStore>((set) => ({
   simulationResult: null,
   isLoading: false,
   error: null,
+  hasRunForecast: false,
 
   // Actions
   setEvents: (events) => set({ events }),
@@ -55,11 +58,14 @@ export const useEventStore = create<EventStore>((set) => ({
   
   clearError: () => set({ error: null }),
   
+  setHasRunForecast: (hasRun) => set({ hasRunForecast: hasRun }),
+  
   reset: () => set({
     events: [],
     currentEvent: null,
     simulationResult: null,
     isLoading: false,
     error: null,
+    hasRunForecast: false,
   }),
 }));
