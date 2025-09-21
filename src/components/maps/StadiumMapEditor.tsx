@@ -9,6 +9,10 @@ import {
   Plus,
   Minus,
 } from "lucide-react";
+// If you already have helpers, keep these imports.
+// (Not required by this component to function.)
+import { addToilet } from "../../utils/toiletutils";
+import type { Toilet } from "../../utils/toiletutils";
 
 /* =========================
    Types
@@ -30,6 +34,7 @@ type EditorExit = {
   id: string;
   name: string;
   position: PctPoint;
+  capacity?: number; // persons per hour (editable)
 };
 
 export type StadiumMapJSON = {
@@ -37,7 +42,8 @@ export type StadiumMapJSON = {
   layers: number;
   exits: number;
   zones: { id: string; name: string; layer: number; points: PctPoint[] }[];
-  exitsList: { id: string; name: string; position: PctPoint }[];
+  exitsList: { id: string; name: string; position: PctPoint; capacity?: number }[];
+  toiletsList?: { id: string; position: PctPoint; label?: string; fixtures?: number }[];
 };
 
 /* =========================
@@ -47,7 +53,9 @@ const vbW = 100;
 const vbH = 62.5;
 
 const CIRCLE_MARGIN = 3; // margin from edges
-const ANG_GAP = 2;       // small angular gap between sections (degrees)
+const ANG_GAP = 2; // small angular gap between sections (degrees)
+const EXIT_DEFAULT_CAP = 800; // persons/hour default
+const TOILET_HIT_R = 2.0; // svg units for click hit-testing
 
 function circleOuterRadius(): number {
   return Math.min(vbW / 2 - CIRCLE_MARGIN, vbH / 2 - CIRCLE_MARGIN);
@@ -59,17 +67,17 @@ function circleCenter(): [number, number] {
 // ---- Limits ----
 const LIMITS = {
   LAYERS_MIN: 1,
-  LAYERS_MAX: 6,            // ⬅️ change as you like
+  LAYERS_MAX: 6,
   SECTIONS_MIN: 1,
-  SECTIONS_MAX: 16,         // ⬅️ max sections PER layer
+  SECTIONS_MAX: 16,
   ROWS_MIN: 1,
-  ROWS_MAX: 20,             // ⬅️ rectangular layout
+  ROWS_MAX: 5,
   COLS_MIN: 1,
-  COLS_MAX: 30,             // ⬅️ rectangular layout
+  COLS_MAX: 8,
 };
 
-const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
-
+const clamp = (v: number, min: number, max: number) =>
+  Math.max(min, Math.min(max, v));
 
 /** Pack concentric rings inside a single outer circle. */
 function computeRingPack(layers: number, voidRatio = 0.35, gap = 1.6) {
@@ -117,7 +125,13 @@ function rectCell(x: number, y: number, w: number, h: number): PctPoint[] {
 }
 
 /** SVG arc path for a circle center (cx,cy), radius r, start->end in degrees (clockwise). */
-function arcPathD(cx: number, cy: number, r: number, startDeg: number, endDeg: number): string {
+function arcPathD(
+  cx: number,
+  cy: number,
+  r: number,
+  startDeg: number,
+  endDeg: number
+): string {
   const toRad = (d: number) => (d * Math.PI) / 180;
   const a0 = toRad(startDeg);
   const a1 = toRad(endDeg);
@@ -143,27 +157,39 @@ const StadiumMapEditor: React.FC<{
   // UI State
   const [layout, setLayout] = React.useState<LayoutMode>("circular");
 
+  // Per-layout toilets (so each layout’s toilets “stick” to that layout)
+  const [toiletsByLayout, setToiletsByLayout] = React.useState<
+    Record<LayoutMode, Toilet[]>
+  >({
+    circular: [],
+    rect: [],
+    custom: [],
+  });
+  const toilets = toiletsByLayout[layout]; // active list for current layout
+  const [hoverToiletId, setHoverToiletId] = React.useState<string | null>(null);
+
   // Circular config
   const [layers, setLayers] = React.useState<number>(
     clamp(Math.max(initialLayers, 1), LIMITS.LAYERS_MIN, LIMITS.LAYERS_MAX)
-  ); 
+  );
   const [sectionsPerLayer, setSectionsPerLayer] = React.useState<number[]>(
     Array.from({ length: layers }, (_, i) =>
       clamp(i === 0 ? 1 : 4, LIMITS.SECTIONS_MIN, LIMITS.SECTIONS_MAX)
-    )  
-);
+    )
+  );
 
   // Rect config
-  const [rows, setRows] = React.useState<number>(3);
-  const [cols, setCols] = React.useState<number>(8);
+  const [rows, setRows] = React.useState<number>(2);
+  const [cols, setCols] = React.useState<number>(3);
 
   // Custom shapes + free exits
   const [zones, setZones] = React.useState<EditorZone[]>([]);
   const [exits, setExits] = React.useState<EditorExit[]>([]);
 
   // Tools
-  const [tool, setTool] = React.useState<"idle" | "draw-section" | "add-exit" | "add-rect" | "move">("idle");
-  const svgRef = React.useRef<SVGSVGElement | null>(null);
+  const [tool, setTool] = React.useState<
+    "idle" | "draw-section" | "add-exit" | "add-rect" | "move" | "add-toilet"
+  >("idle");
 
   // Drafting (free polygon for custom)
   const [draftPoints, setDraftPoints] = React.useState<PctPoint[]>([]);
@@ -172,7 +198,9 @@ const StadiumMapEditor: React.FC<{
 
   // Drag state (custom rectangles)
   const [draggingId, setDraggingId] = React.useState<string | null>(null);
-  const dragStartRef = React.useRef<{ id: string; start: [number, number] } | null>(null);
+  const dragStartRef = React.useRef<{ id: string; start: [number, number] } | null>(
+    null
+  );
 
   /* =========================
      Candidate exits
@@ -191,7 +219,10 @@ const StadiumMapEditor: React.FC<{
     }
     if (layout === "rect") {
       const inset = 5;
-      const left = inset, right = vbW - inset, top = inset, bottom = vbH - inset;
+      const left = inset,
+        right = vbW - inset,
+        top = inset,
+        bottom = vbH - inset;
       const spots: PctPoint[] = [];
       for (let i = 1; i <= 4; i++) {
         const x = left + (i * (right - left)) / 5;
@@ -262,6 +293,44 @@ const StadiumMapEditor: React.FC<{
   const effectiveZones: EditorZone[] = layout === "custom" ? zones : fixedZones;
   const effectiveExits: EditorExit[] = exits;
 
+  /* =========================
+     Toilets helpers
+     ========================= */
+  const setToiletsForLayout = (mode: LayoutMode, updater: (prev: Toilet[]) => Toilet[]) =>
+    setToiletsByLayout((prev) => ({
+      ...prev,
+      [mode]: updater(prev[mode]),
+    }));
+
+  const addToiletAt = (p: PctPoint) => {
+    // If you have a helper creator, you can call it here instead:
+    // const t = addToilet(p); // ensure your util returns {id, position, ...}
+    const t: Toilet = {
+      id: `wc-${Date.now()}`,
+      position: p,
+      label: `WC ${toilets.length + 1}`,
+      fixtures: 0,
+    };
+    setToiletsForLayout(layout, (prev) => [...prev, t]);
+  };
+
+  const removeToiletById = (id: string) => {
+    setToiletsForLayout(layout, (prev) => prev.filter((x) => x.id !== id));
+  };
+
+  const findNearestToilet = (p: PctPoint, list: Toilet[]) => {
+    let best: { idx: number; dist2: number } | null = null;
+    for (let i = 0; i < list.length; i++) {
+      const t = list[i];
+      const dx = t.position[0] - p[0];
+      const dy = t.position[1] - p[1];
+      const d2 = dx * dx + dy * dy;
+      if (best === null || d2 < best.dist2) best = { idx: i, dist2: d2 };
+    }
+    if (!best) return null;
+    return Math.sqrt(best.dist2) <= TOILET_HIT_R ? list[best.idx] : null;
+  };
+
   // Export JSON
   const exportJSON: StadiumMapJSON = React.useMemo(() => {
     const maxLayer =
@@ -270,21 +339,42 @@ const StadiumMapEditor: React.FC<{
         : layout === "rect"
         ? 1
         : Math.max(layers, 1);
+
     return {
       sections: effectiveZones.length,
       layers: maxLayer,
       exits: effectiveExits.length,
-      zones: effectiveZones.map(({ id, name, layer, points }) => ({ id, name, layer, points })),
-      exitsList: effectiveExits.map((e) => ({ ...e })),
+      zones: effectiveZones.map(({ id, name, layer, points }) => ({
+        id,
+        name,
+        layer,
+        points,
+      })),
+      exitsList: effectiveExits.map((e) => ({
+        id: e.id,
+        name: e.name,
+        position: e.position,
+        capacity: e.capacity ?? EXIT_DEFAULT_CAP,
+      })),
+      // ✅ Export toilets for the CURRENT layout
+      toiletsList: toilets.map((t) => ({
+        id: t.id,
+        position: t.position,
+        label: t.label,
+        fixtures: t.fixtures,
+      })),
     };
-  }, [effectiveZones, effectiveExits, layers, layout]);
+  }, [effectiveZones, effectiveExits, layers, layout, toilets]);
 
   React.useEffect(() => {
     onChange?.(exportJSON);
   }, [exportJSON, onChange]);
 
   /* ============ Canvas helpers ============ */
-  const toPct = (evt: React.MouseEvent<SVGSVGElement, MouseEvent>): PctPoint | null => {
+  const svgRef = React.useRef<SVGSVGElement | null>(null);
+  const toPct = (
+    evt: React.MouseEvent<SVGSVGElement, MouseEvent>
+  ): PctPoint | null => {
     const svg = svgRef.current;
     if (!svg) return null;
     const rect = svg.getBoundingClientRect();
@@ -298,10 +388,27 @@ const StadiumMapEditor: React.FC<{
     const p = toPct(evt);
     if (!p) return;
 
+    // Toilets: toggle add/remove on click (per current layout)
+    if (tool === "add-toilet") {
+      const hit = findNearestToilet(p, toilets);
+      if (hit) removeToiletById(hit.id);
+      else addToiletAt(p);
+      return;
+    }
+
+    // Exits
     if (tool === "add-exit") {
       if (layout === "custom") {
         const id = `exit-${Date.now()}`;
-        setExits((prev) => [...prev, { id, name: `Exit ${prev.length + 1}`, position: p }]);
+        setExits((prev) => [
+          ...prev,
+          {
+            id,
+            name: `Exit ${prev.length + 1}`,
+            position: p,
+            capacity: EXIT_DEFAULT_CAP,
+          },
+        ]);
         return;
       }
       let best: { idx: number; dist: number } | null = null;
@@ -318,13 +425,17 @@ const StadiumMapEditor: React.FC<{
         const snap = candidateExits[best.idx];
         const key = `${snap[0].toFixed(2)},${snap[1].toFixed(2)}`;
         const existingIdx = exits.findIndex(
-          (e) => `${e.position[0].toFixed(2)},${e.position[1].toFixed(2)}` === key
+          (e) =>
+            `${e.position[0].toFixed(2)},${e.position[1].toFixed(2)}` === key
         );
         if (existingIdx >= 0) {
           setExits((prev) => prev.filter((_, i) => i !== existingIdx));
         } else {
           const id = `exit-${Date.now()}`;
-          setExits((prev) => [...prev, { id, name: `Exit ${prev.length + 1}`, position: snap }]);
+          setExits((prev) => [
+            ...prev,
+            { id, name: `Exit ${prev.length + 1}`, position: snap },
+          ]);
         }
       }
       return;
@@ -337,7 +448,8 @@ const StadiumMapEditor: React.FC<{
   };
 
   const addRectZone = () => {
-    const w = 12, h = 8;
+    const w = 12,
+      h = 8;
     const x = vbW / 2 - w / 2;
     const y = vbH / 2 - h / 2;
     const id = `rect-${Date.now()}`;
@@ -361,7 +473,15 @@ const StadiumMapEditor: React.FC<{
   };
 
   const onCanvasMouseMove = (evt: React.MouseEvent<SVGSVGElement>) => {
-    if (!(layout === "custom" && tool === "move" && draggingId && dragStartRef.current)) return;
+    if (
+      !(
+        layout === "custom" &&
+        tool === "move" &&
+        draggingId &&
+        dragStartRef.current
+      )
+    )
+      return;
     const p = toPct(evt);
     if (!p) return;
     const prev = dragStartRef.current.start;
@@ -391,14 +511,18 @@ const StadiumMapEditor: React.FC<{
     if (draftPoints.length < 3) return;
     const id = `sec-${Date.now()}`;
     const name = draftName.trim() || `Custom ${zones.length + 1}`;
-    setZones((prev) => [...prev, { id, name, layer: draftLayer || 1, points: draftPoints }]);
+    setZones((prev) => [
+      ...prev,
+      { id, name, layer: draftLayer || 1, points: draftPoints },
+    ]);
     setDraftPoints([]);
     setDraftName("");
     setTool("idle");
   };
 
   const clearDraft = () => setDraftPoints([]);
-  const removeLastPoint = () => setDraftPoints((pts) => (pts.length ? pts.slice(0, -1) : pts));
+  const removeLastPoint = () =>
+    setDraftPoints((pts) => (pts.length ? pts.slice(0, -1) : pts));
 
   const clearAll = () => {
     setZones([]);
@@ -406,12 +530,12 @@ const StadiumMapEditor: React.FC<{
     setDraftPoints([]);
     setDraftName("");
     setTool("idle");
+    // keep toilets — they are per-layout and should persist by design
   };
 
   React.useEffect(() => {
     setSectionsPerLayer((prev) => {
       const next = [...prev];
-
       // Extend or shrink to match layers
       if (layers > next.length) {
         while (next.length < layers) {
@@ -420,7 +544,6 @@ const StadiumMapEditor: React.FC<{
       } else {
         next.length = layers;
       }
-
       // Clamp each layer’s sections
       for (let i = 0; i < next.length; i++) {
         next[i] = clamp(
@@ -431,13 +554,12 @@ const StadiumMapEditor: React.FC<{
       }
       return next;
     });
-  }, [layers]); 
+  }, [layers]);
 
   // Colors
   const Z_FILL = "rgba(59,130,246,0.25)";
   const Z_STROKE = "#2563eb";
   const EXIT_FILL = "#ef4444";
-  const CANDIDATE_FILL = "rgba(34,197,94,0.6)";
   const BG = "#ffffff";
   const BORDER = "#e5e7eb";
 
@@ -447,11 +569,15 @@ const StadiumMapEditor: React.FC<{
       <div className="bg-white p-4 rounded-lg shadow-sm">
         <div className="flex flex-col md:flex-row gap-4 md:items-center">
           <div className="flex-1">
-            <h2 className="text-lg font-semibold text-gray-800 mb-2">Stadium Map Editor</h2>
+            <h2 className="text-lg font-semibold text-gray-800 mb-2">
+              Stadium Map Editor
+            </h2>
 
             <div className="flex flex-wrap items-center gap-3">
               <div className="flex items-center gap-2">
-                <label className="text-sm font-medium text-gray-700">Layout Type</label>
+                <label className="text-sm font-medium text-gray-700">
+                  Layout Type
+                </label>
                 <select
                   value={layout}
                   onChange={(e) => {
@@ -476,16 +602,26 @@ const StadiumMapEditor: React.FC<{
                       <button
                         type="button"
                         className="px-2 py-1 text-gray-600 hover:bg-gray-100"
-                        onClick={() => setLayers((n) => clamp(n - 1, LIMITS.LAYERS_MIN, LIMITS.LAYERS_MAX))}
+                        onClick={() =>
+                          setLayers((n) =>
+                            clamp(n - 1, LIMITS.LAYERS_MIN, LIMITS.LAYERS_MAX)
+                          )
+                        }
                         disabled={layers <= LIMITS.LAYERS_MIN}
                       >
                         <Minus className="h-3 w-3" />
                       </button>
-                      <span className="px-2 py-1 text-sm font-medium min-w-[2rem] text-center">{layers}</span>
+                      <span className="px-2 py-1 text-sm font-medium min-w-[2rem] text-center">
+                        {layers}
+                      </span>
                       <button
                         type="button"
                         className="px-2 py-1 text-gray-600 hover:bg-gray-100"
-                        onClick={() => setLayers((n) => clamp(n + 1, LIMITS.LAYERS_MIN, LIMITS.LAYERS_MAX))}
+                        onClick={() =>
+                          setLayers((n) =>
+                            clamp(n + 1, LIMITS.LAYERS_MIN, LIMITS.LAYERS_MAX)
+                          )
+                        }
                         disabled={layers >= LIMITS.LAYERS_MAX}
                       >
                         <Plus className="h-3 w-3" />
@@ -496,7 +632,9 @@ const StadiumMapEditor: React.FC<{
                   <div className="flex flex-wrap items-center gap-2">
                     {Array.from({ length: layers }, (_, i) => (
                       <div key={i} className="flex items-center gap-1">
-                        <span className="text-xs text-gray-600">L{i + 1} Sections</span>
+                        <span className="text-xs text-gray-600">
+                          L{i + 1} Sections
+                        </span>
                         <input
                           type="number"
                           min={LIMITS.SECTIONS_MIN}
@@ -529,28 +667,48 @@ const StadiumMapEditor: React.FC<{
                     <span className="text-sm text-gray-700">Rows</span>
                     <input
                       type="number"
-                      min={1}
+                      min={LIMITS.ROWS_MIN}
+                      max={LIMITS.ROWS_MAX}
                       value={rows}
                       onChange={(e) => {
                         const raw = parseInt(e.target.value, 10);
-                        setRows(Number.isFinite(raw) ? Math.max(1, raw) : 1);
+                        setRows(
+                          clamp(
+                            Number.isFinite(raw) ? raw : LIMITS.ROWS_MIN,
+                            LIMITS.ROWS_MIN,
+                            LIMITS.ROWS_MAX
+                          )
+                        );
                       }}
                       className="w-16 rounded border border-gray-300 px-2 py-1 text-sm"
                     />
                   </div>
+
                   <div className="flex items-center gap-2">
                     <span className="text-sm text-gray-700">Columns</span>
                     <input
                       type="number"
-                      min={1}
+                      min={LIMITS.COLS_MIN}
+                      max={LIMITS.COLS_MAX}
                       value={cols}
                       onChange={(e) => {
                         const raw = parseInt(e.target.value, 10);
-                        setCols(Number.isFinite(raw) ? Math.max(1, raw) : 1);
+                        setCols(
+                          clamp(
+                            Number.isFinite(raw) ? raw : LIMITS.COLS_MIN,
+                            LIMITS.COLS_MIN,
+                            LIMITS.COLS_MAX
+                          )
+                        );
                       }}
                       className="w-16 rounded border border-gray-300 px-2 py-1 text-sm"
                     />
                   </div>
+
+                  <span className="text-xs text-gray-500">
+                    (Rows {LIMITS.ROWS_MIN}–{LIMITS.ROWS_MAX}, Cols{" "}
+                    {LIMITS.COLS_MIN}–{LIMITS.COLS_MAX})
+                  </span>
                 </div>
               )}
             </div>
@@ -565,10 +723,30 @@ const StadiumMapEditor: React.FC<{
                   ? "bg-red-600 text-white"
                   : "bg-white text-gray-800 border border-gray-300 hover:bg-gray-50"
               }`}
-              title={layout === "custom" ? "Click anywhere to place exit" : "Click highlighted spots to place/remove exit"}
+              title={
+                layout === "custom"
+                  ? "Click anywhere to place exit"
+                  : "Click highlighted spots to place/remove exit"
+              }
             >
               <Triangle className="h-4 w-4" />
               {tool === "add-exit" ? "Placing Exits" : "Add Exit"}
+            </button>
+
+            <button
+              type="button"
+              onClick={() =>
+                setTool((t) => (t === "add-toilet" ? "idle" : "add-toilet"))
+              }
+              className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${
+                tool === "add-toilet"
+                  ? "bg-emerald-600 text-white"
+                  : "bg-white text-gray-800 border border-gray-300 hover:bg-gray-50"
+              }`}
+              title="Click anywhere to place a toilet"
+            >
+              🚻
+              {tool === "add-toilet" ? "Placing Toilets" : "Add Toilet"}
             </button>
 
             <button
@@ -581,7 +759,9 @@ const StadiumMapEditor: React.FC<{
             <button
               type="button"
               onClick={() => {
-                const blob = new Blob([JSON.stringify(exportJSON, null, 2)], { type: "application/json" });
+                const blob = new Blob([JSON.stringify(exportJSON, null, 2)], {
+                  type: "application/json",
+                });
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement("a");
                 a.download = `stadium-map-${Date.now()}.json`;
@@ -614,7 +794,9 @@ const StadiumMapEditor: React.FC<{
               </button>
               <button
                 type="button"
-                onClick={() => setTool((t) => (t === "draw-section" ? "idle" : "draw-section"))}
+                onClick={() =>
+                  setTool((t) => (t === "draw-section" ? "idle" : "draw-section"))
+                }
                 className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${
                   tool === "draw-section"
                     ? "bg-blue-600 text-white"
@@ -635,7 +817,8 @@ const StadiumMapEditor: React.FC<{
                 <MousePointer2 className="h-4 w-4" /> Move
               </button>
 
-              {(tool === "add-rect" || (tool === "draw-section" && draftPoints.length >= 3)) && (
+              {(tool === "add-rect" ||
+                (tool === "draw-section" && draftPoints.length >= 3)) && (
                 <button
                   type="button"
                   onClick={() => {
@@ -659,7 +842,9 @@ const StadiumMapEditor: React.FC<{
       {layout === "custom" && tool === "draw-section" && (
         <div className="bg-white p-4 rounded-lg shadow-sm grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Section Name</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Section Name
+            </label>
             <input
               value={draftName}
               onChange={(e) => setDraftName(e.target.value)}
@@ -668,7 +853,9 @@ const StadiumMapEditor: React.FC<{
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Layer</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Layer
+            </label>
             <input
               type="number"
               min={1}
@@ -741,23 +928,30 @@ const StadiumMapEditor: React.FC<{
             {layout === "circular" &&
               (() => {
                 const { cx, cy, R } = computeRingPack(layers, 0.35, 1.6);
-                return <circle cx={cx} cy={cy} r={R} fill={BG} stroke={BORDER} strokeWidth={0.6} />;
+                return (
+                  <circle
+                    cx={cx}
+                    cy={cy}
+                    r={R}
+                    fill={BG}
+                    stroke={BORDER}
+                    strokeWidth={0.6}
+                  />
+                );
               })()}
 
-            {/* ==== ZONES/EXITS ==== */}
+            {/* ==== ZONES ==== */}
             {layout === "circular" ? (
               <g clipPath="url(#stadiumClip)">
-                {(fixedZones as EditorZone[]).map((z) => {
+                {fixedZones.map((z) => {
                   const { cx, cy } = computeRingPack(layers, 0.35, 1.6);
                   // mid radius of this wedge for text path
-                  // derive rMid by averaging radii from any two polygon points (or recompute)
-                  // safer: recompute from stored angles & compute rIn/rOut by projecting one polygon edge
-                  // We'll approximate by taking average of all vertex distances from center.
-                  const rMid = z.points.reduce((acc, [x, y]) => {
-                    const dx = x - cx;
-                    const dy = y - cy;
-                    return acc + Math.hypot(dx, dy);
-                  }, 0) / z.points.length;
+                  const rMid =
+                    z.points.reduce((acc, [x, y]) => {
+                      const dx = x - cx;
+                      const dy = y - cy;
+                      return acc + Math.hypot(dx, dy);
+                    }, 0) / z.points.length;
 
                   const pathId = `arc-${z.id}`;
                   const startDeg = z.startDeg ?? -90;
@@ -770,20 +964,15 @@ const StadiumMapEditor: React.FC<{
                       onMouseDown={(e) => onZoneMouseDown(z.id, e)}
                       style={{ cursor: "default" }}
                     >
-                      {/* polygon fill */}
                       <polygon
                         points={z.points.map((p) => `${p[0]},${p[1]}`).join(" ")}
                         fill={Z_FILL}
                         stroke={Z_STROKE}
                         strokeWidth={0.4}
                       />
-
-                      {/* curved label path (hidden stroke) */}
                       <defs>
                         <path id={pathId} d={d} />
                       </defs>
-
-                      {/* curved text: S1, S2, ... */}
                       <text fontSize={2.2} fill="#111827" fontWeight="bold">
                         <textPath href={`#${pathId}`} startOffset="50%" textAnchor="middle">
                           {`S${z.sectionIndex ?? 1}`}
@@ -792,34 +981,9 @@ const StadiumMapEditor: React.FC<{
                     </g>
                   );
                 })}
-
-                {/* Draft polyline (custom polygon) */}
-                {draftPoints.length > 0 && layout === "custom" && (
-                  <g>
-                    <polyline
-                      points={draftPoints.map((p) => `${p[0]},${p[1]}`).join(" ")}
-                      fill="none"
-                      stroke="#10b981"
-                      strokeWidth={0.5}
-                    />
-                    {draftPoints.map((p, i) => (
-                      <circle key={i} cx={p[0]} cy={p[1]} r={0.7} fill="#10b981" />
-                    ))}
-                  </g>
-                )}
-
-                {/* Exits */}
-                {exits.map((e) => (
-                  <g key={e.id}>
-                    <circle cx={e.position[0]} cy={e.position[1]} r={1.2} fill={EXIT_FILL} />
-                    <text x={e.position[0] + 1.8} y={e.position[1]} fontSize={2} fill="#374151" dominantBaseline="middle">
-                      {e.name}
-                    </text>
-                  </g>
-                ))}
               </g>
             ) : (
-              // ===== RECT or CUSTOM: straight labels =====
+              // RECT or CUSTOM zones
               <>
                 {(layout === "custom" ? zones : fixedZones).map((z) => (
                   <g
@@ -846,37 +1010,60 @@ const StadiumMapEditor: React.FC<{
                     </text>
                   </g>
                 ))}
-
-                {/* Draft (custom) */}
-                {layout === "custom" && draftPoints.length > 0 && (
-                  <g>
-                    <polyline
-                      points={draftPoints.map((p) => `${p[0]},${p[1]}`).join(" ")}
-                      fill="none"
-                      stroke="#10b981"
-                      strokeWidth={0.5}
-                    />
-                    {draftPoints.map((p, i) => (
-                      <circle key={i} cx={p[0]} cy={p[1]} r={0.7} fill="#10b981" />
-                    ))}
-                  </g>
-                )}
-
-                {/* Exits */}
-                {exits.map((e) => (
-                  <g key={e.id}>
-                    <circle cx={e.position[0]} cy={e.position[1]} r={1.2} fill={EXIT_FILL} />
-                    <text x={e.position[0] + 1.8} y={e.position[1]} fontSize={2} fill="#374151" dominantBaseline="middle">
-                      {e.name}
-                    </text>
-                  </g>
-                ))}
               </>
             )}
 
+            {/* ==== EXITS (rendered outside clipped area for circular) ==== */}
+            {exits.map((e) => (
+              <g key={e.id}>
+                <circle cx={e.position[0]} cy={e.position[1]} r={1.2} fill={EXIT_FILL} />
+                {/* label on hover only? If you want capacity on hover, add hover state like exitsHoverId */}
+                {/* Keeping text hidden per your last change */}
+              </g>
+            ))}
+
+            {/* ==== TOILETS (only show in circular) ==== */}
+            {layout === "circular" &&
+              toilets.map((t) => (
+                <g
+                  key={t.id}
+                  onMouseEnter={() => setHoverToiletId(t.id)}
+                  onMouseLeave={() => setHoverToiletId(null)}
+                  style={{ cursor: tool === "add-toilet" ? "pointer" : "default" }}
+                >
+                  <text
+                    x={t.position[0]}
+                    y={t.position[1]}
+                    fontSize={3.2}            // tweak size if you like
+                    textAnchor="middle"
+                    dominantBaseline="central"
+                  >
+                    {"🚻"}
+                  </text>
+                </g>
+              ))}
+
+            {/* Draft (custom) */}
+            {layout === "custom" && draftPoints.length > 0 && (
+              <g>
+                <polyline
+                  points={draftPoints.map((p) => `${p[0]},${p[1]}`).join(" ")}
+                  fill="none"
+                  stroke="#10b981"
+                  strokeWidth={0.5}
+                />
+                {draftPoints.map((p, i) => (
+                  <circle key={i} cx={p[0]} cy={p[1]} r={0.7} fill="#10b981" />
+                ))}
+              </g>
+            )}
+
             {/* Candidate exit spots (fixed only; works for both circular/rect) */}
-            {layout !== "custom" && tool === "add-exit" &&
-              candidateExits.map((p, i) => <circle key={i} cx={p[0]} cy={p[1]} r={1.0} fill="rgba(34,197,94,0.6)" />)}
+            {layout !== "custom" &&
+              tool === "add-exit" &&
+              candidateExits.map((p, i) => (
+                <circle key={i} cx={p[0]} cy={p[1]} r={1.0} fill="rgba(34,197,94,0.6)" />
+              ))}
           </svg>
 
           {/* Helper text */}
@@ -905,10 +1092,73 @@ const StadiumMapEditor: React.FC<{
               <div>{exportJSON.layers}</div>
               <div className="font-medium">Exits:</div>
               <div>{exits.length}</div>
+              {layout === "circular" && (
+                <>
+                  <div className="font-medium">Toilets:</div>
+                  <div>{toilets.length}</div>
+                </>
+              )}
             </div>
           </div>
         </div>
       </div>
+
+      {exits.length > 0 && (
+        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-medium text-gray-800">
+              Exit Capacity Estimates
+            </h3>
+            <div className="text-xs text-gray-600">
+              Total:&nbsp;
+              <span className="font-semibold">
+                {exits
+                  .reduce(
+                    (sum, e) => sum + (e.capacity ?? EXIT_DEFAULT_CAP),
+                    0
+                  )
+                  .toLocaleString()}{" "}
+                pax/hr
+              </span>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            {exits.map((e) => (
+              <div
+                key={e.id}
+                className="flex flex-wrap items-center gap-3 justify-between rounded-md border border-gray-200 px-3 py-2"
+              >
+                <div className="text-sm font-medium text-gray-800">{e.name}</div>
+
+                <label className="flex items-center gap-2 text-xs text-gray-700">
+                  Capacity (pax/hr)
+                  <input
+                    type="number"
+                    min={0}
+                    step={50}
+                    value={e.capacity ?? EXIT_DEFAULT_CAP}
+                    onChange={(ev) => {
+                      const raw = parseInt(ev.target.value, 10);
+                      const val = Number.isFinite(raw) ? Math.max(0, raw) : 0;
+                      setExits((prev) =>
+                        prev.map((x) =>
+                          x.id === e.id ? { ...x, capacity: val } : x
+                        )
+                      );
+                    }}
+                    className="w-28 rounded border border-gray-300 px-2 py-1 text-sm"
+                  />
+                </label>
+
+                <div className="text-xs text-gray-500">
+                  ~{Math.round((e.capacity ?? EXIT_DEFAULT_CAP) / 60)} pax/min
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* JSON preview */}
       <details className="rounded-lg border border-gray-200 bg-white overflow-hidden">
