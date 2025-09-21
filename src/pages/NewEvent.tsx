@@ -4,6 +4,7 @@ import { Calendar } from 'lucide-react';
 import Card from '../components/common/Card';
 import Button from '../components/common/Button';
 import Input from '../components/common/Input';
+import TimeSelector from '../components/common/TimeSelector';
 import VenueSearchInput from '../components/maps/VenueSearchInput';
 import { useEventStore } from '../store/eventStore';
 import { eventAPI } from '../api/apiClient';
@@ -37,7 +38,7 @@ const NewEvent: React.FC = () => {
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
     
@@ -263,36 +264,36 @@ const NewEvent: React.FC = () => {
               </label>
               <div className="flex items-center space-x-3">
                 <div className="flex-1">
-                  <input
-                    type="time"
-                    name="startTime"
+                  <TimeSelector
                     value={formData.startTime}
-                    onChange={handleInputChange}
-                    className={`block w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-1 ${
-                      errors.startTime || errors.endTime
-                        ? 'border-red-300 focus:border-red-500 focus:ring-red-500'
-                        : 'border-gray-300 focus:border-primary-500 focus:ring-primary-500'
-                    }`}
-                    placeholder="Start time"
-                    required
+                    onChange={(value) => {
+                      setFormData(prev => ({ ...prev, startTime: value }));
+                      // Clear error when user selects a time
+                      if (errors.startTime) {
+                        setErrors(prev => ({ ...prev, startTime: '' }));
+                      }
+                    }}
+                    placeholder="Select start time"
+                    error={!!(errors.startTime || errors.endTime)}
+                    name="startTime"
                   />
                 </div>
                 <div className="flex-shrink-0 text-gray-500 font-medium">
                   to
                 </div>
                 <div className="flex-1">
-                  <input
-                    type="time"
-                    name="endTime"
+                  <TimeSelector
                     value={formData.endTime}
-                    onChange={handleInputChange}
-                    className={`block w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-1 ${
-                      errors.startTime || errors.endTime
-                        ? 'border-red-300 focus:border-red-500 focus:ring-red-500'
-                        : 'border-gray-300 focus:border-primary-500 focus:ring-primary-500'
-                    }`}
-                    placeholder="End time"
-                    required
+                    onChange={(value) => {
+                      setFormData(prev => ({ ...prev, endTime: value }));
+                      // Clear error when user selects a time
+                      if (errors.endTime) {
+                        setErrors(prev => ({ ...prev, endTime: '' }));
+                      }
+                    }}
+                    placeholder="Select end time"
+                    error={!!(errors.startTime || errors.endTime)}
+                    name="endTime"
                   />
                 </div>
               </div>
