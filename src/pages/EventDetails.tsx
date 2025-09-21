@@ -627,12 +627,6 @@ const EventDetails: React.FC = () => {
               />
             </Card>
 
-
-
-            {/* Nearby Parking Options below Venue Layout */}
-            {currentEvent.venueLocation && (
-              <NearbyParkingOptions venueLocation={currentEvent.venueLocation} />
-            )}
           </div>
 
           {/* Right Column - Recommendations and Forecasts */}
