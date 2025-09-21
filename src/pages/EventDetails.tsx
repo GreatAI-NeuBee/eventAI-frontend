@@ -9,6 +9,7 @@ import VenueMap from '../components/dashboard/VenueMap';
 import ScenarioTabs from '../components/dashboard/ScenarioTabs';
 import TransitForecast from '../components/dashboard/TransitForecast';
 import ParkingForecast from '../components/dashboard/ParkingForecast';
+import WeatherWidget from '../components/dashboard/WeatherWidget';
 import VenueLayoutEditor, { VenueLayoutEditorData } from '../components/venue/VenueLayoutEditor';
 import { useEventStore } from '../store/eventStore';
 import { useAuth } from '../contexts/AuthContext';
@@ -597,6 +598,16 @@ const EventDetails: React.FC = () => {
                 venueLocation={currentEvent.venueLocation}
               />
             </Card>
+
+            {/* Weather Forecast */}
+            {currentEvent.venueLocation && (
+              <Card className="p-6">
+                <WeatherWidget
+                  venueLocation={currentEvent.venueLocation}
+                  eventDate={currentEvent.dateStart}
+                />
+              </Card>
+            )}
             
           </div>
 
