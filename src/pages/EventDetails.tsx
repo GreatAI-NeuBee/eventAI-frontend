@@ -14,6 +14,7 @@ import { useEventStore } from '../store/eventStore';
 import { useAuth } from '../contexts/AuthContext';
 import type { EventData } from '../types/simulation';
 import { eventAPI } from '../api/apiClient';
+import { VenueLayoutCard } from './VenueLayoutCard';
 
 const EventDetails: React.FC = () => {
   const { eventId } = useParams<{ eventId: string }>();
@@ -144,6 +145,13 @@ const EventDetails: React.FC = () => {
     error,
   } = useEventStore();
 
+  // Build the object the child expects from data you already have
+  const viewEvent = React.useMemo(
+    () => (currentEvent ? { ...currentEvent, forecastResult } : null),
+    [currentEvent, forecastResult]
+  );
+
+
   // Note: useSimulation and useDynamicRecommendations hooks removed as we're using direct forecast generation
 
   // Note: Simulation monitoring removed as we're using forecast generation instead
@@ -162,10 +170,10 @@ const EventDetails: React.FC = () => {
         console.log('🔍 EventDetails: Fetching event details for:', eventId);
         const response = await eventAPI.getEvent(eventId);
         console.log('🔍 EventDetails: API response:', response);
-        
         // Handle the backend response structure
         const eventData = response.data.data || response.data;
         console.log('🔍 EventDetails: Parsed event data:', eventData);
+
         
         // Transform backend event to frontend EventData format
         const transformedEvent: EventData = {
@@ -592,6 +600,7 @@ const EventDetails: React.FC = () => {
           )}
         </div>
       )}
+      
 
       {/* Main Dashboard Content - Only show if forecast exists */}
       {forecastResult && Object.keys(forecastResult).length > 0 && (
@@ -600,12 +609,14 @@ const EventDetails: React.FC = () => {
           <div className="xl:col-span-2 space-y-6">
             <Card className="p-6">
               <h3 className="text-lg font-semibold mb-4">Crowd Density Simulation</h3>
-              <SimulationChart
+              {/* <SimulationChart
                 data={forecastResult?.crowdDensity || simulationResult?.crowdDensity || []}
                 title="Crowd Density Simulation"
                 onLocationSelect={setSelectedLocation}
                 selectedLocation={selectedLocation}
-              />
+              /> */}
+                <VenueLayoutCard event={viewEvent} />
+
             </Card>
 
             <Card className="p-6">
@@ -615,7 +626,13 @@ const EventDetails: React.FC = () => {
                 venueLocation={currentEvent.venueLocation}
               />
             </Card>
-            
+
+
+
+            {/* Nearby Parking Options below Venue Layout */}
+            {currentEvent.venueLocation && (
+              <NearbyParkingOptions venueLocation={currentEvent.venueLocation} />
+            )}
           </div>
 
           {/* Right Column - Recommendations and Forecasts */}
