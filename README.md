@@ -168,3 +168,7 @@ The app expects a backend API with these endpoints:
 ## 📄 License
 
 This project is part of the Event Buddy platform for intelligent event planning and crowd simulation.
+
+A modern event-ops dashboard for venues and organizers — real-time crowd forecasts, zone layouts, and operational tools.
+
+Live: http://eventai.munymunyhom.tech/
