@@ -207,17 +207,32 @@ const Dashboard: React.FC = () => {
 
   const getStatusBadge = (status: EventData['status']) => {
     const statusConfig: Record<EventData['status'], { color: string; label: string }> = {
-      draft: { color: 'bg-gray-100 text-gray-800', label: 'Draft' },
-      processing: { color: 'bg-blue-100 text-blue-800', label: 'Processing' },
-      completed: { color: 'bg-green-100 text-green-800', label: 'Completed' },
-      error: { color: 'bg-red-100 text-red-800', label: 'Error' },
-      active: { color: 'bg-emerald-100 text-emerald-800', label: 'Active' },
+      draft: { 
+        color: 'bg-gray-100 text-gray-800', 
+        label: 'Draft'
+      },
+      processing: { 
+        color: 'bg-blue-100 text-blue-800', 
+        label: 'Processing'
+      },
+      completed: { 
+        color: 'bg-green-100 text-green-800', 
+        label: 'Completed'
+      },
+      error: { 
+        color: 'bg-red-100 text-red-800', 
+        label: 'Error'
+      },
+      active: { 
+        color: 'bg-green-100 text-green-800', 
+        label: 'Active'
+      },
     };
 
-    // Fallback to 'completed' if status is not recognized
+    // Fallback to 'active' if status is not recognized
     const config = statusConfig[status] || statusConfig.active;
     return (
-      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${config.color}`}>
+      <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${config.color}`}>
         {config.label}
       </span>
     );
@@ -259,19 +274,25 @@ const Dashboard: React.FC = () => {
 
   // Dashboard view showing event list
   return (
-    <div className="max-w-7xl mx-auto p-6">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-          <p className="mt-2 text-gray-600">
-            Manage your events and view simulation insights
-          </p>
+    <div className="min-h-screen bg-gray-50">
+      <div className="max-w-7xl mx-auto p-6">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h1 className="text-4xl font-bold text-gray-900">
+              Event Dashboard
+            </h1>
+            <p className="mt-2 text-gray-600 text-lg">
+              Manage your events and view AI-powered simulation insights
+            </p>
+          </div>
+          <Button 
+            onClick={() => navigate('/new-event')}
+            className="bg-blue-600 hover:bg-blue-700 text-white"
+          >
+            Create New Event
+          </Button>
         </div>
-        <Button onClick={() => navigate('/new-event')}>
-          Create New Event
-        </Button>
-      </div>
 
       {/* Fallback Data Warning */}
       {usingFallbackData && (
@@ -350,13 +371,16 @@ const Dashboard: React.FC = () => {
           </div>
         </Card>
       ) : (
-        <div className="space-y-4">
-          {filteredAndSortedEvents.map((event) => (
-            <Card key={event.id} className="hover:shadow-lg transition-shadow">
+        <div className="space-y-6">
+          {filteredAndSortedEvents.map((event, index) => (
+            <Card 
+              key={event.id} 
+              className="hover:shadow-lg transition-all duration-200 bg-white border border-gray-200"
+            >
               <div className="flex items-center justify-between">
                 <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-2">
-                    <h3 className="text-lg font-semibold text-gray-900">
+                  <div className="flex items-center gap-3 mb-3">
+                    <h3 className="text-xl font-bold text-gray-900">
                       {event.name}
                     </h3>
                     {getStatusBadge(event.status)}
@@ -463,6 +487,7 @@ const Dashboard: React.FC = () => {
           </div>
         </Card>
       )} */}
+      </div>
     </div>
   );
 };

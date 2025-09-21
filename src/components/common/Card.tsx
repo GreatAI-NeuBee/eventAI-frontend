@@ -15,7 +15,7 @@ const Card: React.FC<CardProps> = ({
   shadow = 'md',
   border = true,
 }) => {
-  const baseClasses = 'bg-white rounded-lg';
+  const baseClasses = 'bg-white rounded-lg transition-all duration-300 hover:shadow-lg border border-gray-200';
   
   const paddingClasses = {
     none: '',
@@ -31,7 +31,7 @@ const Card: React.FC<CardProps> = ({
     lg: 'shadow-lg',
   };
 
-  const borderClasses = border ? 'border border-gray-200' : '';
+  const borderClasses = border ? '' : 'border-0';
 
   const combinedClasses = `${baseClasses} ${paddingClasses[padding]} ${shadowClasses[shadow]} ${borderClasses} ${className}`;
 

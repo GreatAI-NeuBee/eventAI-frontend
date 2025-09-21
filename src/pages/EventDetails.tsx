@@ -9,6 +9,7 @@ import VenueMap from '../components/dashboard/VenueMap';
 import ScenarioTabs from '../components/dashboard/ScenarioTabs';
 import TransitForecast from '../components/dashboard/TransitForecast';
 import ParkingForecast from '../components/dashboard/ParkingForecast';
+import NearbyParkingOptions from '../components/dashboard/NearbyParkingOptions';
 import { useEventStore } from '../store/eventStore';
 import { useAuth } from '../contexts/AuthContext';
 import type { EventData } from '../types/simulation';
@@ -468,6 +469,11 @@ const EventDetails: React.FC = () => {
                 venueLocation={currentEvent.venueLocation}
               />
             </Card>
+
+            {/* Nearby Parking Options below Venue Layout */}
+            {currentEvent.venueLocation && (
+              <NearbyParkingOptions venueLocation={currentEvent.venueLocation} />
+            )}
           </div>
 
           {/* Right Column - Recommendations and Forecasts */}
@@ -505,18 +511,14 @@ const EventDetails: React.FC = () => {
                 congestion: {}
               }}
             />
-          </div>
-        </div>
-      )}
 
-      {/* Bottom Row - Transit and Parking Forecasts */}
-      {forecastResult && currentEvent.venueLocation && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-          <div className="h-fit">
-            <TransitForecast venueLocation={currentEvent.venueLocation} />
-          </div>
-          <div className="h-fit">
-            <ParkingForecast venueLocation={currentEvent.venueLocation} />
+            {/* Transit and Parking Forecasts in Right Column */}
+            {currentEvent.venueLocation && (
+              <div className="space-y-6">
+                <TransitForecast venueLocation={currentEvent.venueLocation} />
+                <ParkingForecast venueLocation={currentEvent.venueLocation} />
+              </div>
+            )}
           </div>
         </div>
       )}
