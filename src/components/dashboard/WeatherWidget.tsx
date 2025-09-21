@@ -108,9 +108,14 @@ const WeatherWidget: React.FC<WeatherWidgetProps> = ({
   return (
     <div className={`${className}`}>
       <div className="mb-4">
-        <h3 className="text-lg font-semibold text-gray-900">Weather Forecast</h3>
+        <h3 className="text-lg font-semibold text-gray-900">Event Weather Forecast</h3>
         <p className="text-sm text-gray-600">
-          Current weather conditions for {weatherData.location}
+          Weather conditions for {weatherData.location} on {new Date(eventDate).toLocaleDateString('en-US', { 
+            weekday: 'long', 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric' 
+          })}
         </p>
       </div>
 
@@ -120,13 +125,13 @@ const WeatherWidget: React.FC<WeatherWidgetProps> = ({
           <div className="flex items-start justify-between">
             <div className="flex-1">
               <div className="flex items-center mb-2">
-                <h4 className="font-medium text-gray-900 mr-2 text-sm">Current Weather</h4>
+                <h4 className="font-medium text-gray-900 mr-2 text-sm">Event Weather</h4>
                 <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                  🌤️
-                  <span className="ml-1">Live</span>
+                  📅
+                  <span className="ml-1">Event Day</span>
                 </span>
                 <span className="ml-2 px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                  UPDATED
+                  FORECAST
                 </span>
               </div>
               
