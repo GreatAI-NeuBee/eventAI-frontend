@@ -25,7 +25,7 @@ const NewEvent: React.FC = () => {
     description: '',
   });
 
-  const [venueLayoutJson, setVenueLayoutJson] = useState<string>('');
+  const [venueLayoutJson, setVenueLayoutJson] = useState<StadiumMapJSON | null>(null);
 
   const [venueLocation, setVenueLocation] = useState<{
     lat: number;
@@ -47,11 +47,10 @@ const NewEvent: React.FC = () => {
     }
   };
 
-  const handleVenueLayoutChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const value = e.target.value;
-    setVenueLayoutJson(value);
+  const handleVenueLayoutChange = (venueLayoutData: StadiumMapJSON) => {
+    setVenueLayoutJson(venueLayoutData);
     
-    // Clear error when user starts typing
+    // Clear error when layout is updated
     if (errors.venueLayout) {
       setErrors(prev => ({ ...prev, venueLayout: '' }));
     }
@@ -91,13 +90,9 @@ const NewEvent: React.FC = () => {
       newErrors.venue = 'Venue is required';
     }
 
-    // Venue layout validation (optional for now since it will be implemented later)
-    if (venueLayoutJson.trim() && venueLayoutJson.trim() !== '') {
-      try {
-        JSON.parse(venueLayoutJson);
-      } catch (e) {
-        newErrors.venueLayout = 'Invalid JSON format for venue layout';
-      }
+    // Venue layout validation (optional but if provided should have at least 1 section)
+    if (venueLayoutJson && venueLayoutJson.sections === 0) {
+      newErrors.venueLayout = 'Venue layout must have at least one section';
     }
 
     if (!venueLocation) {
@@ -142,13 +137,12 @@ const NewEvent: React.FC = () => {
         submitData.venueLocation = venueLocation;
       }
       
-      if (venueLayoutJson.trim()) {
-        try {
-          submitData.venueLayout = JSON.parse(venueLayoutJson);
-        } catch (e) {
-          console.warn('Invalid JSON in venue layout, sending as string:', e);
-          submitData.venueLayout = venueLayoutJson;
-        }
+      // Include venue layout JSON if available
+      if (venueLayoutJson) {
+        submitData.venueLayout = venueLayoutJson;
+        console.log('📍 Including venue layout with', venueLayoutJson.sections, 'sections,', venueLayoutJson.exits, 'exits, and', venueLayoutJson.toiletsList?.length || 0, 'toilets');
+      } else {
+        console.log('📍 No venue layout configured for this event');
       }
 
       // Debug: Log the JSON data being submitted
@@ -180,7 +174,7 @@ const NewEvent: React.FC = () => {
         venue: backendEvent.venue || venueLocation?.name || venueLocation?.address || 'Event Venue',
         description: backendEvent.description || formData.description,
         venueLocation: venueLocation || undefined,
-        venueLayout: JSON.parse(venueLayoutJson || '{}'),
+        venueLayout: venueLayoutJson || null,
         userEmail: backendEvent.userEmail || submitData.userEmail,
         status,
         createdAt: backendEvent.createdAt || new Date().toISOString(),
@@ -305,58 +299,37 @@ const NewEvent: React.FC = () => {
           </div>
         </Card>
 
-        {/* Venue Layout */}
-        <Card>
-          <h2 className="text-xl font-semibold text-gray-900 mb-6">Venue Layout Configuration</h2>
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Venue Layout (JSON) - Optional
-            </label>
-            <p className="text-sm text-gray-500 mb-3">
-              Provide venue layout configuration in JSON format. This will be implemented later - you can leave this empty for now.
-            </p>
-            <textarea
-              value={venueLayoutJson}
-              onChange={handleVenueLayoutChange}
-              rows={8}
-              placeholder='Example: {"shape": "circular", "sections": 8, "layers": 3, "exits": 4}'
-              className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm placeholder-gray-500 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 font-mono"
-            />
-            {errors.venueLayout && (
-              <p className="mt-1 text-sm text-red-600">{errors.venueLayout}</p>
-            )}
-            <p className="mt-2 text-xs text-gray-500">
-              Leave empty to use default venue configuration
-            </p>
-          </div>
-        </Card>
-
-        {/* Venue Location Picker */}
-        {/* <GoogleMapPicker
-          onLocationSelected={(location) => {
-            setVenueLocation(location);
-            // Auto-fill venue name if not already set
-            if (!formData.venue && location.name) {
-              setFormData(prev => ({ ...prev, venue: location.name || location.address || '' }));
-            }
-            // Clear venue location error if exists
-            if (errors.venueLocation) {
-              setErrors(prev => ({ ...prev, venueLocation: '' }));
-            }
-          }}
-          initialLocation={venueLocation || undefined}
-          title={venueLocation ? "Venue Location - Click to change" : "Select Venue Location"}
-        />
-        }
-      
+       
         {/* User Authentication Error */}
         <Card>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold text-gray-900">Stadium Map Builder (JSON)</h2>
-            <span className="text-xs text-gray-500">Draw sections & place exits anywhere</span>
+            <div>
+              <h2 className="text-xl font-semibold text-gray-900">Venue Layout Builder</h2>
+              <p className="text-sm text-gray-600 mt-1">Design your venue sections and exits</p>
+            </div>
+            <div className="text-right">
+              {venueLayoutJson ? (
+                <div className="text-sm space-y-1">
+                  <div className="text-green-600 font-medium">
+                    ✓ {venueLayoutJson.sections} sections, {venueLayoutJson.exits} exits
+                  </div>
+                  {venueLayoutJson.toiletsList && venueLayoutJson.toiletsList.length > 0 && (
+                    <div className="text-blue-600 text-xs">
+                      + {venueLayoutJson.toiletsList.length} facilities
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="text-sm text-gray-500">
+                  No layout configured
+                </div>
+              )}
+            </div>
           </div>
-          <StadiumMapEditor initialLayers={2} />
+          <StadiumMapEditor 
+            initialLayers={2} 
+            onChange={handleVenueLayoutChange}
+          />
         </Card>
         
         {errors.userEmail && (

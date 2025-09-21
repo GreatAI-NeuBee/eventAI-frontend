@@ -756,23 +756,7 @@ const StadiumMapEditor: React.FC<{
             >
               <RotateCcw className="h-4 w-4" /> Reset
             </button>
-            <button
-              type="button"
-              onClick={() => {
-                const blob = new Blob([JSON.stringify(exportJSON, null, 2)], {
-                  type: "application/json",
-                });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement("a");
-                a.download = `stadium-map-${Date.now()}.json`;
-                a.href = url;
-                a.click();
-                URL.revokeObjectURL(url);
-              }}
-              className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm text-white hover:bg-blue-700"
-            >
-              <Download className="h-4 w-4" /> Export
-            </button>
+           
           </div>
         </div>
 
@@ -1161,16 +1145,7 @@ const StadiumMapEditor: React.FC<{
       )}
 
       {/* JSON preview */}
-      <details className="rounded-lg border border-gray-200 bg-white overflow-hidden">
-        <summary className="cursor-pointer px-4 py-3 text-sm font-medium text-gray-700 bg-gray-50 hover:bg-gray-100">
-          Preview JSON Output
-        </summary>
-        <div className="p-4 bg-gray-50 border-t border-gray-200">
-          <pre className="p-3 overflow-auto text-xs bg-white rounded border border-gray-200 max-h-64">
-            {JSON.stringify(exportJSON, null, 2)}
-          </pre>
-        </div>
-      </details>
+   
     </div>
   );
 };

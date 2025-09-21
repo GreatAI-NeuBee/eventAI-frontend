@@ -72,16 +72,29 @@ export const eventAPI = {
   },
   
   // Get event history
-  getEventHistory: (userEmail?: string) => {
+  getEventHistory: async (userEmail?: string) => {
     if (USE_MOCK_EVENT_HISTORY) {
       console.log('🎭 Using mock data for getEventHistory');
       return mockApiClient.getEventHistory();
     }
     
-    console.log('🌐 Using real API for getEventHistory:', `${apiClient.defaults.baseURL}/events`);
-    // Add userEmail as query parameter if provided
-    const params = userEmail ? { userEmail } : {};
-    return apiClient.get('/events', { params });
+    try {
+      console.log('🌐 Using real API for getEventHistory:', `${apiClient.defaults.baseURL}/events`);
+      // Add userEmail as query parameter if provided
+      const params = userEmail ? { userEmail } : {};
+      return await apiClient.get('/events', { params });
+    } catch (error: any) {
+      // If server returns 500 error, temporarily fallback to mock data
+      if (error.response?.status === 500) {
+        console.warn('⚠️ Server error (500), falling back to mock data for getEventHistory');
+        const mockResponse = await mockApiClient.getEventHistory();
+        // Add a flag to indicate this is fallback data
+        (mockResponse as any)._isFallbackData = true;
+        return mockResponse;
+      }
+      // Re-throw other errors
+      throw error;
+    }
   },
   
   // Get specific event details

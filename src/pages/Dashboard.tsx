@@ -16,6 +16,7 @@ const Dashboard: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<'date' | 'name' | 'status'>('date');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [usingFallbackData, setUsingFallbackData] = useState(false);
   
   const {
     events,
@@ -42,6 +43,13 @@ const Dashboard: React.FC = () => {
       
       try {
         const response = await eventAPI.getEventHistory(user.email);
+        
+        // Check if this is fallback data
+        if ((response as any)._isFallbackData) {
+          setUsingFallbackData(true);
+        } else {
+          setUsingFallbackData(false);
+        }
         
         // Handle the backend response structure
         const backendEvents = response.data.data?.events || response.data.events || response.data.data || response.data;
@@ -78,10 +86,34 @@ const Dashboard: React.FC = () => {
           : [];
         
         setEvents(transformedEvents);
+        setUsingFallbackData(false); // Using real data
       } catch (error: any) {
         console.error('Error fetching event history:', error);
-        setError(error.response?.data?.message || 'Failed to fetch event history');
+        
+        // Provide more specific error messages based on error type
+        let errorMessage = 'Failed to fetch event history';
+        if (error.response?.status === 500) {
+          errorMessage = 'Server error occurred. Please try again later or contact support.';
+        } else if (error.response?.status === 404) {
+          errorMessage = 'No events found for your account.';
+        } else if (error.code === 'NETWORK_ERROR' || !error.response) {
+          errorMessage = 'Unable to connect to server. Please check your internet connection.';
+        } else if (error.response?.data?.message) {
+          errorMessage = error.response.data.message;
+        }
+        
+        setError(errorMessage);
         setEvents([]); // Clear events on error
+        setUsingFallbackData(false); // Not using fallback data since we have no data
+        
+        // Log detailed error for debugging
+        console.error('Detailed error info:', {
+          status: error.response?.status,
+          statusText: error.response?.statusText,
+          data: error.response?.data,
+          url: error.config?.url,
+          method: error.config?.method
+        });
       } finally {
         setLoading(false);
       }
@@ -240,6 +272,19 @@ const Dashboard: React.FC = () => {
           Create New Event
         </Button>
       </div>
+
+      {/* Fallback Data Warning */}
+      {usingFallbackData && (
+        <Card className="mb-6 bg-yellow-50 border-yellow-200">
+          <div className="flex items-center gap-2 text-yellow-700">
+            <AlertTriangle className="h-5 w-5" />
+            <span className="font-medium">Demo Mode Active:</span>
+            <span>
+              Server is temporarily unavailable. Showing sample data for demonstration purposes.
+            </span>
+          </div>
+        </Card>
+      )}
 
       {/* Error Display */}
       {error && (
