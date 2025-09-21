@@ -4,7 +4,6 @@ import { Calendar } from 'lucide-react';
 import Card from '../components/common/Card';
 import Button from '../components/common/Button';
 import Input from '../components/common/Input';
-import Spinner from '../components/common/Spinner';
 import VenueSearchInput from '../components/maps/VenueSearchInput';
 import { useEventStore } from '../store/eventStore';
 import { eventAPI } from '../api/apiClient';
@@ -454,14 +453,7 @@ const NewEvent: React.FC = () => {
               loading={isLoading}
               disabled={isLoading}
             >
-              {isLoading ? (
-                <>
-                  <Spinner size="sm" color="white" className="mr-2" />
-                  Creating Event...
-                </>
-              ) : (
-                'Create Event'
-              )}
+              {isLoading ? 'Creating Event...' : 'Create Event'}
             </Button>
           </div>
         </div>
