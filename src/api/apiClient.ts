@@ -123,54 +123,20 @@ export const eventAPI = {
   },
   
   // Generate forecast for event
-  generateForecast: (eventId: string) => {
-    // For now, use mock data since the server is not ready
-    console.log('🎭 Using mock data for generateForecast');
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        // Mock forecast result with simulation data
-        const mockForecastResult = {
-          eventId,
-          crowdDensity: [
-            { timestamp: '2024-01-15T10:00:00Z', location: 'Main Entrance', density: 45 },
-            { timestamp: '2024-01-15T11:00:00Z', location: 'Main Entrance', density: 78 },
-            { timestamp: '2024-01-15T12:00:00Z', location: 'Food Court', density: 92 },
-            { timestamp: '2024-01-15T13:00:00Z', location: 'Stage Area', density: 156 },
-            { timestamp: '2024-01-15T14:00:00Z', location: 'Stage Area', density: 189 },
-          ],
-          hotspots: [
-            { x: 150, y: 200, intensity: 0.8, location: 'Main Entrance' },
-            { x: 300, y: 350, intensity: 0.9, location: 'Stage Area' },
-            { x: 450, y: 150, intensity: 0.6, location: 'Food Court' },
-          ],
-          recommendations: [
-            {
-              id: 'rec-1',
-              type: 'warning',
-              title: 'High Congestion Expected',
-              description: 'Stage area will experience high congestion between 1-2 PM',
-              priority: 'high',
-              action: 'Deploy additional staff'
-            },
-            {
-              id: 'rec-2',
-              type: 'info',
-              title: 'Optimize Entry Flow',
-              description: 'Consider opening additional entry points',
-              priority: 'medium',
-              action: 'Open side entrances'
-            }
-          ],
-          scenarios: {
-            entry: { peak_time: '12:00', capacity_utilization: 0.85 },
-            exit: { peak_time: '17:00', capacity_utilization: 0.78 },
-            congestion: { max_density: 189, critical_areas: ['Stage Area', 'Main Entrance'] }
-          },
-          generatedAt: new Date().toISOString()
-        };
-        
-        resolve({ data: mockForecastResult });
-      }, 2000); // 2 second delay to simulate API call
+  generateForecast: (forecastData: {
+    eventid: string;
+    gates: string[];
+    gates_crowd: number[];
+    schedule_start_time: string;
+    event_end_time: string;
+    event_capacity: number;
+    method_exits: string;
+    freq: string;
+  }) => {
+    console.log('🌐 Using real API for generateForecast:', `${apiClient.defaults.baseURL}/forecast`);
+    console.log('🔮 Forecast data:', forecastData);
+    return apiClient.post('/forecast', forecastData, {
+      headers: { 'Content-Type': 'application/json' }
     });
   },
 };
