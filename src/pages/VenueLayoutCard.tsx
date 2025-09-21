@@ -294,7 +294,7 @@ const StadiumPlanSVG: React.FC<{
   dsKey: string;
   gateLoads: Record<string, number>;
   particles: Particle[];
-}> = ({ plan, zones, phase, dsKey, gateLoads, particles }) => {
+}> = ({ plan, zones, phase, gateLoads, particles }) => {
   const vbW = 100, vbH = 62.5;
   const cx = 50, cy = 31.25;
   const MARGIN = 3;

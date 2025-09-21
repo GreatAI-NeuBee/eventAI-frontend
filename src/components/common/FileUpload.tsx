@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Upload, X, FileText, AlertCircle, CheckCircle, Loader } from 'lucide-react';
+import { Upload, X, AlertCircle, CheckCircle, Loader } from 'lucide-react';
 import Button from './Button';
 import { awsDirectService as awsService, FileUploadResult, ComprehendAnalysis } from '../../services/awsDirectService';
 

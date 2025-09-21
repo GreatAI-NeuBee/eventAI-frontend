@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Lock, Eye, EyeOff, Save, X } from 'lucide-react';
+import { Lock, Save, X } from 'lucide-react';
 import Input from '../common/Input';
 import Button from '../common/Button';
 import Card from '../common/Card';
@@ -23,7 +23,7 @@ const PasswordChangeForm: React.FC<PasswordChangeFormProps> = ({
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [showPasswords, setShowPasswords] = useState({
+  const [, ] = useState({
     current: false,
     new: false,
     confirm: false,
@@ -80,12 +80,12 @@ const PasswordChangeForm: React.FC<PasswordChangeFormProps> = ({
     }
   };
 
-  const togglePasswordVisibility = (field: keyof typeof showPasswords) => {
-    setShowPasswords(prev => ({
-      ...prev,
-      [field]: !prev[field],
-    }));
-  };
+  // const togglePasswordVisibility = (field: keyof typeof showPasswords) => {
+  //   setShowPasswords(prev => ({
+  //     ...prev,
+  //     [field]: !prev[field],
+  //   }));
+  // };
 
   return (
     <Card>
@@ -97,7 +97,7 @@ const PasswordChangeForm: React.FC<PasswordChangeFormProps> = ({
       <form onSubmit={handleSubmit} className="space-y-4">
         <Input
           label="Current Password *"
-          type={showPasswords.current ? 'text' : 'password'}
+          type="password"
           value={formData.currentPassword}
           onChange={(e) => handleInputChange('currentPassword', e.target.value)}
           error={errors.currentPassword}
@@ -107,7 +107,7 @@ const PasswordChangeForm: React.FC<PasswordChangeFormProps> = ({
 
         <Input
           label="New Password *"
-          type={showPasswords.new ? 'text' : 'password'}
+          type="password"
           value={formData.newPassword}
           onChange={(e) => handleInputChange('newPassword', e.target.value)}
           error={errors.newPassword}
@@ -118,7 +118,7 @@ const PasswordChangeForm: React.FC<PasswordChangeFormProps> = ({
 
         <Input
           label="Confirm New Password *"
-          type={showPasswords.confirm ? 'text' : 'password'}
+          type="password"
           value={formData.confirmPassword}
           onChange={(e) => handleInputChange('confirmPassword', e.target.value)}
           error={errors.confirmPassword}

@@ -1,4 +1,4 @@
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client } from '@aws-sdk/client-s3';
 import { ComprehendClient, DetectKeyPhrasesCommand, DetectEntitiesCommand, DetectSentimentCommand } from '@aws-sdk/client-comprehend';
 import { Upload } from '@aws-sdk/lib-storage';
 import { eventAPI } from '../api/apiClient';
@@ -207,7 +207,7 @@ class AWSDirectService {
         }
       });
 
-      const result = await upload.done();
+      await upload.done();
       
       const fileUrl = `https://${bucketName}.s3.amazonaws.com/${key}`;
       
@@ -293,7 +293,7 @@ class AWSDirectService {
         })),
         sentiment: {
           sentiment: sentimentResult.Sentiment || 'NEUTRAL',
-          score: sentimentResult.SentimentScore?.[sentimentResult.Sentiment || 'NEUTRAL'] || 0
+          score: sentimentResult.SentimentScore?.[sentimentResult.Sentiment as keyof typeof sentimentResult.SentimentScore || 'Neutral'] || 0
         },
         language: languageCode
       };
@@ -305,7 +305,19 @@ class AWSDirectService {
     } catch (error: any) {
       console.error('Comprehend analysis error:', error);
       // Fallback to mock analysis if Comprehend fails
-      return this.generateMockAnalysis(file);
+      // Fallback mock analysis when Comprehend fails
+      return {
+        keyPhrases: [
+          { text: 'event management', score: 0.9 },
+          { text: 'operational procedures', score: 0.8 }
+        ],
+        entities: [
+          { text: 'Event Management', type: 'OTHER', score: 0.9 }
+        ],
+        sentiment: { sentiment: 'NEUTRAL', score: 0.5 },
+        language: 'en',
+        summary: 'Document analysis failed. Using fallback analysis.'
+      };
     }
   }
 

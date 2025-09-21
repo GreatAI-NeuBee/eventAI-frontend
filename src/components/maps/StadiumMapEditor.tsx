@@ -2,7 +2,7 @@ import React from "react";
 import {
   Map,
   Triangle,
-  Download,
+  // Download,
   RotateCcw,
   Square,
   MousePointer2,
@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 // If you already have helpers, keep these imports.
 // (Not required by this component to function.)
-import { addToilet } from "../../utils/toiletutils";
+// import { addToilet } from "../../utils/toiletutils";
 import type { Toilet } from "../../utils/toiletutils";
 
 /* =========================
@@ -166,7 +166,7 @@ const StadiumMapEditor: React.FC<{
     custom: [],
   });
   const toilets = toiletsByLayout[layout]; // active list for current layout
-  const [hoverToiletId, setHoverToiletId] = React.useState<string | null>(null);
+  const [, setHoverToiletId] = React.useState<string | null>(null);
 
   // Circular config
   const [layers, setLayers] = React.useState<number>(
@@ -502,10 +502,10 @@ const StadiumMapEditor: React.FC<{
     dragStartRef.current = null;
   };
 
-  const onCanvasMouseLeave = () => {
-    setDraggingId(null);
-    dragStartRef.current = null;
-  };
+  // const onCanvasMouseLeave = () => {
+  //   setDraggingId(null);
+  //   dragStartRef.current = null;
+  // };
 
   const finishSection = () => {
     if (draftPoints.length < 3) return;

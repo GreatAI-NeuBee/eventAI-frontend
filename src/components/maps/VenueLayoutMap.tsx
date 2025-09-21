@@ -80,7 +80,7 @@ const VenueLayoutMap: React.FC<VenueLayoutMapProps> = ({
         script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places,geometry`;
         script.async = true;
         script.defer = true;
-        script.onload = () => resolve();
+        script.onload = () => resolve(undefined);
         script.onerror = () => reject(new Error('Failed to load Google Maps script'));
         document.head.appendChild(script);
       });
@@ -380,7 +380,7 @@ const VenueLayoutMap: React.FC<VenueLayoutMapProps> = ({
           types: ['parking'],
           rating: 4.2,
           distance: calculateDistance(venueLocation.lat, venueLocation.lng, venueLocation.lat + 0.002, venueLocation.lng + 0.001),
-          availability: 'full',
+          availability: 'full' as const,
           capacity: 200,
           occupied: 200
         },
@@ -394,7 +394,7 @@ const VenueLayoutMap: React.FC<VenueLayoutMapProps> = ({
           types: ['parking'],
           rating: 3.8,
           distance: calculateDistance(venueLocation.lat, venueLocation.lng, venueLocation.lat - 0.001, venueLocation.lng + 0.002),
-          availability: 'limited',
+          availability: 'limited' as const,
           capacity: 50,
           occupied: 45
         },
@@ -408,7 +408,7 @@ const VenueLayoutMap: React.FC<VenueLayoutMapProps> = ({
           types: ['parking'],
           rating: 4.5,
           distance: calculateDistance(venueLocation.lat, venueLocation.lng, venueLocation.lat + 0.003, venueLocation.lng - 0.001),
-          availability: 'available',
+          availability: 'available' as const,
           capacity: 30,
           occupied: 15
         },
@@ -422,7 +422,7 @@ const VenueLayoutMap: React.FC<VenueLayoutMapProps> = ({
           types: ['parking'],
           rating: 4.1,
           distance: calculateDistance(venueLocation.lat, venueLocation.lng, venueLocation.lat - 0.002, venueLocation.lng - 0.003),
-          availability: 'available',
+          availability: 'available' as const,
           capacity: 150,
           occupied: 60
         },
@@ -436,7 +436,7 @@ const VenueLayoutMap: React.FC<VenueLayoutMapProps> = ({
           types: ['parking'],
           rating: 4.7,
           distance: calculateDistance(venueLocation.lat, venueLocation.lng, venueLocation.lat + 0.001, venueLocation.lng - 0.002),
-          availability: 'full',
+          availability: 'full' as const,
           capacity: 25,
           occupied: 25
         },
@@ -450,7 +450,7 @@ const VenueLayoutMap: React.FC<VenueLayoutMapProps> = ({
           types: ['parking'],
           rating: 3.9,
           distance: calculateDistance(venueLocation.lat, venueLocation.lng, venueLocation.lat - 0.003, venueLocation.lng + 0.001),
-          availability: 'available',
+          availability: 'available' as const,
           capacity: 40,
           occupied: 12
         },
@@ -464,7 +464,7 @@ const VenueLayoutMap: React.FC<VenueLayoutMapProps> = ({
           types: ['parking'],
           rating: 4.3,
           distance: calculateDistance(venueLocation.lat, venueLocation.lng, venueLocation.lat + 0.004, venueLocation.lng + 0.003),
-          availability: 'limited',
+          availability: 'limited' as const,
           capacity: 300,
           occupied: 280
         },
@@ -478,7 +478,7 @@ const VenueLayoutMap: React.FC<VenueLayoutMapProps> = ({
           types: ['parking'],
           rating: 4.0,
           distance: calculateDistance(venueLocation.lat, venueLocation.lng, venueLocation.lat - 0.004, venueLocation.lng - 0.001),
-          availability: 'available',
+          availability: 'available' as const,
           capacity: 500,
           occupied: 200
         }
@@ -547,17 +547,17 @@ const VenueLayoutMap: React.FC<VenueLayoutMapProps> = ({
   };
 
   // Convert hotspot coordinates to map coordinates
-  const getHotspotMapPosition = (hotspot: Hotspot) => {
-    // Convert percentage-based coordinates to actual map coordinates
-    // This is a rough approximation - in a real app you'd need proper coordinate transformation
-    const latOffset = (hotspot.y - 50) * 0.001; // Convert to degrees
-    const lngOffset = (hotspot.x - 50) * 0.001;
-    
-    return {
-      lat: venueLocation.lat + latOffset,
-      lng: venueLocation.lng + lngOffset
-    };
-  };
+  // const getHotspotMapPosition = (hotspot: Hotspot) => {
+  //   // Convert percentage-based coordinates to actual map coordinates
+  //   // This is a rough approximation - in a real app you'd need proper coordinate transformation
+  //   const latOffset = (hotspot.y - 50) * 0.001; // Convert to degrees
+  //   const lngOffset = (hotspot.x - 50) * 0.001;
+  //   
+  //   return {
+  //     lat: venueLocation.lat + latOffset,
+  //     lng: venueLocation.lng + lngOffset
+  //   };
+  // };
 
   if (!apiKey) {
     return (
@@ -719,7 +719,10 @@ const VenueLayoutMap: React.FC<VenueLayoutMapProps> = ({
                 setSelectedParking(null);
                 setRouteInfo(null);
                 if (directionsRendererRef.current) {
-                  directionsRendererRef.current.setDirections({ routes: [] });
+                  directionsRendererRef.current.setDirections({ 
+                    routes: [],
+                    request: {} as google.maps.DirectionsRequest
+                  });
                 }
               }}
               className="text-green-600 hover:text-green-800 text-sm font-medium"

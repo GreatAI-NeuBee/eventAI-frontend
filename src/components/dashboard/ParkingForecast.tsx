@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { MapPin, Car, Clock, AlertTriangle, CheckCircle, ExternalLink } from 'lucide-react';
+import { AlertTriangle, CheckCircle } from 'lucide-react';
 import Card from '../common/Card';
 import Button from '../common/Button';
 import Spinner from '../common/Spinner';
@@ -35,7 +35,7 @@ const ParkingForecast: React.FC<ParkingForecastProps> = ({
   eventDate,
   expectedCapacity
 }) => {
-  const [parkingLocations, setParkingLocations] = useState<ParkingLocation[]>([]);
+  const [, setParkingLocations] = useState<ParkingLocation[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [forecastData, setForecastData] = useState<any>(null);
@@ -294,55 +294,55 @@ const ParkingForecast: React.FC<ParkingForecastProps> = ({
     setForecastData(forecast);
   };
 
-  const getParkingTypeIcon = (type: string) => {
-    switch (type) {
-      case 'indoor':
-        return <Car className="w-4 h-4" />;
-      case 'outdoor':
-        return <MapPin className="w-4 h-4" />;
-      case 'street':
-        return <MapPin className="w-4 h-4" />;
-      case 'valet':
-        return <Car className="w-4 h-4" />;
-      default:
-        return <Car className="w-4 h-4" />;
-    }
-  };
+  // const getParkingTypeIcon = (type: string) => {
+  //   switch (type) {
+  //     case 'indoor':
+  //       return <Car className="w-4 h-4" />;
+  //     case 'outdoor':
+  //       return <MapPin className="w-4 h-4" />;
+  //     case 'street':
+  //       return <MapPin className="w-4 h-4" />;
+  //     case 'valet':
+  //       return <Car className="w-4 h-4" />;
+  //     default:
+  //       return <Car className="w-4 h-4" />;
+  //   }
+  // };
 
-  const getParkingTypeColor = (type: string) => {
-    switch (type) {
-      case 'indoor':
-        return 'text-blue-600 bg-blue-100';
-      case 'outdoor':
-        return 'text-green-600 bg-green-100';
-      case 'street':
-        return 'text-orange-600 bg-orange-100';
-      case 'valet':
-        return 'text-purple-600 bg-purple-100';
-      default:
-        return 'text-gray-600 bg-gray-100';
-    }
-  };
+  // const getParkingTypeColor = (type: string) => {
+  //   switch (type) {
+  //     case 'indoor':
+  //       return 'text-blue-600 bg-blue-100';
+  //     case 'outdoor':
+  //       return 'text-green-600 bg-green-100';
+  //     case 'street':
+  //       return 'text-orange-600 bg-orange-100';
+  //     case 'valet':
+  //       return 'text-purple-600 bg-purple-100';
+  //     default:
+  //       return 'text-gray-600 bg-gray-100';
+  //   }
+  // };
 
-  const getAvailabilityColor = (availability: string) => {
-    switch (availability) {
-      case 'high':
-        return 'text-green-600 bg-green-100';
-      case 'medium':
-        return 'text-yellow-600 bg-yellow-100';
-      case 'low':
-        return 'text-red-600 bg-red-100';
-      default:
-        return 'text-gray-600 bg-gray-100';
-    }
-  };
+  // const getAvailabilityColor = (availability: string) => {
+  //   switch (availability) {
+  //     case 'high':
+  //       return 'text-green-600 bg-green-100';
+  //     case 'medium':
+  //       return 'text-yellow-600 bg-yellow-100';
+  //     case 'low':
+  //       return 'text-red-600 bg-red-100';
+  //     default:
+  //       return 'text-gray-600 bg-gray-100';
+  //   }
+  // };
 
-  const formatDistance = (distance: number) => {
-    if (distance < 1000) {
-      return `${Math.round(distance)}m`;
-    }
-    return `${(distance / 1000).toFixed(1)}km`;
-  };
+  // const formatDistance = (distance: number) => {
+  //   if (distance < 1000) {
+  //     return `${Math.round(distance)}m`;
+  //   }
+  //   return `${(distance / 1000).toFixed(1)}km`;
+  // };
 
   if (loading) {
     return (

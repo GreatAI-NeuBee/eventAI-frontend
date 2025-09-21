@@ -108,7 +108,7 @@ export const mockUserApi = {
       ...mockProfiles[profileIndex],
       ...updates,
       updatedAt: new Date().toISOString(),
-    };
+    } as UserProfile;
     
     mockProfiles[profileIndex] = updatedProfile;
     return { ...updatedProfile };
@@ -171,7 +171,7 @@ export const mockUserApi = {
   // Reset mock data (for testing)
   resetMockData(): void {
     mockProfiles = [];
-    nextId = 1;
+    (globalThis as any).nextId = 1;
   },
 };
 

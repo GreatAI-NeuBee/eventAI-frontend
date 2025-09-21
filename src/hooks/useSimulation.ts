@@ -1,8 +1,8 @@
-import { useEffect, useCallback } from 'react';
+import { useCallback } from 'react';
 import { useEventStore } from '../store/eventStore';
 import { eventAPI } from '../api/apiClient';
 
-export const useSimulation = (eventId?: string) => {
+export const useSimulation = () => {
   const {
     simulationResult,
     isLoading,

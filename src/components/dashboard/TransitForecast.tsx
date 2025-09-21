@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { MapPin, Train, Bus, Phone, RefreshCw } from 'lucide-react';
+import { Phone, RefreshCw } from 'lucide-react';
 import Card from '../common/Card';
 import Button from '../common/Button';
 import Spinner from '../common/Spinner';
 import StationSelector from '../common/StationSelector';
-import { rapidKlAPI, Station, RapidKlAgency } from '../../api/rapidKlApi';
+import { rapidKlAPI, Station } from '../../api/rapidKlApi';
 
 interface TransitForecastProps {
   venueLocation: {
@@ -117,43 +117,43 @@ const TransitForecast: React.FC<TransitForecastProps> = ({
     setSelectedStation(station);
   };
 
-  const getAgencyIcon = (agency: RapidKlAgency) => {
-    switch (agency) {
-      case 'lrt':
-      case 'mrt':
-        return <Train className="w-4 h-4" />;
-      case 'monorail':
-        return <Train className="w-4 h-4" />;
-      case 'bus':
-      case 'brt':
-        return <Bus className="w-4 h-4" />;
-      default:
-        return <MapPin className="w-4 h-4" />;
-    }
-  };
+  // const getAgencyIcon = (agency: RapidKlAgency) => {
+  //   switch (agency) {
+  //     case 'lrt':
+  //     case 'mrt':
+  //       return <Train className="w-4 h-4" />;
+  //     case 'monorail':
+  //       return <Train className="w-4 h-4" />;
+  //     case 'bus':
+  //     case 'brt':
+  //       return <Bus className="w-4 h-4" />;
+  //     default:
+  //       return <MapPin className="w-4 h-4" />;
+  //   }
+  // };
 
-  const getAgencyColor = (agency: RapidKlAgency) => {
-    switch (agency) {
-      case 'lrt':
-        return 'text-blue-600 bg-blue-100';
-      case 'mrt':
-        return 'text-green-600 bg-green-100';
-      case 'monorail':
-        return 'text-purple-600 bg-purple-100';
-      case 'bus':
-      case 'brt':
-        return 'text-orange-600 bg-orange-100';
-      default:
-        return 'text-gray-600 bg-gray-100';
-    }
-  };
+  // const getAgencyColor = (agency: RapidKlAgency) => {
+  //   switch (agency) {
+  //     case 'lrt':
+  //       return 'text-blue-600 bg-blue-100';
+  //     case 'mrt':
+  //       return 'text-green-600 bg-green-100';
+  //     case 'monorail':
+  //       return 'text-purple-600 bg-purple-100';
+  //     case 'bus':
+  //     case 'brt':
+  //       return 'text-orange-600 bg-orange-100';
+  //     default:
+  //       return 'text-gray-600 bg-gray-100';
+  //   }
+  // };
 
-  const formatDistance = (distance: number) => {
-    if (distance < 1000) {
-      return `${Math.round(distance)}m`;
-    }
-    return `${(distance / 1000).toFixed(1)}km`;
-  };
+  // const formatDistance = (distance: number) => {
+  //   if (distance < 1000) {
+  //     return `${Math.round(distance)}m`;
+  //   }
+  //   return `${(distance / 1000).toFixed(1)}km`;
+  // };
 
   const handleContactRapidKl = () => {
     window.open('https://www.myrapid.com.my/contact-us', '_blank');

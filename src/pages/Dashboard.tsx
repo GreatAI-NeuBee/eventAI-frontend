@@ -372,7 +372,7 @@ const Dashboard: React.FC = () => {
         </Card>
       ) : (
         <div className="space-y-6">
-          {filteredAndSortedEvents.map((event, index) => (
+          {filteredAndSortedEvents.map((event) => (
             <Card 
               key={event.id} 
               className="hover:shadow-lg transition-all duration-200 bg-white border border-gray-200"

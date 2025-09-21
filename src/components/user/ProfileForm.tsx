@@ -146,7 +146,7 @@ const ProfileForm: React.FC<ProfileFormProps> = ({
         return {
           ...prev,
           [parent]: {
-            ...prev[parent as keyof UserProfileUpdate],
+            ...(prev[parent as keyof UserProfileUpdate] as Record<string, any> || {}),
             [child]: value,
           },
         };

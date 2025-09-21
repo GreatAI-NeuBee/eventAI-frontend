@@ -1,7 +1,7 @@
-import axios from 'axios';
+// import axios from 'axios';
 
 // Rapid KL API configuration
-const RAPID_KL_BASE_URL = 'https://api.data.gov.my/gtfs-realtime/vehicle-position';
+// const RAPID_KL_BASE_URL = 'https://api.data.gov.my/gtfs-realtime/vehicle-position';
 
 // Available agencies for Rapid KL
 export const RAPID_KL_AGENCIES = {
@@ -60,14 +60,14 @@ export interface RapidKlResponse {
 }
 
 // Create axios instance for Rapid KL API
-const rapidKlClient = axios.create({
-  baseURL: RAPID_KL_BASE_URL,
-  timeout: 10000,
-  headers: {
-    'Accept': 'application/x-protobuf',
-    'User-Agent': 'Event-Buddy-Frontend/1.0'
-  }
-});
+// const rapidKlClient = axios.create({
+//   baseURL: RAPID_KL_BASE_URL,
+//   timeout: 10000,
+//   headers: {
+//     'Accept': 'application/x-protobuf',
+//     'User-Agent': 'Event-Buddy-Frontend/1.0'
+//   }
+// });
 
 // Rapid KL API functions
 export const rapidKlAPI = {

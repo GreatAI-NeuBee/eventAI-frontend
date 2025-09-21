@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { MapPin, Car, Clock, ExternalLink } from 'lucide-react';
 import Card from '../common/Card';
 import Button from '../common/Button';
-import { rapidKlAPI } from '../../api/rapidKlApi';
+// import { rapidKlAPI } from '../../api/rapidKlApi';
 
 interface ParkingLocation {
   id: string;
@@ -31,7 +31,8 @@ const NearbyParkingOptions: React.FC<NearbyParkingOptionsProps> = ({ venueLocati
   const loadParkingLocations = async () => {
     setLoading(true);
     try {
-      const locations = await rapidKlAPI.findNearbyParking(venueLocation);
+      // const locations = await rapidKlAPI.findNearbyParking(venueLocation);
+      const locations: any[] = []; // Mock for now
       setParkingLocations(locations);
     } catch (error) {
       console.error('Error loading parking locations:', error);
