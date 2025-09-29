@@ -21,11 +21,29 @@ const TimeSelector: React.FC<TimeSelectorProps> = ({
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Generate time options (00:00, 00:30, 01:00, etc.)
-  const timeOptions = Array.from({ length: 24 }, (_, hour) => [
-    `${hour.toString().padStart(2, '0')}:00`,
-    `${hour.toString().padStart(2, '0')}:30`
-  ]).flat();
+  // Generate time options starting from 10:00 AM
+  const generateTimeOptions = () => {
+    const allTimes = Array.from({ length: 24 }, (_, hour) => [
+      `${hour.toString().padStart(2, '0')}:00`,
+      `${hour.toString().padStart(2, '0')}:30`
+    ]).flat();
+    
+    // Start from 10:00 AM (10:00-23:30), then early morning (00:00-09:30)
+    const mainTimes = allTimes.filter(time => {
+      const hour = parseInt(time.split(':')[0]);
+      return hour >= 10;
+    });
+    
+    const earlyTimes = allTimes.filter(time => {
+      const hour = parseInt(time.split(':')[0]);
+      return hour < 10;
+    });
+    
+    // Return main times (10 AM onwards) first, then early morning times
+    return [...mainTimes, ...earlyTimes];
+  };
+  
+  const timeOptions = generateTimeOptions();
 
   // Format time for display (convert to 12-hour format for better UX)
   const formatTimeDisplay = (time: string) => {
@@ -114,10 +132,7 @@ const TimeSelector: React.FC<TimeSelectorProps> = ({
                   }
                 `}
               >
-                <div className="flex items-center justify-between">
-                  <span>{formatTimeDisplay(time)}</span>
-                  <span className="text-xs text-gray-500">{time}</span>
-                </div>
+                {formatTimeDisplay(time)}
               </button>
             ))}
           </div>
