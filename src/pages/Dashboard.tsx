@@ -5,6 +5,7 @@ import Card from '../components/common/Card';
 import Button from '../components/common/Button';
 import Spinner from '../components/common/Spinner';
 import Input from '../components/common/Input';
+import DeleteModal from '../components/common/DeleteModal';
 import { useEventStore } from '../store/eventStore';
 import { useAuth } from '../contexts/AuthContext';
 import type { EventData } from '../types/simulation';
@@ -17,6 +18,9 @@ const Dashboard: React.FC = () => {
   const [sortBy, setSortBy] = useState<'date' | 'name' | 'status'>('date');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [usingFallbackData, setUsingFallbackData] = useState(false);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [eventToDelete, setEventToDelete] = useState<EventData | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   
   const {
     events,
@@ -175,24 +179,31 @@ const Dashboard: React.FC = () => {
     navigate(`/event/${event.id}`);
   };
 
-  const handleDeleteEvent = async (eventId: string) => {
-    if (!confirm('Are you sure you want to delete this event? This action cannot be undone.')) {
-      return;
-    }
+  const handleDeleteEvent = (event: EventData) => {
+    setEventToDelete(event);
+    setDeleteModalOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!eventToDelete) return;
 
     try {
-      setLoading(true);
+      setIsDeleting(true);
       
       // Call API to delete the event
-      await eventAPI.deleteEvent(eventId);
-      console.log('✅ Event deleted successfully:', eventId);
+      await eventAPI.deleteEvent(eventToDelete.id);
+      console.log('✅ Event deleted successfully:', eventToDelete.id);
       
       // Remove from local state after successful API call
-      const updatedEvents = events.filter(event => event.id !== eventId);
+      const updatedEvents = events.filter(event => event.id !== eventToDelete.id);
       setEvents(updatedEvents);
       
       // Show success feedback (optional)
       setError(null);
+      
+      // Close modal and reset state
+      setDeleteModalOpen(false);
+      setEventToDelete(null);
     } catch (error: any) {
       console.error('❌ Error deleting event:', error);
       console.error('Error response:', error.response?.data);
@@ -214,7 +225,14 @@ const Dashboard: React.FC = () => {
       
       setError(errorMessage);
     } finally {
-      setLoading(false);
+      setIsDeleting(false);
+    }
+  };
+
+  const handleCloseDeleteModal = () => {
+    if (!isDeleting) {
+      setDeleteModalOpen(false);
+      setEventToDelete(null);
     }
   };
 
@@ -458,7 +476,7 @@ const Dashboard: React.FC = () => {
                   <Button
                     size="sm"
                     variant="ghost"
-                    onClick={() => handleDeleteEvent(event.id)}
+                    onClick={() => handleDeleteEvent(event)}
                     icon={Trash2}
                     className="text-red-600 hover:text-red-700 hover:bg-red-50"
                   >
@@ -503,6 +521,17 @@ const Dashboard: React.FC = () => {
           </div>
         </Card>
       )} */}
+
+      {/* Delete Modal */}
+      <DeleteModal
+        isOpen={deleteModalOpen}
+        onClose={handleCloseDeleteModal}
+        onConfirm={handleConfirmDelete}
+        title="Delete Event"
+        message="Are you sure you want to delete this event? This action cannot be undone and all associated data will be permanently removed."
+        itemName={eventToDelete?.name}
+        isLoading={isDeleting}
+      />
       </div>
     </div>
   );
