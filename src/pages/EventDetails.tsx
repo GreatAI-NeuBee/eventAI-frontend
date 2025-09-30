@@ -4,10 +4,10 @@ import { AlertTriangle, CheckCircle, TrendingUp, Calendar, MapPin, Play } from '
 import Card from '../components/common/Card';
 import Button from '../components/common/Button';
 import Spinner from '../components/common/Spinner';
+import WeatherBackground from '../components/common/WeatherBackground';
 import VenueMap from '../components/dashboard/VenueMap';
 import TransitForecast from '../components/dashboard/TransitForecast';
 import ParkingForecast from '../components/dashboard/ParkingForecast';
-import WeatherWidget from '../components/dashboard/WeatherWidget';
 import VenueLayoutEditor, { VenueLayoutEditorData } from '../components/venue/VenueLayoutEditor';
 import { useEventStore } from '../store/eventStore';
 import { useAuth } from '../contexts/AuthContext';
@@ -433,43 +433,48 @@ const EventDetails: React.FC = () => {
   // Debug logging removed
 
   return (
-    <div className="max-w-7xl mx-auto p-6">
-      {/* Back button */}
-      
+    <WeatherBackground 
+      venueLocation={currentEvent?.venueLocation || null} 
+      eventDate={currentEvent?.dateStart || ''}
+      testMode={true} // Enable test mode for development
+    >
+      <div className="max-w-7xl mx-auto p-6">
+        {/* Back button */}
+        
 
-      {/* Event Header */}
-      <div className="mb-8">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">{currentEvent.name}</h1>
-            <p className="mt-2 text-gray-600">
-              Event Dashboard - Real-time monitoring and insights
-            </p>
-          </div>
-          <div className="flex items-center space-x-4">
-            {getStatusBadge(currentEvent.status)}
-            {(!forecastResult || Object.keys(forecastResult).length === 0) && (
-              <Button 
-                onClick={handleGenerateForecast}
-                disabled={isForecastLoading || !currentEvent.venueLayout}
-                title={!currentEvent.venueLayout ? 'Venue layout required to generate forecast' : ''}
-              >
-                {isForecastLoading ? 'Generating...' : 'Forecast'}
-              </Button>
-            )}
-            {forecastResult && Object.keys(forecastResult).length > 0 && (
-              <Button 
-                onClick={handleViewOngoingEvent}
-                variant="primary"
-                className="bg-green-600 hover:bg-green-700"
-              >
-                <Play className="h-4 w-4 mr-2" />
-                View Ongoing Event
-              </Button>
-            )}
+        {/* Event Header */}
+        <div className="mb-8">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">{currentEvent.name}</h1>
+              <p className="mt-2 text-gray-600">
+                Event Dashboard - Real-time monitoring and insights
+              </p>
+            </div>
+            <div className="flex items-center space-x-4">
+              {getStatusBadge(currentEvent.status)}
+              {(!forecastResult || Object.keys(forecastResult).length === 0) && (
+                <Button 
+                  onClick={handleGenerateForecast}
+                  disabled={isForecastLoading || !currentEvent.venueLayout}
+                  title={!currentEvent.venueLayout ? 'Venue layout required to generate forecast' : ''}
+                >
+                  {isForecastLoading ? 'Generating...' : 'Forecast'}
+                </Button>
+              )}
+              {forecastResult && Object.keys(forecastResult).length > 0 && (
+                <Button 
+                  onClick={handleViewOngoingEvent}
+                  variant="primary"
+                  className="bg-green-600 hover:bg-green-700"
+                >
+                  <Play className="h-4 w-4 mr-2" />
+                  View Ongoing Event
+                </Button>
+              )}
+            </div>
           </div>
         </div>
-      </div>
 
       {/* Error Display */}
       {(error || forecastError) && (
@@ -625,15 +630,6 @@ const EventDetails: React.FC = () => {
               />
             </Card>
 
-            {/* Weather Forecast */}
-            {currentEvent.venueLocation && (
-              <Card className="p-6">
-                <WeatherWidget
-                  venueLocation={currentEvent.venueLocation}
-                  eventDate={currentEvent.dateStart}
-                />
-              </Card>
-            )}
             
           </div>
 
@@ -717,7 +713,8 @@ const EventDetails: React.FC = () => {
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </WeatherBackground>
   );
 };
 
