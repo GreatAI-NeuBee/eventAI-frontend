@@ -44,6 +44,8 @@ interface EventData {
   userEmail?: string; // Email of the user who created the event
   status: 'draft' | 'processing' | 'completed' | 'error' | 'active';
   createdAt: string;
+  attachmentUrls?: string[]; // Array of attachment URLs
+  attachmentFilenames?: string[]; // Array of attachment filenames (corresponds to URLs by index)
 }
 
 export type { SimulationResult, EventData };

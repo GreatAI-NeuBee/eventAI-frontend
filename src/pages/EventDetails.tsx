@@ -94,7 +94,6 @@ const EventDetails: React.FC = () => {
 
       if (window.google && window.google.maps && window.google.maps.Geocoder) {
         try {
-          console.log('🗺️ Geocoding venue:', venueString);
           const geocoder = new google.maps.Geocoder();
           const result = await new Promise<google.maps.GeocoderResult[]>((resolve, reject) => {
             geocoder.geocode({ address: venueString }, (results, status) => {
@@ -113,13 +112,10 @@ const EventDetails: React.FC = () => {
             name: venueString,
             address: result[0].formatted_address,
           };
-          console.log('✅ Geocoded venue location:', geocodedLocation);
           return geocodedLocation;
         } catch (error) {
           console.warn('⚠️ Geocoding failed:', error);
         }
-      } else {
-        console.warn('⚠️ Google Maps not loaded after waiting');
       }
     }
 
@@ -130,7 +126,6 @@ const EventDetails: React.FC = () => {
       name: venueString || 'Event Venue',
       address: venueString || 'Kuala Lumpur, Malaysia',
     };
-    console.log('🏙️ Using default location for venue:', defaultLocation);
     return defaultLocation;
   };
   
@@ -165,12 +160,9 @@ const EventDetails: React.FC = () => {
     const fetchEventDetails = async () => {
       setIsLoadingEventDetails(true);
       try {
-        console.log('🔍 EventDetails: Fetching event details for:', eventId);
         const response = await eventAPI.getEvent(eventId);
-        console.log('🔍 EventDetails: API response:', response);
         // Handle the backend response structure
         const eventData = response.data.data || response.data;
-        console.log('🔍 EventDetails: Parsed event data:', eventData);
 
         
         // Transform backend event to frontend EventData format
@@ -181,25 +173,19 @@ const EventDetails: React.FC = () => {
           dateEnd: eventData.dateOfEventEnd || eventData.dateEnd,
           venue: eventData.venue || eventData.venueLocation?.name || eventData.venueLocation?.address || 'Venue location',
           description: eventData.description || '',
-          venueLocation: await (async () => {
-            console.log('🗺️ EventDetails: Getting venue location for:', eventData.venue);
-            const venueLocationWithCoords = await getVenueLocationWithCoordinates(eventData);
-            console.log('🗺️ EventDetails: Final venue location:', venueLocationWithCoords);
-            return venueLocationWithCoords;
-          })(),
+          venueLocation: await getVenueLocationWithCoordinates(eventData),
           venueLayout: eventData.venueLayout,
           userEmail: eventData.userEmail,
           status: eventData.status?.toLowerCase() === 'created' ? 'active' : (eventData.status?.toLowerCase() || 'completed') as EventData['status'],
           createdAt: eventData.createdAt,
+          attachmentUrls: eventData.attachmentUrls || [],
+          attachmentFilenames: eventData.attachmentFilenames || [],
         };
         
-        console.log('🔍 EventDetails: Transformed event:', transformedEvent);
         setCurrentEvent(transformedEvent);
         
         // Check if forecastResult exists (note: API returns 'forecastResult', not 'forecast_result')
         if (eventData.forecastResult) {
-          console.log('EventDetails: Forecast result found, loading simulation data');
-          console.log('EventDetails: Forecast result structure:', eventData.forecastResult);
           setForecastResult(eventData.forecastResult);
           
           // Handle nested forecast structure - data might be under 'forecast' property
@@ -217,25 +203,19 @@ const EventDetails: React.FC = () => {
             // Update the simulation result in the store
             const { setSimulationResult } = useEventStore.getState();
             setSimulationResult(simulationData);
-            console.log('EventDetails: Simulation data set in store:', simulationData);
           }
         } else {
-          console.log('EventDetails: No forecast result found, showing basic event info');
           setForecastResult(null);
         }
         
       } catch (error: any) {
         console.error('❌ EventDetails: Error fetching event details:', error);
-        console.error('Error response:', error.response?.data);
-        console.error('Error status:', error.response?.status);
         
         // If API fails, try to find event in existing events array as fallback
         const foundEvent = events.find(event => event.id === eventId);
         if (foundEvent) {
-          console.log('EventDetails: Using fallback event from store');
           setCurrentEvent(foundEvent);
         } else {
-          console.warn('EventDetails: Event not found, redirecting to dashboard');
           navigate('/dashboard');
         }
       } finally {
@@ -269,7 +249,6 @@ const EventDetails: React.FC = () => {
     setForecastError(null);
     
     try {
-      console.log('🔮 Generating forecast for event:', currentEvent.name);
       
       // Extract gates and their capacities from venue layout
       const { gates, gates_crowd } = extractGatesFromVenueLayout(currentEvent.venueLayout);
@@ -293,7 +272,6 @@ const EventDetails: React.FC = () => {
         freq: "5min"
       };
       
-      console.log('🔮 Forecast request data:', forecastRequestData);
       
       const response = await eventAPI.generateForecast(forecastRequestData);
       const forecastData = response.data;
@@ -326,7 +304,6 @@ const EventDetails: React.FC = () => {
       const { setSimulationResult } = useEventStore.getState();
       setSimulationResult(simulationData);
       
-      console.log('✅ Forecast generated successfully with API integration');
       
     } catch (error: any) {
       console.error('❌ Error generating forecast:', error);
@@ -583,6 +560,8 @@ const EventDetails: React.FC = () => {
               eventId={eventId}
               onSave={handleVenueConfigSave}
               readOnly={false}
+              existingAttachmentUrls={currentEvent.attachmentUrls || []}
+              existingAttachmentFilenames={currentEvent.attachmentFilenames || []}
             />
           )}
 

@@ -19,6 +19,8 @@ interface VenueLayoutEditorProps {
   eventId?: string; // Add eventId for file uploads
   onSave?: (updatedLayout: VenueLayoutEditorData) => void;
   readOnly?: boolean;
+  existingAttachmentUrls?: string[]; // Existing attachment URLs from backend
+  existingAttachmentFilenames?: string[]; // Existing attachment filenames from backend
 }
 
 export interface VenueLayoutEditorData {
@@ -46,7 +48,9 @@ const VenueLayoutEditor: React.FC<VenueLayoutEditorProps> = ({
   venueLayout,
   eventId,
   onSave,
-  readOnly = false
+  readOnly = false,
+  existingAttachmentUrls = [],
+  existingAttachmentFilenames = []
 }) => {
   const [gateConfig, setGateConfig] = useState<Record<string, GateConfig>>({});
   const [hasChanges, setHasChanges] = useState(false);
@@ -54,6 +58,13 @@ const VenueLayoutEditor: React.FC<VenueLayoutEditorProps> = ({
     links: string[];
     context: string;
   }>({ links: [], context: '' });
+
+  // Combine existing and newly uploaded attachments for display
+  const allAttachmentUrls = [...existingAttachmentUrls, ...attachments.links];
+  const allAttachmentFilenames = [
+    ...existingAttachmentFilenames,
+    ...attachments.links.map(url => url.split('/').pop() || 'Uploaded file')
+  ];
   const [showUpdateNotification, setShowUpdateNotification] = useState<{
     show: boolean;
     gateName: string;
@@ -104,7 +115,6 @@ const VenueLayoutEditor: React.FC<VenueLayoutEditorProps> = ({
             attachmentLinks: attachments.links,
             attachmentContext: attachments.context
           });
-          console.log('✅ Attachments saved to backend');
         } catch (error) {
           console.error('❌ Failed to save attachments to backend:', error);
         }
@@ -123,6 +133,14 @@ const VenueLayoutEditor: React.FC<VenueLayoutEditorProps> = ({
   };
 
   const removeAttachment = (linkToRemove: string) => {
+    // Only allow removing newly uploaded files, not existing ones
+    const isExistingFile = existingAttachmentUrls.includes(linkToRemove);
+    
+    if (isExistingFile) {
+      console.warn('Cannot remove existing attachments from frontend');
+      return;
+    }
+    
     setAttachments(prev => ({
       links: prev.links.filter(link => link !== linkToRemove),
       context: prev.context.replace(new RegExp(`\\n\\nFile: .*${linkToRemove}.*`, 'g'), '')
@@ -398,19 +416,24 @@ const VenueLayoutEditor: React.FC<VenueLayoutEditorProps> = ({
             disabled={readOnly}
             maxFiles={5}
             className="mb-6"
+            existingFiles={{
+              urls: existingAttachmentUrls,
+              filenames: existingAttachmentFilenames
+            }}
           />
 
-          {/* Uploaded Files List */}
-          {attachments.links.length > 0 && (
+          {/* All Files List (Existing + New) */}
+          {allAttachmentUrls.length > 0 && (
             <div className="space-y-4">
               <h5 className="font-medium text-gray-900 flex items-center gap-2">
                 <FileText className="h-4 w-4" />
-                Uploaded Files ({attachments.links.length})
+                Documents ({allAttachmentUrls.length})
               </h5>
               
               <div className="space-y-2">
-                {attachments.links.map((link) => {
-                  const fileName = link.split('/').pop() || 'Unknown file';
+                {allAttachmentUrls.map((link, index) => {
+                  const fileName = allAttachmentFilenames[index] || 'Unknown file';
+                  const isExistingFile = existingAttachmentUrls.includes(link);
                   
                   return (
                     <div key={link} className="flex items-start space-x-3 p-3 bg-gray-50 rounded-lg">
@@ -418,9 +441,21 @@ const VenueLayoutEditor: React.FC<VenueLayoutEditorProps> = ({
                       
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between">
-                          <h6 className="text-sm font-medium text-gray-900 truncate">
-                            {fileName}
-                          </h6>
+                          <div className="flex items-center space-x-2">
+                            <h6 className="text-sm font-medium text-gray-900 truncate">
+                              {fileName}
+                            </h6>
+                            {isExistingFile && (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                                Existing
+                              </span>
+                            )}
+                            {!isExistingFile && (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
+                                New
+                              </span>
+                            )}
+                          </div>
                           <div className="flex items-center space-x-2">
                             <a
                               href={link}
@@ -431,10 +466,11 @@ const VenueLayoutEditor: React.FC<VenueLayoutEditorProps> = ({
                               <ExternalLink className="h-3 w-3" />
                               View
                             </a>
-                            {!readOnly && (
+                            {!readOnly && !isExistingFile && (
                               <button
                                 onClick={() => removeAttachment(link)}
                                 className="text-red-600 hover:text-red-800 text-sm"
+                                title="Remove newly uploaded file"
                               >
                                 Remove
                               </button>
@@ -448,37 +484,9 @@ const VenueLayoutEditor: React.FC<VenueLayoutEditorProps> = ({
                 })}
               </div>
 
-              {/* Combined Analysis Summary */}
-              {attachments.links.length > 0 && (
-                <div className="mt-6 p-4 bg-green-50 rounded-lg">
-                  <h5 className="font-medium text-green-900 mb-2">Document Upload Summary</h5>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <span className="font-medium text-green-800">Total Documents:</span>
-                      <span className="ml-2 text-green-700">{attachments.links.length}</span>
-                    </div>
-                    <div>
-                      <span className="font-medium text-green-800">Upload Status:</span>
-                      <span className="ml-2 text-green-700">
-                        All files uploaded successfully
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              )}
             </div>
           )}
 
-          {/* Help Text */}
-          <div className="mt-6 p-4 bg-blue-50 rounded-lg">
-            <h5 className="font-medium text-blue-900 mb-2">💡 Tips for Better Analysis</h5>
-            <ul className="text-sm text-blue-800 space-y-1">
-              <li>• Upload event procedures, safety protocols, or workflow documents</li>
-              <li>• Include floor plans, capacity charts, or operational guidelines</li>
-              <li>• Text-based files (PDF, Word, Excel) provide the best analysis results</li>
-              <li>• Our AI will extract key information to improve event recommendations</li>
-            </ul>
-          </div>
         </Card>
       )}
 

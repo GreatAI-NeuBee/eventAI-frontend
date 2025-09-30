@@ -16,6 +16,10 @@ interface FileUploadProps {
   disabled?: boolean;
   maxFiles?: number;
   className?: string;
+  existingFiles?: {
+    urls: string[];
+    filenames: string[];
+  };
 }
 
 interface UploadingFile {
@@ -32,7 +36,8 @@ const FileUpload: React.FC<FileUploadProps> = ({
   eventId,
   disabled = false,
   maxFiles = 5,
-  className = ''
+  className = '',
+  existingFiles = { urls: [], filenames: [] }
 }) => {
   const [uploadingFiles, setUploadingFiles] = useState<UploadingFile[]>([]);
   const [dragOver, setDragOver] = useState(false);
@@ -41,7 +46,15 @@ const FileUpload: React.FC<FileUploadProps> = ({
   const handleFileSelect = (files: FileList | null) => {
     if (!files || files.length === 0) return;
 
-    const selectedFiles = Array.from(files).slice(0, maxFiles - uploadingFiles.length);
+    const totalExistingFiles = existingFiles.urls.length + uploadingFiles.length;
+    const availableSlots = maxFiles - totalExistingFiles;
+    
+    if (availableSlots <= 0) {
+      alert(`Maximum ${maxFiles} files allowed. You already have ${totalExistingFiles} files.`);
+      return;
+    }
+
+    const selectedFiles = Array.from(files).slice(0, availableSlots);
     
     selectedFiles.forEach(file => {
       const uploadId = Date.now() + Math.random().toString(36).substr(2, 9);
@@ -66,11 +79,11 @@ const FileUpload: React.FC<FileUploadProps> = ({
       // Call the backend API to upload the file
       const response = await eventAPI.uploadEventAttachments(eventId, file);
       
-      // Backend should return the file URLs in the response
+      // Backend should return the file URLs and filename in the response
       const result: FileUploadResult = {
         success: true,
         fileUrl: response.data.fileUrl || response.data.url, // Handle different response formats
-        fileName: file.name,
+        fileName: response.data.fileName || response.data.filename || file.name, // Use backend filename if provided
       };
 
       // Update status to completed
@@ -153,11 +166,12 @@ const FileUpload: React.FC<FileUploadProps> = ({
 
   // Simple file type icon function to replace AWS service dependency
   const getFileTypeIcon = (fileType: string) => {
-    if (fileType.includes('pdf')) {
+    const type = fileType.toLowerCase();
+    if (type.includes('pdf')) {
       return <FileText className="w-4 h-4 text-red-500" />;
-    } else if (fileType.includes('spreadsheet') || fileType.includes('excel')) {
+    } else if (type.includes('spreadsheet') || type.includes('excel') || type.includes('xlsx') || type.includes('xls')) {
       return <FileText className="w-4 h-4 text-green-500" />;
-    } else if (fileType.includes('word') || fileType.includes('document')) {
+    } else if (type.includes('word') || type.includes('document') || type.includes('docx') || type.includes('doc')) {
       return <FileText className="w-4 h-4 text-blue-500" />;
     } else {
       return <File className="w-4 h-4 text-gray-500" />;
@@ -227,6 +241,9 @@ const FileUpload: React.FC<FileUploadProps> = ({
         )}
       </div>
 
+      {/* Existing Files List */}
+      
+
       {/* Uploading Files List */}
       {uploadingFiles.length > 0 && (
         <div className="space-y-2">
@@ -244,9 +261,19 @@ const FileUpload: React.FC<FileUploadProps> = ({
               {/* File Info */}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between">
-                  <p className="text-sm font-medium text-gray-900 truncate">
-                    {uploadingFile.file.name}
-                  </p>
+                  <div className="flex flex-col min-w-0">
+                    <p className="text-sm font-medium text-gray-900 truncate">
+                      {uploadingFile.status === 'completed' && uploadingFile.result?.fileName 
+                        ? uploadingFile.result.fileName 
+                        : uploadingFile.file.name}
+                    </p>
+                    {uploadingFile.status === 'completed' && uploadingFile.result?.fileName && 
+                     uploadingFile.result.fileName !== uploadingFile.file.name && (
+                      <p className="text-xs text-gray-500 truncate">
+                        Original: {uploadingFile.file.name}
+                      </p>
+                    )}
+                  </div>
                   <button
                     onClick={() => removeUploadingFile(uploadingFile.id)}
                     className="flex-shrink-0 text-gray-400 hover:text-gray-600"
@@ -280,7 +307,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
                   <div className="mt-2 p-2 bg-green-50 rounded text-xs">
                     <p className="text-green-800 font-medium">✅ Upload Successful</p>
                     <p className="text-green-700 mt-1 truncate">
-                      File saved to server
+                      Saved as: {uploadingFile.result.fileName || 'Unknown filename'}
                     </p>
                   </div>
                 )}
@@ -290,12 +317,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
         </div>
       )}
 
-      {/* Upload Limits Info */}
-      {uploadingFiles.length > 0 && (
-        <div className="text-xs text-gray-500 text-center">
-          {uploadingFiles.length} / {maxFiles} files uploaded
-        </div>
-      )}
+      
     </div>
   );
 };
