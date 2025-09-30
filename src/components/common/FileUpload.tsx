@@ -1,7 +1,14 @@
 import React, { useState, useRef } from 'react';
-import { Upload, X, AlertCircle, CheckCircle, Loader } from 'lucide-react';
+import { Upload, X, AlertCircle, CheckCircle, Loader, FileText, File } from 'lucide-react';
 import Button from './Button';
-import { awsDirectService as awsService, FileUploadResult, ComprehendAnalysis } from '../../services/awsDirectService';
+import { eventAPI } from '../../api/apiClient';
+
+interface FileUploadResult {
+  success: boolean;
+  fileUrl?: string;
+  fileName?: string;
+  error?: string;
+}
 
 interface FileUploadProps {
   onFileUploaded: (result: FileUploadResult) => void;
@@ -15,7 +22,7 @@ interface UploadingFile {
   id: string;
   file: File;
   progress: number;
-  status: 'uploading' | 'analyzing' | 'completed' | 'error';
+  status: 'uploading' | 'completed' | 'error';
   result?: FileUploadResult;
   error?: string;
 }
@@ -56,47 +63,42 @@ const FileUpload: React.FC<FileUploadProps> = ({
 
   const uploadFile = async (uploadId: string, file: File) => {
     try {
-      const result = await awsService.uploadAndAnalyzeFile(
-        file,
-        eventId,
-        (progress) => {
-          setUploadingFiles(prev => prev.map(uf => 
-            uf.id === uploadId 
-              ? { 
-                  ...uf, 
-                  progress, 
-                  status: progress < 70 ? 'uploading' : 'analyzing' 
-                }
-              : uf
-          ));
-        }
-      );
+      // Call the backend API to upload the file
+      const response = await eventAPI.uploadEventAttachments(eventId, file);
+      
+      // Backend should return the file URLs in the response
+      const result: FileUploadResult = {
+        success: true,
+        fileUrl: response.data.fileUrl || response.data.url, // Handle different response formats
+        fileName: file.name,
+      };
 
-      // Update status
+      // Update status to completed
       setUploadingFiles(prev => prev.map(uf => 
         uf.id === uploadId 
           ? { 
               ...uf, 
               progress: 100, 
-              status: result.success ? 'completed' : 'error',
-              result,
-              error: result.error
+              status: 'completed',
+              result
             }
           : uf
       ));
 
       // Notify parent component
-      if (result.success) {
-        onFileUploaded(result);
-      }
+      onFileUploaded(result);
 
     } catch (error: any) {
+      console.error('File upload error:', error);
+      
+      const errorMessage = error.response?.data?.message || error.message || 'Upload failed';
+      
       setUploadingFiles(prev => prev.map(uf => 
         uf.id === uploadId 
           ? { 
               ...uf, 
               status: 'error',
-              error: error.message || 'Upload failed'
+              error: errorMessage
             }
           : uf
       ));
@@ -130,7 +132,6 @@ const FileUpload: React.FC<FileUploadProps> = ({
   const getStatusIcon = (status: UploadingFile['status']) => {
     switch (status) {
       case 'uploading':
-      case 'analyzing':
         return <Loader className="w-4 h-4 animate-spin text-blue-500" />;
       case 'completed':
         return <CheckCircle className="w-4 h-4 text-green-500" />;
@@ -143,13 +144,33 @@ const FileUpload: React.FC<FileUploadProps> = ({
     switch (uploadingFile.status) {
       case 'uploading':
         return `Uploading... ${uploadingFile.progress}%`;
-      case 'analyzing':
-        return 'Analyzing content...';
       case 'completed':
         return 'Upload completed';
       case 'error':
         return uploadingFile.error || 'Upload failed';
     }
+  };
+
+  // Simple file type icon function to replace AWS service dependency
+  const getFileTypeIcon = (fileType: string) => {
+    if (fileType.includes('pdf')) {
+      return <FileText className="w-4 h-4 text-red-500" />;
+    } else if (fileType.includes('spreadsheet') || fileType.includes('excel')) {
+      return <FileText className="w-4 h-4 text-green-500" />;
+    } else if (fileType.includes('word') || fileType.includes('document')) {
+      return <FileText className="w-4 h-4 text-blue-500" />;
+    } else {
+      return <File className="w-4 h-4 text-gray-500" />;
+    }
+  };
+
+  // Simple file size formatter
+  const formatFileSize = (bytes: number): string => {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
   return (
@@ -217,7 +238,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
             >
               {/* File Icon */}
               <div className="flex-shrink-0">
-                {awsService.getFileTypeIcon(uploadingFile.file.type)}
+                {getFileTypeIcon(uploadingFile.file.type)}
               </div>
 
               {/* File Info */}
@@ -240,12 +261,12 @@ const FileUpload: React.FC<FileUploadProps> = ({
                     {getStatusText(uploadingFile)}
                   </p>
                   <span className="text-xs text-gray-400">
-                    ({awsService.formatFileSize(uploadingFile.file.size)})
+                    ({formatFileSize(uploadingFile.file.size)})
                   </span>
                 </div>
 
                 {/* Progress Bar */}
-                {(uploadingFile.status === 'uploading' || uploadingFile.status === 'analyzing') && (
+                {uploadingFile.status === 'uploading' && (
                   <div className="w-full bg-gray-200 rounded-full h-1.5 mt-2">
                     <div
                       className="bg-blue-500 h-1.5 rounded-full transition-all duration-300"
@@ -254,12 +275,12 @@ const FileUpload: React.FC<FileUploadProps> = ({
                   </div>
                 )}
 
-                {/* Analysis Results Preview */}
-                {uploadingFile.status === 'completed' && uploadingFile.result?.analysisResult && (
-                  <div className="mt-2 p-2 bg-blue-50 rounded text-xs">
-                    <p className="text-blue-800 font-medium">Analysis Complete:</p>
-                    <p className="text-blue-700 mt-1">
-                      {(uploadingFile.result.analysisResult as ComprehendAnalysis).summary}
+                {/* Upload Success Message */}
+                {uploadingFile.status === 'completed' && uploadingFile.result?.fileUrl && (
+                  <div className="mt-2 p-2 bg-green-50 rounded text-xs">
+                    <p className="text-green-800 font-medium">✅ Upload Successful</p>
+                    <p className="text-green-700 mt-1 truncate">
+                      File saved to server
                     </p>
                   </div>
                 )}

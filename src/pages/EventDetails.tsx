@@ -436,7 +436,6 @@ const EventDetails: React.FC = () => {
     <WeatherBackground 
       venueLocation={currentEvent?.venueLocation || null} 
       eventDate={currentEvent?.dateStart || ''}
-      testMode={true} // Enable test mode for development
     >
       <div className="max-w-7xl mx-auto p-6">
         {/* Back button */}

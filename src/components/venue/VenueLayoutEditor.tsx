@@ -4,8 +4,15 @@ import Card from '../common/Card';
 import Button from '../common/Button';
 import FileUpload from '../common/FileUpload';
 import type { StadiumMapJSON } from '../maps/StadiumMapEditor';
-import { FileUploadResult, ComprehendAnalysis } from '../../services/awsDirectService';
 import { eventAPI } from '../../api/apiClient';
+
+// Updated interfaces without AWS dependencies
+interface FileUploadResult {
+  success: boolean;
+  fileUrl?: string;
+  fileName?: string;
+  error?: string;
+}
 
 interface VenueLayoutEditorProps {
   venueLayout: StadiumMapJSON;
@@ -26,7 +33,6 @@ export interface VenueLayoutEditorData {
   attachments?: {
     links: string[];
     context: string;
-    analyses: ComprehendAnalysis[];
   };
 }
 
@@ -47,8 +53,7 @@ const VenueLayoutEditor: React.FC<VenueLayoutEditorProps> = ({
   const [attachments, setAttachments] = useState<{
     links: string[];
     context: string;
-    analyses: ComprehendAnalysis[];
-  }>({ links: [], context: '', analyses: [] });
+  }>({ links: [], context: '' });
   const [showUpdateNotification, setShowUpdateNotification] = useState<{
     show: boolean;
     gateName: string;
@@ -111,28 +116,17 @@ const VenueLayoutEditor: React.FC<VenueLayoutEditorProps> = ({
     if (result.success && result.fileUrl) {
       setAttachments(prev => ({
         links: [...prev.links, result.fileUrl!],
-        analyses: result.analysisResult 
-          ? [...prev.analyses, result.analysisResult as ComprehendAnalysis]
-          : prev.analyses,
-        context: prev.context + (result.analysisResult 
-          ? `\n\nFile: ${result.fileUrl}\nAnalysis: ${(result.analysisResult as ComprehendAnalysis).summary}`
-          : `\n\nFile: ${result.fileUrl}`)
+        context: prev.context + `\n\nFile: ${result.fileName || 'uploaded file'} - ${result.fileUrl}`
       }));
       setHasChanges(true);
     }
   };
 
   const removeAttachment = (linkToRemove: string) => {
-    setAttachments(prev => {
-      const linkIndex = prev.links.indexOf(linkToRemove);
-      return {
-        links: prev.links.filter(link => link !== linkToRemove),
-        analyses: linkIndex >= 0 
-          ? prev.analyses.filter((_, index) => index !== linkIndex)
-          : prev.analyses,
-        context: prev.context.replace(new RegExp(`\\n\\nFile: ${linkToRemove}[^\\n]*(?:\\nAnalysis: [^\\n]*)?`, 'g'), '')
-      };
-    });
+    setAttachments(prev => ({
+      links: prev.links.filter(link => link !== linkToRemove),
+      context: prev.context.replace(new RegExp(`\\n\\nFile: .*${linkToRemove}.*`, 'g'), '')
+    }));
     setHasChanges(true);
   };
 
@@ -415,9 +409,8 @@ const VenueLayoutEditor: React.FC<VenueLayoutEditorProps> = ({
               </h5>
               
               <div className="space-y-2">
-                {attachments.links.map((link, index) => {
+                {attachments.links.map((link) => {
                   const fileName = link.split('/').pop() || 'Unknown file';
-                  const analysis = attachments.analyses[index];
                   
                   return (
                     <div key={link} className="flex items-start space-x-3 p-3 bg-gray-50 rounded-lg">
@@ -449,30 +442,6 @@ const VenueLayoutEditor: React.FC<VenueLayoutEditorProps> = ({
                           </div>
                         </div>
                         
-                        {analysis && (
-                          <div className="mt-2 p-2 bg-blue-50 rounded text-xs">
-                            <p className="text-blue-800 font-medium">AI Analysis:</p>
-                            <p className="text-blue-700 mt-1">{analysis.summary}</p>
-                            
-                            {analysis.keyPhrases.length > 0 && (
-                              <div className="mt-2">
-                                <span className="text-blue-800 font-medium">Key Topics: </span>
-                                <span className="text-blue-700">
-                                  {analysis.keyPhrases.slice(0, 3).map(kp => kp.text).join(', ')}
-                                </span>
-                              </div>
-                            )}
-                            
-                            {analysis.entities.length > 0 && (
-                              <div className="mt-1">
-                                <span className="text-blue-800 font-medium">Entities: </span>
-                                <span className="text-blue-700">
-                                  {analysis.entities.slice(0, 3).map(e => e.text).join(', ')}
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                        )}
                       </div>
                     </div>
                   );
@@ -480,25 +449,18 @@ const VenueLayoutEditor: React.FC<VenueLayoutEditorProps> = ({
               </div>
 
               {/* Combined Analysis Summary */}
-              {attachments.analyses.length > 0 && (
+              {attachments.links.length > 0 && (
                 <div className="mt-6 p-4 bg-green-50 rounded-lg">
-                  <h5 className="font-medium text-green-900 mb-2">Document Analysis Summary</h5>
+                  <h5 className="font-medium text-green-900 mb-2">Document Upload Summary</h5>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                     <div>
                       <span className="font-medium text-green-800">Total Documents:</span>
                       <span className="ml-2 text-green-700">{attachments.links.length}</span>
                     </div>
                     <div>
-                      <span className="font-medium text-green-800">Analysis Status:</span>
+                      <span className="font-medium text-green-800">Upload Status:</span>
                       <span className="ml-2 text-green-700">
-                        {attachments.analyses.length} analyzed
-                      </span>
-                    </div>
-                    <div className="md:col-span-2">
-                      <span className="font-medium text-green-800">Common Themes:</span>
-                      <span className="ml-2 text-green-700">
-                        {[...new Set(attachments.analyses.flatMap(a => a.keyPhrases.slice(0, 2).map(kp => kp.text)))]
-                          .slice(0, 5).join(', ')}
+                        All files uploaded successfully
                       </span>
                     </div>
                   </div>

@@ -156,4 +156,24 @@ export const eventAPI = {
     console.log('🌐 Using real API for getEventAttachments:', `${apiClient.defaults.baseURL}/events/${eventId}/attachments`);
     return apiClient.get(`/events/${eventId}/attachments`);
   },
+
+  // Upload event attachments - NEW endpoint
+  uploadEventAttachments: (eventId: string, file: File) => {
+    const formData = new FormData();
+    formData.append('files', file);
+    
+    console.log('📤 Using real API for uploadEventAttachments:', `${apiClient.defaults.baseURL}/events/${eventId}/uploadEventAttachments`);
+    return apiClient.post(`/events/${eventId}/uploadEventAttachments`, formData, {
+      headers: { 
+        'Content-Type': 'multipart/form-data',
+      },
+      onUploadProgress: (progressEvent) => {
+        // This can be used for progress tracking
+        if (progressEvent.total) {
+          const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+          console.log(`Upload progress: ${progress}%`);
+        }
+      }
+    });
+  },
 };
