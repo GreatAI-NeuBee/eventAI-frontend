@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { Save, Phone, Users, MapPin, Settings, Upload, FileText, ExternalLink, CheckCircle, Bot } from 'lucide-react';
-import Card from '../common/Card';
+import StaticGlassCard from '../common/StaticGlassCard';
 import Button from '../common/Button';
 import FileUpload from '../common/FileUpload';
 import type { StadiumMapJSON } from '../maps/StadiumMapEditor';
 import { eventAPI } from '../../api/apiClient';
+import { WeatherContext } from '../common/WeatherBackground';
 
 // Updated interfaces without AWS dependencies
 interface FileUploadResult {
@@ -52,6 +53,23 @@ const VenueLayoutEditor: React.FC<VenueLayoutEditorProps> = ({
   existingAttachmentUrls = [],
   existingAttachmentFilenames = []
 }) => {
+  const { isDarkBackground, isRainBackground } = useContext(WeatherContext);
+  
+  // Determine text colors based on weather background
+  const getTextColor = () => {
+    if (isDarkBackground) return 'text-white'; // Storm - white text on light glass
+    return 'text-white'; // Rain and Clear - white text on dark glass
+  };
+  
+  const getSecondaryTextColor = () => {
+    if (isDarkBackground) return 'text-white/80'; // Storm
+    return 'text-white/80'; // Rain and Clear
+  };
+  
+  const getIconColor = () => {
+    if (isDarkBackground) return 'text-white/80'; // Storm
+    return 'text-white/80'; // Rain and Clear
+  };
   const [gateConfig, setGateConfig] = useState<Record<string, GateConfig>>({});
   const [hasChanges, setHasChanges] = useState(false);
   const [attachments, setAttachments] = useState<{
@@ -180,26 +198,26 @@ const VenueLayoutEditor: React.FC<VenueLayoutEditorProps> = ({
 
   if (!venueLayout) {
     return (
-      <Card className="p-6">
-        <div className="text-center text-gray-500">
-          <MapPin className="mx-auto h-12 w-12 text-gray-400 mb-3" />
-          <p>No venue layout configured for this event.</p>
+      <StaticGlassCard intensity="medium" blur="md">
+        <div className="text-center text-white/70">
+          <MapPin className="mx-auto h-12 w-12 text-white/60 mb-3" />
+          <p className="text-white/80">No venue layout configured for this event.</p>
         </div>
-      </Card>
+      </StaticGlassCard>
     );
   }
 
   return (
     <div className="space-y-6">
       {/* Venue Layout Summary */}
-      <Card className="p-6">
+      <StaticGlassCard intensity="medium" blur="md">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-              <Settings className="h-5 w-5" />
+            <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+              <Settings className="h-5 w-5 text-white/80" />
               Venue Layout Configuration
             </h3>
-            <p className="text-sm text-gray-600 mt-1">
+            <p className="text-sm text-white/80 mt-1">
               Configure capacity and assign person-in-charge for each gate
             </p>
           </div>
@@ -212,41 +230,41 @@ const VenueLayoutEditor: React.FC<VenueLayoutEditorProps> = ({
         </div>
 
         {/* Venue Overview */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6 p-4 bg-gray-50 rounded-lg">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6 p-4 bg-white/10 backdrop-blur-sm rounded-lg border border-white/20">
           <div className="text-center">
-            <div className="text-2xl font-bold text-blue-600">{venueLayout.sections}</div>
-            <div className="text-sm text-gray-600">Sections</div>
+            <div className="text-2xl font-bold text-blue-300">{venueLayout.sections}</div>
+            <div className="text-sm text-white/70">Sections</div>
           </div>
           <div className="text-center">
-            <div className="text-2xl font-bold text-green-600">{venueLayout.layers}</div>
-            <div className="text-sm text-gray-600">Layers</div>
+            <div className="text-2xl font-bold text-green-300">{venueLayout.layers}</div>
+            <div className="text-sm text-white/70">Layers</div>
           </div>
           <div className="text-center">
-            <div className="text-2xl font-bold text-orange-600">{venueLayout.exits}</div>
-            <div className="text-sm text-gray-600">Exits/Gates</div>
+            <div className="text-2xl font-bold text-orange-300">{venueLayout.exits}</div>
+            <div className="text-sm text-white/70">Exits/Gates</div>
           </div>
           <div className="text-center">
-            <div className="text-2xl font-bold text-purple-600">
+            <div className="text-2xl font-bold text-purple-300">
               {venueLayout.toiletsList?.length || 0}
             </div>
-            <div className="text-sm text-gray-600">Facilities</div>
+            <div className="text-sm text-white/70">Facilities</div>
           </div>
         </div>
 
         {/* Venue Layout Visualization */}
         <div className="mb-6">
-          <h4 className="text-md font-medium text-gray-900 mb-3">Layout Visualization</h4>
-          <div className="border rounded-lg p-4 bg-white">
+          <h4 className="text-md font-medium text-white mb-3">Layout Visualization</h4>
+          <div className="border border-white/30 rounded-lg p-4 bg-white/10 backdrop-blur-sm">
             <VenueLayoutVisualization venueLayout={venueLayout} />
           </div>
         </div>
-      </Card>
+      </StaticGlassCard>
 
       {/* Gate Configuration */}
       {venueLayout.exitsList && venueLayout.exitsList.length > 0 && (
-        <Card className="p-6">
-          <h4 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-            <Users className="h-5 w-5" />
+        <StaticGlassCard intensity="medium" blur="md">
+          <h4 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+            <Users className="h-5 w-5 text-white/80" />
             Gate Configuration ({venueLayout.exitsList.length} gates)
           </h4>
           <div className="space-y-4">
@@ -255,13 +273,13 @@ const VenueLayoutEditor: React.FC<VenueLayoutEditorProps> = ({
               const isPhoneValid = !config.picPhoneNumber || validatePhoneNumber(config.picPhoneNumber);
               
               return (
-                <div key={exit.id} className="p-4 border border-gray-200 rounded-lg">
+                <div key={exit.id} className="p-4 border border-white/10 rounded-lg">
                   <div className="flex items-center justify-between mb-3">
                     <div>
-                      <h5 className="font-medium text-gray-900">{exit.name}</h5>
+                      <h5 className="font-medium text-white">{exit.name}</h5>
                       
                     </div>
-                    <div className="text-sm text-gray-500">
+                    <div className="text-sm text-white/60">
                       Gate #{index + 1}
                     </div>
                   </div>
@@ -284,8 +302,8 @@ const VenueLayoutEditor: React.FC<VenueLayoutEditorProps> = ({
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     {/* Capacity Configuration */}
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        <Users className="h-4 w-4 inline mr-1" />
+                      <label className="block text-sm font-medium text-white/80 mb-1">
+                        <Users className="h-4 w-4 inline mr-1 text-white/70" />
                         Capacity (people/hour)
                       </label>
                       <input
@@ -315,14 +333,14 @@ const VenueLayoutEditor: React.FC<VenueLayoutEditorProps> = ({
                         className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 disabled:bg-gray-100"
                         placeholder="800"
                       />
-                      <p className="text-xs text-gray-500 mt-1">
+                      <p className="text-xs text-white/60 mt-1">
                         ~{Math.round((config.capacity || 800) / 60)} people/minute
                       </p>
                     </div>
 
                     {/* PIC Name */}
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                      <label className="block text-sm font-medium text-white/80 mb-1">
                         PIC Name (Optional)
                       </label>
                       <input
@@ -337,8 +355,8 @@ const VenueLayoutEditor: React.FC<VenueLayoutEditorProps> = ({
 
                     {/* Phone Number Configuration */}
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        <Phone className="h-4 w-4 inline mr-1" />
+                      <label className="block text-sm font-medium text-white/80 mb-1">
+                        <Phone className="h-4 w-4 inline mr-1 text-white/70" />
                         PIC Phone Number
                       </label>
                       <input
@@ -358,7 +376,7 @@ const VenueLayoutEditor: React.FC<VenueLayoutEditorProps> = ({
                           Please enter a valid Malaysian phone number
                         </p>
                       )}
-                      <p className="text-xs text-gray-500 mt-1">
+                      <p className="text-xs text-white/60 mt-1">
                         WhatsApp number for gate notifications
                       </p>
                     </div>
@@ -369,7 +387,7 @@ const VenueLayoutEditor: React.FC<VenueLayoutEditorProps> = ({
           </div>
 
           {/* Configuration Summary */}
-          <div className="mt-6 p-4 bg-blue-50 rounded-lg">
+          {/* <div className="mt-6 p-4 bg-blue-50 rounded-lg">
             <h5 className="font-medium text-blue-900 mb-2">Configuration Summary</h5>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
               <div>
@@ -393,18 +411,18 @@ const VenueLayoutEditor: React.FC<VenueLayoutEditorProps> = ({
                 </span>
               </div>
             </div>
-          </div>
-        </Card>
+          </div> */}
+        </StaticGlassCard>
       )}
 
       {/* File Upload Section */}
       {eventId && (
-        <Card className="p-6">
-          <h4 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-            <Upload className="h-5 w-5" />
+        <StaticGlassCard intensity="medium" blur="md">
+          <h4 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+            <Upload className="h-5 w-5 text-white/80" />
             Event Documents & Files
           </h4>
-          <p className="text-sm text-gray-600 mb-6">
+          <p className="text-sm text-white/80 mb-6">
             Upload relevant documents such as workflows, procedures, floor plans, or any other files related to your event. 
             Our AI will analyze the content to provide better insights and recommendations.
           </p>
@@ -425,8 +443,8 @@ const VenueLayoutEditor: React.FC<VenueLayoutEditorProps> = ({
           {/* All Files List (Existing + New) */}
           {allAttachmentUrls.length > 0 && (
             <div className="space-y-4">
-              <h5 className="font-medium text-gray-900 flex items-center gap-2">
-                <FileText className="h-4 w-4" />
+              <h5 className="font-medium text-white flex items-center gap-2">
+                <FileText className="h-4 w-4 text-white/80" />
                 Documents ({allAttachmentUrls.length})
               </h5>
               
@@ -436,22 +454,22 @@ const VenueLayoutEditor: React.FC<VenueLayoutEditorProps> = ({
                   const isExistingFile = existingAttachmentUrls.includes(link);
                   
                   return (
-                    <div key={link} className="flex items-start space-x-3 p-3 bg-gray-50 rounded-lg">
-                      <FileText className="h-5 w-5 text-blue-500 mt-0.5" />
+                    <div key={link} className="flex items-start space-x-3 p-3 bg-white/10 backdrop-blur-sm rounded-lg border border-white/20">
+                      <FileText className="h-5 w-5 text-blue-300 mt-0.5" />
                       
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center space-x-2">
-                            <h6 className="text-sm font-medium text-gray-900 truncate">
+                            <h6 className="text-sm font-medium text-white truncate">
                               {fileName}
                             </h6>
                             {isExistingFile && (
-                              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-400/30 text-blue-100 border border-blue-300/40">
                                 Existing
                               </span>
                             )}
                             {!isExistingFile && (
-                              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-400/30 text-green-100 border border-green-300/40">
                                 New
                               </span>
                             )}
@@ -461,7 +479,7 @@ const VenueLayoutEditor: React.FC<VenueLayoutEditorProps> = ({
                               href={link}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="text-blue-600 hover:text-blue-800 text-sm flex items-center gap-1"
+                              className="text-blue-300 hover:text-blue-100 text-sm flex items-center gap-1"
                             >
                               <ExternalLink className="h-3 w-3" />
                               View
@@ -487,7 +505,7 @@ const VenueLayoutEditor: React.FC<VenueLayoutEditorProps> = ({
             </div>
           )}
 
-        </Card>
+        </StaticGlassCard>
       )}
 
       {/* Modern Update Notification Popup */}

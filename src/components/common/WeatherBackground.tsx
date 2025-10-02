@@ -8,6 +8,17 @@ interface WeatherBackgroundProps {
   testMode?: boolean; // Enable test mode with manual weather selection
 }
 
+// Create a context to share weather condition with child components
+export const WeatherContext = React.createContext<{
+  weatherCondition: string;
+  isDarkBackground: boolean;
+  isRainBackground: boolean;
+}>({
+  weatherCondition: 'clear',
+  isDarkBackground: false,
+  isRainBackground: false,
+});
+
 const WeatherBackground: React.FC<WeatherBackgroundProps> = ({
   venueLocation,
   eventDate,
@@ -73,18 +84,23 @@ const WeatherBackground: React.FC<WeatherBackgroundProps> = ({
 
   const weatherCondition = getWeatherCondition();
 
+  // Determine if background is dark (affects text color)
+  // Storm is dark background, rain is light but needs special handling
+  const isDarkBackground = weatherCondition === 'storm';
+  const isRainBackground = weatherCondition === 'rain';
+
   // Weather-specific styles and animations
   const getWeatherStyles = () => {
     switch (weatherCondition) {
       case 'rain':
         return {
-          background: '', // Keep default white background
-          overlay: ''
+          background: '', // Video will provide the background
+          overlay: 'bg-gray-900/5' // Very light overlay since rain video is lighter
         };
       case 'storm':
         return {
-          background: 'linear-gradient(135deg, #2c3e50 0%, #34495e 100%)',
-          overlay: 'bg-gray-900/20'
+          background: '', // Video will provide the background
+          overlay: 'bg-gray-900/10' // Lighter overlay since video has its own overlay
         };
       case 'snow':
         return {
@@ -106,51 +122,50 @@ const WeatherBackground: React.FC<WeatherBackgroundProps> = ({
 
   const styles = getWeatherStyles();
 
-  // Rain animation component
-  const RainAnimation = () => (
-    <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
-      {Array.from({ length: 60 }).map((_, i) => {
-        const dropHeight = Math.random() * 12 + 8; // 8-20px height
-        const animationDuration = Math.random() * 1.5 + 1.5; // 1.5-3s duration (slower)
-        return (
-          <div
-            key={i}
-            className="absolute bg-blue-500/70"
-            style={{
-              left: `${Math.random() * 100}%`,
-              width: '3px',
-              height: `${dropHeight}px`,
-              borderRadius: '50% 50% 50% 50% / 60% 60% 40% 40%', // Teardrop shape
-              animationDelay: `${Math.random() * 2}s`,
-              animationDuration: `${animationDuration}s`,
-              transform: `translateY(-100vh) rotate(${Math.random() * 6 - 3}deg)`, // Slight random rotation
-              animation: `rainDrop ${animationDuration}s linear infinite`,
-              boxShadow: '0 0 2px rgba(59, 130, 246, 0.4)', // Subtle blue glow
-              filter: 'blur(0.3px)', // Slight blur for more realistic look
-            }}
-          />
-        );
-      })}
-      <style>{`
-        @keyframes rainDrop {
-          0% {
-            transform: translateY(-100vh);
-            opacity: 0;
-          }
-          10% {
-            opacity: 1;
-          }
-          90% {
-            opacity: 1;
-          }
-          100% {
-            transform: translateY(100vh);
-            opacity: 0;
-          }
+  // Rain animation component with video background
+  const RainAnimation = () => {
+    const videoRef = React.useRef<HTMLVideoElement>(null);
+
+    React.useEffect(() => {
+      const video = videoRef.current;
+      if (video) {
+        // Force load and play when component mounts
+        video.load();
+        const playPromise = video.play();
+        if (playPromise !== undefined) {
+          playPromise.catch(error => {
+            console.log('Rain video autoplay prevented:', error);
+            // Try to play again after a short delay
+            setTimeout(() => video.play(), 100);
+          });
         }
-      `}</style>
-    </div>
-  );
+      }
+    }, []);
+
+    return (
+      <div className="fixed inset-0 pointer-events-none z-0">
+        {/* Video Background */}
+        <video
+          ref={videoRef}
+          key="rain-video"
+          autoPlay
+          loop
+          muted
+          playsInline
+          className="absolute inset-0 w-full h-full object-cover opacity-60"
+          style={{
+            filter: 'brightness(0.9) contrast(1.0) saturate(0.9)',
+            transform: 'scale(1.05)', // Slight scale to avoid edge artifacts
+          }}
+        >
+          <source src="/videos/raining12.mp4" type="video/mp4" />
+        </video>
+        
+        {/* Light overlay for better content readability */}
+        <div className="absolute inset-0 bg-gray-500/10" />
+      </div>
+    );
+  };
 
   // Snow animation component
   const SnowAnimation = () => (
@@ -178,28 +193,72 @@ const WeatherBackground: React.FC<WeatherBackgroundProps> = ({
     </div>
   );
 
-  // Storm animation component
-  const StormAnimation = () => (
-    <div className="fixed inset-0 pointer-events-none z-0">
-      <div
-        className="absolute inset-0 opacity-20"
-        style={{
-          background: 'radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.1) 0%, transparent 70%)',
-          animation: 'lightning 4s ease-in-out infinite alternate',
-        }}
-      />
-      <style>{`
-        @keyframes lightning {
-          0%, 90%, 100% {
-            opacity: 0;
-          }
-          5%, 10% {
-            opacity: 0.2;
-          }
+  // Storm animation component with video background
+  const StormAnimation = () => {
+    const videoRef = React.useRef<HTMLVideoElement>(null);
+
+    React.useEffect(() => {
+      const video = videoRef.current;
+      if (video) {
+        // Force load and play when component mounts
+        video.load();
+        const playPromise = video.play();
+        if (playPromise !== undefined) {
+          playPromise.catch(error => {
+            console.log('Storm video autoplay prevented:', error);
+            // Try to play again after a short delay
+            setTimeout(() => video.play(), 100);
+          });
         }
-      `}</style>
-    </div>
-  );
+      }
+    }, []);
+
+    return (
+      <div className="fixed inset-0 pointer-events-none z-0">
+        {/* Video Background */}
+        <video
+          ref={videoRef}
+          key="storm-video"
+          autoPlay
+          loop
+          muted
+          playsInline
+          className="absolute inset-0 w-full h-full object-cover opacity-70"
+          style={{
+            filter: 'brightness(0.8) contrast(1.1) saturate(0.8)',
+            transform: 'scale(1.05)', // Slight scale to avoid edge artifacts
+          }}
+        >
+          <source src="/videos/storm1.mp4" type="video/mp4" />
+        </video>
+        
+        {/* Light overlay for better content readability */}
+        <div className="absolute inset-0 bg-gray-900/15" />
+        
+        {/* Subtle lightning effect overlay - reduced to let video thunder show through */}
+        <div
+          className="absolute inset-0 opacity-5"
+          style={{
+            background: 'radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.1) 0%, transparent 70%)',
+            animation: 'lightning 8s ease-in-out infinite alternate',
+          }}
+        />
+        <style>{`
+          @keyframes lightning {
+            0%, 85%, 100% {
+              opacity: 0;
+            }
+            5%, 10% {
+              opacity: 0.15;
+            }
+            15%, 20% {
+              opacity: 0.1;
+            }
+          }
+        `}</style>
+      </div>
+    );
+  };
 
   if (isLoading) {
     return <div className="min-h-screen bg-gray-50">{children}</div>;
@@ -222,7 +281,9 @@ const WeatherBackground: React.FC<WeatherBackgroundProps> = ({
       
       {/* Content */}
       <div className="relative z-20">
-        {children}
+        <WeatherContext.Provider value={{ weatherCondition, isDarkBackground, isRainBackground }}>
+          {children}
+        </WeatherContext.Provider>
       </div>
       
       {/* Weather indicator (subtle) */}
@@ -249,7 +310,7 @@ const WeatherBackground: React.FC<WeatherBackgroundProps> = ({
             >
               <option value="clear">☀️ Clear/Sunny</option>
               <option value="rain">🌧️ Rain</option>
-              <option value="storm">⛈️ Storm/Thunder</option>
+              <option value="storm">⛈️ Storm/Thunder (Video)</option>
               <option value="snow">❄️ Snow</option>
               <option value="cloudy">☁️ Cloudy</option>
             </select>
