@@ -1,10 +1,35 @@
 import React, { useMemo, useState, useEffect } from "react";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { Activity, AlertTriangle, CheckCircle2, Map, DoorOpen, RefreshCw } from "lucide-react";
+import { Activity, AlertTriangle, CheckCircle2, Map, DoorOpen, RefreshCw, TrendingUp, Calendar } from "lucide-react";
 import Card from "../components/common/Card";
 import Button from "../components/common/Button";
 import Spinner from "../components/common/Spinner";
 import { useEventStore } from "../store/eventStore";
+import { eventAPI } from "../api/apiClient";
+import { Line } from 'react-chartjs-2';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+  Filler
+} from 'chart.js';
+
+// Register ChartJS components
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+  Filler
+);
 
 /* ========= Types from the map editor ========= */
 type PctPoint = [number, number];
@@ -279,10 +304,53 @@ const OngoingEvent: React.FC = () => {
   const [searchParams] = useSearchParams();
   const [refreshCounter, setRefreshCounter] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [eventDetails, setEventDetails] = useState<any>(null);
+  const [isLoadingEvent, setIsLoadingEvent] = useState(true);
+  const [predictResult, setPredictResult] = useState<any>(null);
+  const [forecastResult, setForecastResult] = useState<any>(null);
 
   // Resolve eventId (fallback)
   const eventId =
     paramId ?? searchParams.get("eventId") ?? location.state?.eventId ?? currentEvent?.id ?? "demo";
+
+  // Fetch event details including predict_result
+  useEffect(() => {
+    const fetchEventDetails = async () => {
+      if (!eventId || eventId === "demo") {
+        setIsLoadingEvent(false);
+        return;
+      }
+
+      setIsLoadingEvent(true);
+      try {
+        const response = await eventAPI.getEvent(eventId);
+        console.log('📥 OnGoingEvent - Full API Response:', response);
+        console.log('📥 OnGoingEvent - Response.data:', response.data);
+        
+        // Handle nested response structure similar to Dashboard
+        const event = response.data.data || response.data;
+        console.log('📥 OnGoingEvent - Extracted event:', event);
+        
+        setEventDetails(event);
+        
+        // Extract predict_result and forecast_result with multiple fallback paths
+        const predictData = event.predict_result || event.predictResult || null;
+        const forecastData = event.forecast_result || event.forecastResult || null;
+        
+        console.log('📊 OnGoingEvent - Predict Result:', predictData);
+        console.log('📊 OnGoingEvent - Forecast Result:', forecastData);
+        
+        setPredictResult(predictData);
+        setForecastResult(forecastData);
+      } catch (error) {
+        console.error('Error fetching event details:', error);
+      } finally {
+        setIsLoadingEvent(false);
+      }
+    };
+
+    fetchEventDetails();
+  }, [eventId]);
 
   // Pull plan JSON from your event (string or object). Falls back to embedded sample.
   const plan: StadiumMapJSON = useMemo(() => {
@@ -302,9 +370,24 @@ const OngoingEvent: React.FC = () => {
 
   // Build zones for SVG from the plan (merge live congestion by id if available)
   const zones: FloorZonePolygon[] = useMemo(() => {
+    // Prioritize predict_result zones if available (live event data)
+    const predictZones = predictResult?.zones || predictResult?.hotspots || [];
+    if (predictZones.length > 0) {
+      return predictZones.map((z: any, index: number) => ({
+        id: z.id || `zone-${index}`,
+        name: z.name || `Zone ${index + 1}`,
+        layer: z.layer || 1,
+        section: z.section || index + 1,
+        points: z.points || [],
+        congestion: z.congestion || z.density || 0,
+      }));
+    }
+
+    // Fallback to simulationResult
     const apiZones = (simulationResult as any)?.zones as FloorZonePolygon[] | undefined;
     if (apiZones?.length) return apiZones;
 
+    // Fallback to plan zones with mock data
     if (plan?.zones?.length) {
       const liveById: Record<string, number> = {};
       (simulationResult as any)?.zones?.forEach?.((z: any) => (liveById[z.id] = z.congestion));
@@ -337,7 +420,7 @@ const OngoingEvent: React.FC = () => {
       });
     }
     return [];
-  }, [plan, simulationResult, refreshCounter]);
+  }, [plan, simulationResult, predictResult, refreshCounter]);
 
   // Auto-refresh every 10 seconds
   useEffect(() => {
@@ -365,10 +448,87 @@ const OngoingEvent: React.FC = () => {
     [zones]
   );
 
-  const activeEvent: any = currentEvent ?? { name: "Event", capacity: 0, date: new Date().toISOString(), venue: "" };
+  const activeEvent: any = eventDetails || currentEvent || { name: "Event", capacity: 0, date: new Date().toISOString(), venue: "" };
   const eventDate = activeEvent?.date ? new Date(activeEvent.date) : null;
 
-  if (isLoading && !simulationResult && !plan) {
+  // Prepare comparison chart data
+  const comparisonChartData = useMemo(() => {
+    if (!forecastResult || !predictResult) return null;
+
+    // Extract congestion data from both results
+    const forecastZones = forecastResult.zones || forecastResult.hotspots || [];
+    const predictZones = predictResult.zones || predictResult.hotspots || [];
+
+    // Create labels from zone names
+    const labels = forecastZones.map((z: any, idx: number) => 
+      z.name || z.id || `Zone ${idx + 1}`
+    );
+
+    return {
+      labels,
+      datasets: [
+        {
+          label: 'Forecast (Predicted)',
+          data: forecastZones.map((z: any) => z.congestion || z.density || 0),
+          borderColor: 'rgb(74, 163, 186)',
+          backgroundColor: 'rgba(74, 163, 186, 0.1)',
+          tension: 0.4,
+          fill: true,
+        },
+        {
+          label: 'Live Prediction (Real-time)',
+          data: predictZones.map((z: any) => z.congestion || z.density || 0),
+          borderColor: 'rgb(218, 92, 83)',
+          backgroundColor: 'rgba(218, 92, 83, 0.1)',
+          tension: 0.4,
+          fill: true,
+        },
+      ],
+    };
+  }, [forecastResult, predictResult]);
+
+  const chartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: 'top' as const,
+      },
+      title: {
+        display: true,
+        text: 'Forecast vs Live Prediction Comparison',
+        font: {
+          size: 16,
+          weight: 'bold' as const,
+        },
+      },
+      tooltip: {
+        callbacks: {
+          label: function(context: any) {
+            return `${context.dataset.label}: ${context.parsed.y.toFixed(1)}%`;
+          }
+        }
+      }
+    },
+    scales: {
+      y: {
+        beginAtZero: true,
+        max: 100,
+        title: {
+          display: true,
+          text: 'Congestion (%)',
+        },
+      },
+      x: {
+        title: {
+          display: true,
+          text: 'Zones',
+        },
+      },
+    },
+  };
+
+  if (isLoadingEvent || (isLoading && !simulationResult && !plan)) {
     return (
       <div className="max-w-7xl mx-auto p-6">
         <div className="text-center py-12">
@@ -401,6 +561,53 @@ const OngoingEvent: React.FC = () => {
   const headerSections = plan?.zones?.length ?? 0;
   const headerToilets = plan?.toiletsList?.length ?? 0;
 
+  // Check if predict_result is null (not event day yet)
+  if (predictResult === null && !isLoadingEvent) {
+    return (
+      <div className="max-w-7xl mx-auto p-6">
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">{activeEvent?.name || "On-going Event"}</h1>
+            <p className="mt-2 text-gray-600">Live Event Monitoring</p>
+          </div>
+          <Button
+            onClick={() => navigate('/dashboard')}
+            variant="outline"
+          >
+            Back to Dashboard
+          </Button>
+        </div>
+
+        <Card className="bg-gradient-to-br from-amber-50 to-amber-100 border-amber-200">
+          <div className="text-center py-12">
+            <Calendar className="h-16 w-16 text-amber-600 mx-auto mb-4" />
+            <h2 className="text-2xl font-semibold text-gray-900 mb-3">
+              Live Model Only Available on Event Day
+            </h2>
+            <p className="text-gray-700 mb-6 max-w-2xl mx-auto">
+              The live prediction model will be activated on the day of the event. 
+              Real-time crowd density predictions and monitoring will be available once the event begins.
+            </p>
+            <div className="flex items-center justify-center gap-8 text-sm text-gray-600">
+              <div className="flex flex-col items-center">
+                <span className="font-medium text-gray-900">Event Date</span>
+                <span>{activeEvent?.dateStart ? new Date(activeEvent.dateStart).toLocaleDateString() : "—"}</span>
+              </div>
+              <div className="flex flex-col items-center">
+                <span className="font-medium text-gray-900">Event Time</span>
+                <span>{activeEvent?.dateStart ? new Date(activeEvent.dateStart).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "—"}</span>
+              </div>
+              <div className="flex flex-col items-center">
+                <span className="font-medium text-gray-900">Venue</span>
+                <span>{activeEvent?.venue || activeEvent?.venueLocation?.name || "—"}</span>
+              </div>
+            </div>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-7xl mx-auto p-6 space-y-8">
       {/* Header */}
@@ -429,6 +636,38 @@ const OngoingEvent: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Comparison Chart (if both forecast and predict exist) */}
+      {comparisonChartData && (
+        <Card className="bg-gradient-to-b from-white to-blue-50">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <TrendingUp className="h-5 w-5 text-blue-600" />
+              <h2 className="text-xl font-semibold text-gray-900">Forecast vs Live Prediction</h2>
+            </div>
+            <div className="flex items-center gap-2 text-sm">
+              <span className="flex items-center gap-1">
+                <span className="w-3 h-3 rounded-full bg-blue-500"></span>
+                <span className="text-gray-600">Forecast</span>
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="w-3 h-3 rounded-full bg-red-500"></span>
+                <span className="text-gray-600">Live</span>
+              </span>
+            </div>
+          </div>
+          <div className="h-80">
+            <Line data={comparisonChartData} options={chartOptions} />
+          </div>
+          <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+            <p className="text-sm text-gray-700">
+              <span className="font-semibold">Insight:</span> This chart compares the forecasted crowd density 
+              predictions with real-time live predictions. Significant deviations may indicate unexpected crowd 
+              patterns or changes in event conditions.
+            </p>
+          </div>
+        </Card>
+      )}
 
       {/* Summary */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">

@@ -72,7 +72,7 @@ export const eventAPI = {
   },
   
   // Get event history
-  getEventHistory: async (userEmail?: string) => {
+  getEventHistory: async (userEmail?: string, page: number = 1, limit: number = 10) => {
     if (USE_MOCK_EVENT_HISTORY) {
       console.log('🎭 Using mock data for getEventHistory');
       return mockApiClient.getEventHistory();
@@ -80,8 +80,11 @@ export const eventAPI = {
     
     try {
       console.log('🌐 Using real API for getEventHistory:', `${apiClient.defaults.baseURL}/events`);
-      // Add userEmail as query parameter if provided
-      const params = userEmail ? { userEmail } : {};
+      // Add userEmail, page, and limit as query parameters
+      const params: any = { page, limit };
+      if (userEmail) {
+        params.userEmail = userEmail;
+      }
       return await apiClient.get('/events', { params });
     } catch (error: any) {
       // If server returns 500 error, temporarily fallback to mock data
