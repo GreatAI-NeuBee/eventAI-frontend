@@ -24,7 +24,7 @@ export const defaultStadiumModels: ModelConfig[] = [
     description: 'Southeast Asia\'s largest stadium',
     modelPath: '/models/stadiums/stadiumModel.glb',
     position: [0, 0,0],
-    scale: 0.185,
+    scale: 0.18,
     rotation: [0, 0, 0],
     enableFloat: true,
     enableRotation: true,
