@@ -24,6 +24,9 @@ const NewEvent: React.FC = () => {
     endTime: '',
     venue: '',
     description: '',
+    eventType: 'event' as 'concert' | 'event',
+    featuredGuest: '',
+    location: '',
   });
 
   const [venueLayoutJson, setVenueLayoutJson] = useState<StadiumMapJSON | null>(null);
@@ -37,6 +40,38 @@ const NewEvent: React.FC = () => {
   } | null>(null);
 
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Function to extract country/location from venue address
+  const extractLocationFromAddress = (address?: string): string => {
+    if (!address) return '';
+    
+    // Common patterns to extract country/location
+    const addressParts = address.split(',').map(part => part.trim());
+    
+    // Last part is usually the country
+    if (addressParts.length > 0) {
+      const lastPart = addressParts[addressParts.length - 1];
+      
+      // If it's a known country, return it
+      if (lastPart.toLowerCase().includes('malaysia') || lastPart === 'MY') {
+        return 'Malaysia';
+      }
+      if (lastPart.toLowerCase().includes('singapore') || lastPart === 'SG') {
+        return 'Singapore';
+      }
+      if (lastPart.toLowerCase().includes('thailand') || lastPart === 'TH') {
+        return 'Thailand';
+      }
+      if (lastPart.toLowerCase().includes('indonesia') || lastPart === 'ID') {
+        return 'Indonesia';
+      }
+      
+      // Otherwise return the last part (likely country or state)
+      return lastPart;
+    }
+    
+    return '';
+  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -99,6 +134,15 @@ const NewEvent: React.FC = () => {
       newErrors.venue = 'Venue is required';
     }
 
+    if (!formData.location.trim()) {
+      newErrors.location = 'Location is required';
+    }
+
+    // Validate featured guest for concerts
+    if (formData.eventType === 'concert' && !formData.featuredGuest.trim()) {
+      newErrors.featuredGuest = 'Featured guest is required for concerts';
+    }
+
     // Venue layout validation (optional but if provided should have at least 1 section)
     if (venueLayoutJson && venueLayoutJson.sections === 0) {
       newErrors.venueLayout = 'Venue layout must have at least one section';
@@ -150,6 +194,11 @@ const NewEvent: React.FC = () => {
         dateOfEventEnd: dateOfEventEnd,
         venue: formData.venue,
         description: formData.description,
+        popularity: {
+          type: formData.eventType,
+          feat: formData.featuredGuest || undefined,
+          location: formData.location,
+        },
       };
       
       // Add logged-in user email
@@ -172,6 +221,7 @@ const NewEvent: React.FC = () => {
       // Debug: Log the JSON data being submitted
       console.log('🚀 Submitting event data to API...');
       console.log('📝 JSON payload:', submitData);
+      console.log('🎭 Popularity data:', submitData.popularity);
       
       const response = await eventAPI.createEvent(submitData);
       console.log('✅ Event created successfully:', response.data);
@@ -331,10 +381,22 @@ const NewEvent: React.FC = () => {
                 }}
                 onVenueSelected={(location) => {
                   setVenueLocation(location);
-                  setFormData(prev => ({ ...prev, venue: location.name || location.address || '' }));
-                  // Clear venue location error if exists
-                  if (errors.venueLocation) {
-                    setErrors(prev => ({ ...prev, venueLocation: '' }));
+                  const venueName = location.name || location.address || '';
+                  const extractedLocation = extractLocationFromAddress(location.address);
+                  
+                  setFormData(prev => ({ 
+                    ...prev, 
+                    venue: venueName,
+                    location: extractedLocation 
+                  }));
+                  
+                  // Clear venue and location errors if exist
+                  if (errors.venueLocation || errors.location) {
+                    setErrors(prev => ({ 
+                      ...prev, 
+                      venueLocation: '', 
+                      location: '' 
+                    }));
                   }
                 }}
               />
@@ -342,6 +404,67 @@ const NewEvent: React.FC = () => {
                 <p className="mt-1 text-sm text-red-600">{errors.venue}</p>
               )}
             </div>
+          </div>
+
+          {/* Event Type Selection */}
+          <div className="mt-6">
+            <label className="block text-sm font-medium text-gray-700 mb-3">
+              Event Type *
+            </label>
+            <div className="flex gap-4">
+              <label className="flex items-center cursor-pointer">
+                <input
+                  type="radio"
+                  name="eventType"
+                  value="event"
+                  checked={formData.eventType === 'event'}
+                  onChange={handleInputChange}
+                  className="w-4 h-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                />
+                <span className="ml-2 text-sm text-gray-700">Event</span>
+              </label>
+              <label className="flex items-center cursor-pointer">
+                <input
+                  type="radio"
+                  name="eventType"
+                  value="concert"
+                  checked={formData.eventType === 'concert'}
+                  onChange={handleInputChange}
+                  className="w-4 h-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                />
+                <span className="ml-2 text-sm text-gray-700">Concert</span>
+              </label>
+            </div>
+          </div>
+
+          {/* Featured Guest - Only show for concerts */}
+          {formData.eventType === 'concert' && (
+            <div className="mt-6">
+              <Input
+                label="Featured Guest / Artist"
+                name="featuredGuest"
+                value={formData.featuredGuest}
+                onChange={handleInputChange}
+                placeholder="e.g., Blackpink, Taylor Swift"
+                error={errors.featuredGuest}
+                required
+              />
+            </div>
+          )}
+
+          {/* Location - Auto-populated from venue */}
+          <div className="mt-6">
+            <Input
+              label="Location"
+              name="location"
+              value={formData.location}
+              onChange={handleInputChange}
+              placeholder="e.g., Malaysia, Singapore"
+              error={errors.location}
+              required
+              disabled={!formData.venue}
+              helperText={!formData.venue ? "Location will be auto-filled when you select a venue" : ""}
+            />
           </div>
 
           <div className="mt-6">
