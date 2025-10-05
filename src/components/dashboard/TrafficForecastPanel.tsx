@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { AlertCircle, TrendingUp, Clock, Car } from 'lucide-react';
+import { AlertCircle } from 'lucide-react';
 import Card from '../common/Card';
 
 interface TrafficForecastPanelProps {
@@ -11,12 +11,18 @@ interface TrafficForecastPanelProps {
   };
 }
 
+interface TrafficDataPoint {
+  time: string;
+  value: number;
+  type: 'regular' | 'peak' | 'event';
+}
+
 const TrafficForecastPanel: React.FC<TrafficForecastPanelProps> = ({
   venueLocation
 }) => {
   const [realTimeData, setRealTimeData] = useState<any>(null);
-  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
-  const [autoRefresh, setAutoRefresh] = useState(true);
+  const [trafficHistory, setTrafficHistory] = useState<TrafficDataPoint[]>([]);
+  const [autoRefresh] = useState(true);
   
   // Real-time traffic API configuration
   const TRAFFIC_API_KEY = import.meta.env.VITE_TOMTOM_API_KEY;
@@ -33,6 +39,38 @@ const TrafficForecastPanel: React.FC<TrafficForecastPanelProps> = ({
     return () => clearInterval(interval);
   }, [autoRefresh]);
 
+  // Generate mock traffic data for demonstration when API fails
+  const generateMockTrafficData = useCallback(() => {
+    const dataPoints: TrafficDataPoint[] = [];
+    
+    // Generate 16 data points for the day (6 AM to 10 PM)
+    for (let i = 0; i < 16; i++) {
+      const hour = 6 + i;
+      const time = `${hour.toString().padStart(2, '0')}:00`;
+      
+      // Base traffic level with some randomness
+      let baseValue = 100 + (i * 15) + Math.random() * 50;
+      
+      // Determine traffic type based on time
+      let type: 'regular' | 'peak' | 'event' = 'regular';
+      if ((hour >= 7 && hour <= 9) || (hour >= 17 && hour <= 19)) {
+        type = 'peak';
+        baseValue += 100; // Higher during peak hours
+      } else if (hour >= 19 && hour <= 22) {
+        type = 'event';
+        baseValue += 150; // Highest during event period
+      }
+      
+      dataPoints.push({
+        time,
+        value: Math.round(baseValue),
+        type
+      });
+    }
+    
+    return dataPoints;
+  }, []);
+
   // Fetch real-time traffic data from TomTom API
   const fetchRealTimeTrafficData = useCallback(async () => {
     try {
@@ -43,17 +81,81 @@ const TrafficForecastPanel: React.FC<TrafficForecastPanelProps> = ({
       if (response.ok) {
         const data = await response.json();
         setRealTimeData(data);
-        setLastUpdated(new Date());
         console.log('🚦 Real-time traffic data updated:', data);
+        
+        // Generate traffic history from API data
+        const currentSpeed = data.flowSegmentData?.currentSpeed || 50;
+        const freeFlowSpeed = data.flowSegmentData?.freeFlowSpeed || 100;
+        const trafficLevel = Math.round((currentSpeed / freeFlowSpeed) * 500);
+        
+        // Create a realistic traffic pattern based on current data
+        const now = new Date();
+        const currentHour = now.getHours();
+        const newDataPoint: TrafficDataPoint = {
+          time: now.toTimeString().slice(0, 5),
+          value: trafficLevel,
+          type: currentHour >= 19 ? 'event' : (currentHour >= 7 && currentHour <= 9) || (currentHour >= 17 && currentHour <= 19) ? 'peak' : 'regular'
+        };
+        
+        setTrafficHistory(prev => {
+          const updated = [...prev, newDataPoint];
+          // Keep only last 16 data points
+          return updated.slice(-16);
+        });
+      } else {
+        // Fallback to mock data if API fails
+        console.warn('⚠️ API failed, using mock data');
+        setTrafficHistory(generateMockTrafficData());
       }
     } catch (error) {
       console.warn('⚠️ Failed to fetch real-time traffic data:', error);
+      // Fallback to mock data
+      setTrafficHistory(generateMockTrafficData());
     }
-  }, [venueLocation]);
+  }, [venueLocation, generateMockTrafficData]);
 
   useEffect(() => {
     fetchRealTimeTrafficData();
   }, [fetchRealTimeTrafficData]);
+
+  // Initialize with mock data if no traffic history
+  useEffect(() => {
+    if (trafficHistory.length === 0) {
+      setTrafficHistory(generateMockTrafficData());
+    }
+  }, [trafficHistory.length, generateMockTrafficData]);
+
+  // Helper function to get color for traffic type
+  const getTrafficColor = (type: 'regular' | 'peak' | 'event') => {
+    switch (type) {
+      case 'peak': return '#f59e0b';
+      case 'event': return '#ef4444';
+      default: return '#3b82f6';
+    }
+  };
+
+  // Helper function to generate SVG path from data points
+  const generatePathFromData = (data: TrafficDataPoint[]) => {
+    if (data.length === 0) return '';
+    
+    const width = 900; // Chart width
+    const height = 200; // Chart height
+    const padding = 50;
+    const chartWidth = width - (padding * 2);
+    const chartHeight = height - (padding * 2);
+    
+    const maxValue = Math.max(...data.map(d => d.value), 500);
+    const minValue = Math.min(...data.map(d => d.value), 100);
+    const valueRange = maxValue - minValue;
+    
+    const points = data.map((point, index) => {
+      const x = padding + (index / (data.length - 1)) * chartWidth;
+      const y = padding + ((maxValue - point.value) / valueRange) * chartHeight;
+      return `${x},${y}`;
+    });
+    
+    return `M ${points.join(' L ')}`;
+  };
 
   return (
     <Card className="mb-6">
@@ -98,15 +200,6 @@ const TrafficForecastPanel: React.FC<TrafficForecastPanelProps> = ({
           <text x="15" y="170" className="fill-gray-600 text-sm font-medium">200</text>
           <text x="15" y="220" className="fill-gray-600 text-sm font-medium">100</text>
           
-          {/* Traffic line */}
-          <path
-            d="M 50,200 Q 150,180 250,160 Q 350,140 450,120 Q 550,100 650,80 Q 750,60 850,40 Q 950,20 950,20"
-            fill="none"
-            stroke="url(#trafficLineGradient)"
-            strokeWidth="4"
-            className="drop-shadow-sm"
-          />
-          
           {/* Peak Hours Highlight (7-9 AM) */}
           <rect x="200" y="10" width="120" height="230" fill="#fef3c7" opacity="0.6" rx="4"/>
           <text x="260" y="5" className="text-xs fill-yellow-700 font-medium" textAnchor="middle">Peak Hours</text>
@@ -119,26 +212,67 @@ const TrafficForecastPanel: React.FC<TrafficForecastPanelProps> = ({
           <rect x="750" y="10" width="150" height="230" fill="#fecaca" opacity="0.6" rx="4"/>
           <text x="825" y="5" className="text-xs fill-red-700 font-medium" textAnchor="middle">Event Period</text>
           
-          {/* Data Points */}
-          <circle cx="150" cy="180" r="4" fill="#3b82f6" className="hover:r-6 transition-all"/>
-          <circle cx="250" cy="160" r="4" fill="#f59e0b" className="hover:r-6 transition-all"/>
-          <circle cx="350" cy="140" r="4" fill="#3b82f6" className="hover:r-6 transition-all"/>
-          <circle cx="450" cy="120" r="4" fill="#3b82f6" className="hover:r-6 transition-all"/>
-          <circle cx="550" cy="100" r="4" fill="#f59e0b" className="hover:r-6 transition-all"/>
-          <circle cx="650" cy="80" r="4" fill="#f59e0b" className="hover:r-6 transition-all"/>
-          <circle cx="750" cy="60" r="4" fill="#ef4444" className="hover:r-6 transition-all"/>
-          <circle cx="850" cy="40" r="4" fill="#ef4444" className="hover:r-6 transition-all"/>
+          {/* Dynamic Traffic Line */}
+          {trafficHistory.length > 0 && (
+            <path
+              d={generatePathFromData(trafficHistory)}
+              fill="none"
+              stroke="url(#trafficLineGradient)"
+              strokeWidth="4"
+              className="drop-shadow-sm"
+            />
+          )}
+          
+          {/* Dynamic Data Points */}
+          {trafficHistory.map((point, index) => {
+            const width = 900;
+            const height = 200;
+            const padding = 50;
+            const chartWidth = width - (padding * 2);
+            const chartHeight = height - (padding * 2);
+            
+            const maxValue = Math.max(...trafficHistory.map(d => d.value), 500);
+            const minValue = Math.min(...trafficHistory.map(d => d.value), 100);
+            const valueRange = maxValue - minValue;
+            
+            const x = padding + (index / (trafficHistory.length - 1)) * chartWidth;
+            const y = padding + ((maxValue - point.value) / valueRange) * chartHeight;
+            
+            return (
+              <circle
+                key={index}
+                cx={x}
+                cy={y}
+                r="4"
+                fill={getTrafficColor(point.type)}
+                className="hover:r-6 transition-all cursor-pointer"
+              >
+                <title>{`${point.time}: ${point.value} traffic level`}</title>
+              </circle>
+            );
+          })}
           
           {/* X-axis Labels */}
-          <text x="100" y="245" className="text-xs fill-gray-500" textAnchor="middle">6 AM</text>
-          <text x="200" y="245" className="text-xs fill-gray-500" textAnchor="middle">8 AM</text>
-          <text x="300" y="245" className="text-xs fill-gray-500" textAnchor="middle">10 AM</text>
-          <text x="400" y="245" className="text-xs fill-gray-500" textAnchor="middle">12 PM</text>
-          <text x="500" y="245" className="text-xs fill-gray-500" textAnchor="middle">2 PM</text>
-          <text x="600" y="245" className="text-xs fill-gray-500" textAnchor="middle">4 PM</text>
-          <text x="700" y="245" className="text-xs fill-gray-500" textAnchor="middle">6 PM</text>
-          <text x="800" y="245" className="text-xs fill-gray-500" textAnchor="middle">8 PM</text>
-          <text x="900" y="245" className="text-xs fill-gray-500" textAnchor="middle">10 PM</text>
+          {trafficHistory.map((point, index) => {
+            const width = 900;
+            const padding = 50;
+            const chartWidth = width - (padding * 2);
+            const x = padding + (index / (trafficHistory.length - 1)) * chartWidth;
+            const hour = parseInt(point.time.split(':')[0]);
+            const timeLabel = hour < 12 ? `${hour} AM` : hour === 12 ? '12 PM' : `${hour - 12} PM`;
+            
+            return (
+              <text
+                key={index}
+                x={x}
+                y="245"
+                className="text-xs fill-gray-500"
+                textAnchor="middle"
+              >
+                {timeLabel}
+              </text>
+            );
+          })}
         </svg>
         
         {/* Real-time data overlay */}
