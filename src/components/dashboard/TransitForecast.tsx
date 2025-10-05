@@ -75,50 +75,72 @@ const TransitForecast: React.FC<TransitForecastProps> = ({
     if (!selectedStation) return;
     
     try {
-      // Fetch real-time schedules
+      // Use venue location and date as search parameters
+      const searchParams = new URLSearchParams({
+        lat: venueLocation.lat.toString(),
+        lng: venueLocation.lng.toString(),
+        date: eventDate || new Date().toISOString().split('T')[0],
+        station_id: selectedStation.id,
+        venue_name: venueLocation.name || 'Event Venue'
+      });
+      
+      // Fetch real-time schedules with location and date context
       const schedulesResponse = await fetch(
-        `${TRANSIT_API_BASE}/schedules/${selectedStation.id}?key=${TRANSIT_API_KEY}`
+        `${TRANSIT_API_BASE}/schedules?${searchParams}&key=${TRANSIT_API_KEY}`
       );
       
       if (schedulesResponse.ok) {
         const schedulesData = await schedulesResponse.json();
         setTransitSchedules(schedulesData.schedules || []);
-        console.log('🚌 Real-time transit schedules updated:', schedulesData);
+        console.log('🚌 Real-time transit schedules updated for location:', venueLocation.name, schedulesData);
       }
       
-      // Fetch capacity and passenger load data
+      // Fetch capacity and passenger load data with venue context
       const capacityResponse = await fetch(
-        `${TRANSIT_API_BASE}/capacity/${selectedStation.id}?key=${TRANSIT_API_KEY}`
+        `${TRANSIT_API_BASE}/capacity?${searchParams}&key=${TRANSIT_API_KEY}`
       );
       
       if (capacityResponse.ok) {
         const capacityData = await capacityResponse.json();
         setRealTimeData(capacityData);
         generateTransitForecast(capacityData);
-        console.log('📊 Real-time transit capacity updated:', capacityData);
+        console.log('📊 Real-time transit capacity updated for location:', venueLocation.name, capacityData);
       }
       
       setLastUpdated(new Date());
     } catch (error) {
-      console.warn('⚠️ Failed to fetch real-time transit data:', error);
-      // Fallback to mock transit data
+      console.warn('⚠️ Failed to fetch real-time transit data for location:', venueLocation.name, error);
+      // Fallback to mock transit data with location context
       generateMockTransitData();
     }
-  }, [selectedStation]);
+  }, [selectedStation, venueLocation, eventDate]);
 
-  // Generate transit forecast based on real data
+  // Generate transit forecast based on real data and venue context
   const generateTransitForecast = useCallback((_capacityData: any) => {
     const forecastData: TransitForecastData[] = [];
+    
+    // Get event date or use current date
+    const eventDateTime = eventDate ? new Date(eventDate) : new Date();
+    const isWeekend = eventDateTime.getDay() === 0 || eventDateTime.getDay() === 6;
     
     // Generate 16 data points for the day (6 AM to 10 PM)
     for (let i = 0; i < 16; i++) {
       const hour = 6 + i;
       const time = `${hour.toString().padStart(2, '0')}:00`;
       
-      // Base passenger load with some randomness
+      // Base passenger load varies by location and day type
       let baseLoad = 30 + (i * 5) + Math.random() * 20;
       
-      // Determine transit type based on time
+      // Adjust for weekend vs weekday patterns
+      if (isWeekend) {
+        baseLoad *= 0.7; // Lower weekend usage
+      }
+      
+      // Location-specific adjustments
+      const locationMultiplier = getLocationTransitMultiplier(venueLocation.name || '');
+      baseLoad *= locationMultiplier;
+      
+      // Determine transit type based on time and event context
       let type: 'regular' | 'peak' | 'event' = 'regular';
       if ((hour >= 7 && hour <= 9) || (hour >= 17 && hour <= 19)) {
         type = 'peak';
@@ -126,23 +148,70 @@ const TransitForecast: React.FC<TransitForecastProps> = ({
       } else if (hour >= 19 && hour <= 22) {
         type = 'event';
         baseLoad += 60; // Highest during event period
-        // Add event capacity impact
+        // Add event capacity impact based on venue
         if (expectedCapacity) {
-          baseLoad += Math.min(expectedCapacity * 0.1, 50);
+          const eventImpact = getEventTransitImpact(venueLocation.name || '', expectedCapacity);
+          baseLoad += eventImpact;
         }
       }
       
+      // Adjust frequency based on location and time
+      const frequency = getTransitFrequency(venueLocation.name || '', type, isWeekend);
+      
       forecastData.push({
         time,
-        passengerLoad: Math.round(baseLoad),
-        frequency: type === 'peak' ? 3 : type === 'event' ? 2 : 5, // minutes between trains
+        passengerLoad: Math.round(Math.min(baseLoad, 100)), // Cap at 100%
+        frequency,
         capacity: 100, // max capacity
         type
       });
     }
     
     setTransitForecast(forecastData);
-  }, [expectedCapacity]);
+  }, [expectedCapacity, eventDate, venueLocation]);
+
+  // Get location-specific transit multiplier
+  const getLocationTransitMultiplier = (venueName: string): number => {
+    const location = venueName.toLowerCase();
+    if (location.includes('bukit jalil') || location.includes('stadium')) return 1.2; // High transit usage
+    if (location.includes('klcc') || location.includes('pavilion')) return 1.1; // Commercial areas
+    if (location.includes('subang') || location.includes('shah alam')) return 0.9; // Lower density areas
+    return 1.0; // Default
+  };
+
+  // Get event-specific transit impact
+  const getEventTransitImpact = (venueName: string, capacity: number): number => {
+    const location = venueName.toLowerCase();
+    if (location.includes('stadium') || location.includes('arena')) {
+      return Math.min(capacity * 0.15, 80); // Stadium events have high transit impact
+    }
+    if (location.includes('convention') || location.includes('exhibition')) {
+      return Math.min(capacity * 0.1, 60); // Convention centers moderate impact
+    }
+    return Math.min(capacity * 0.05, 40); // Default impact
+  };
+
+  // Get transit frequency based on location and time
+  const getTransitFrequency = (venueName: string, type: string, isWeekend: boolean): number => {
+    const location = venueName.toLowerCase();
+    let baseFrequency = 5; // Default 5 minutes
+    
+    if (location.includes('bukit jalil') || location.includes('klcc')) {
+      baseFrequency = 3; // More frequent service in major areas
+    }
+    
+    if (type === 'peak') {
+      baseFrequency = Math.max(baseFrequency - 1, 2); // More frequent during peak
+    } else if (type === 'event') {
+      baseFrequency = Math.max(baseFrequency - 2, 1); // Most frequent during events
+    }
+    
+    if (isWeekend) {
+      baseFrequency += 1; // Less frequent on weekends
+    }
+    
+    return baseFrequency;
+  };
 
   const loadTransitForecast = async () => {
     setLoading(true);
@@ -236,40 +305,96 @@ const TransitForecast: React.FC<TransitForecastProps> = ({
 
   // Generate mock transit data when API fails
   const generateMockTransitData = useCallback(() => {
-    console.log('🎭 Using mock transit data');
+    console.log('🎭 Using mock transit data for location:', venueLocation.name);
     
-    // Mock transit schedules
-    const mockSchedules: TransitSchedule[] = [
-      {
-        line: 'LRT Kelana Jaya',
-        destination: 'Gombak',
-        arrivalTime: '14:32',
-        delay: 0,
-        capacity: 85,
-        status: 'on-time'
-      },
-      {
-        line: 'LRT Kelana Jaya',
-        destination: 'Putra Heights',
-        arrivalTime: '14:35',
-        delay: 2,
-        capacity: 92,
-        status: 'delayed'
-      },
-      {
-        line: 'LRT Kelana Jaya',
-        destination: 'Gombak',
-        arrivalTime: '14:38',
-        delay: 0,
-        capacity: 78,
-        status: 'on-time'
-      }
-    ];
+    // Generate location-specific mock schedules
+    const mockSchedules: TransitSchedule[] = generateLocationSpecificSchedules(venueLocation.name || '');
     setTransitSchedules(mockSchedules);
     
-    // Generate mock forecast data
+    // Generate mock forecast data with location context
     generateTransitForecast({});
-  }, [generateTransitForecast]);
+  }, [generateTransitForecast, venueLocation]);
+
+  // Generate location-specific mock schedules
+  const generateLocationSpecificSchedules = (venueName: string): TransitSchedule[] => {
+    const location = venueName.toLowerCase();
+    const now = new Date();
+    const currentHour = now.getHours();
+    const currentMinute = now.getMinutes();
+    
+    // Base schedules that vary by location
+    let baseSchedules: TransitSchedule[] = [];
+    
+    if (location.includes('bukit jalil') || location.includes('stadium')) {
+      baseSchedules = [
+        {
+          line: 'LRT Kelana Jaya',
+          destination: 'Gombak',
+          arrivalTime: `${currentHour}:${(currentMinute + 2).toString().padStart(2, '0')}`,
+          delay: 0,
+          capacity: 85,
+          status: 'on-time'
+        },
+        {
+          line: 'LRT Kelana Jaya',
+          destination: 'Putra Heights',
+          arrivalTime: `${currentHour}:${(currentMinute + 5).toString().padStart(2, '0')}`,
+          delay: 1,
+          capacity: 92,
+          status: 'delayed'
+        },
+        {
+          line: 'LRT Kelana Jaya',
+          destination: 'Gombak',
+          arrivalTime: `${currentHour}:${(currentMinute + 8).toString().padStart(2, '0')}`,
+          delay: 0,
+          capacity: 78,
+          status: 'on-time'
+        }
+      ];
+    } else if (location.includes('klcc') || location.includes('pavilion')) {
+      baseSchedules = [
+        {
+          line: 'LRT Kelana Jaya',
+          destination: 'Gombak',
+          arrivalTime: `${currentHour}:${(currentMinute + 3).toString().padStart(2, '0')}`,
+          delay: 0,
+          capacity: 75,
+          status: 'on-time'
+        },
+        {
+          line: 'LRT Kelana Jaya',
+          destination: 'Putra Heights',
+          arrivalTime: `${currentHour}:${(currentMinute + 6).toString().padStart(2, '0')}`,
+          delay: 0,
+          capacity: 88,
+          status: 'on-time'
+        }
+      ];
+    } else {
+      // Default for other locations
+      baseSchedules = [
+        {
+          line: 'LRT/MRT',
+          destination: 'City Center',
+          arrivalTime: `${currentHour}:${(currentMinute + 4).toString().padStart(2, '0')}`,
+          delay: 0,
+          capacity: 70,
+          status: 'on-time'
+        },
+        {
+          line: 'LRT/MRT',
+          destination: 'Terminal',
+          arrivalTime: `${currentHour}:${(currentMinute + 7).toString().padStart(2, '0')}`,
+          delay: 0,
+          capacity: 65,
+          status: 'on-time'
+        }
+      ];
+    }
+    
+    return baseSchedules;
+  };
 
   // const getAgencyIcon = (agency: RapidKlAgency) => {
   //   switch (agency) {
@@ -355,6 +480,10 @@ const TransitForecast: React.FC<TransitForecastProps> = ({
               </div>
             )}
           </div>
+        </div>
+        
+        <div className="flex items-center justify-between mb-4">
+          <div></div>
           <div className="flex items-center space-x-2">
             <Button
               onClick={fetchRealTimeTransitData}
