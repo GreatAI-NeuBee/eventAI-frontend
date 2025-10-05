@@ -92,19 +92,8 @@ export const generateMockSimulationResult = (eventId: string): SimulationResult 
     });
   }
 
-  // Generate hotspots
-  const hotspots = [
-    { x: 0.2, y: 0.3, intensity: 0.95, location: 'Main Entrance Bottleneck' },
-    { x: 0.8, y: 0.2, intensity: 0.87, location: 'Food Court Queue' },
-    { x: 0.5, y: 0.7, intensity: 0.92, location: 'Stage Front Area' },
-    { x: 0.1, y: 0.8, intensity: 0.78, location: 'Restroom Area' },
-    { x: 0.9, y: 0.9, intensity: 0.65, location: 'Emergency Exit' },
-    { x: 0.6, y: 0.1, intensity: 0.58, location: 'VIP Entrance' },
-    { x: 0.3, y: 0.9, intensity: 0.73, location: 'Merchandise Stand' },
-    { x: 0.7, y: 0.6, intensity: 0.82, location: 'Bar Area' },
-  ];
 
-  // Generate recommendations based on hotspots and density
+  // Generate recommendations based on density
   const recommendations = [
     {
       id: 'rec-1',
@@ -190,7 +179,6 @@ export const generateMockSimulationResult = (eventId: string): SimulationResult 
   return {
     eventId,
     crowdDensity: crowdDensityData,
-    hotspots,
     recommendations,
     scenarios,
   };
