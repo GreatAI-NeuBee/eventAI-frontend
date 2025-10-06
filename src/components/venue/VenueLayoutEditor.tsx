@@ -57,18 +57,18 @@ const VenueLayoutEditor: React.FC<VenueLayoutEditorProps> = ({
   
   // Determine text colors based on weather background
   const getTextColor = () => {
-    if (isDarkBackground) return 'text-white'; // Storm - white text on light glass
-    return 'text-white'; // Rain and Clear - white text on dark glass
+    if (isDarkBackground || isRainBackground) return 'text-white'; // Storm/Rain - white text
+    return 'text-gray-900'; // Clear/Sunny/Cloudy - dark text
   };
   
   const getSecondaryTextColor = () => {
-    if (isDarkBackground) return 'text-white/80'; // Storm
-    return 'text-white/80'; // Rain and Clear
+    if (isDarkBackground || isRainBackground) return 'text-white/80'; // Storm/Rain
+    return 'text-gray-700'; // Clear/Sunny/Cloudy
   };
   
   const getIconColor = () => {
-    if (isDarkBackground) return 'text-white/80'; // Storm
-    return 'text-white/80'; // Rain and Clear
+    if (isDarkBackground || isRainBackground) return 'text-white/80'; // Storm/Rain
+    return 'text-gray-600'; // Clear/Sunny/Cloudy
   };
   const [gateConfig, setGateConfig] = useState<Record<string, GateConfig>>({});
   const [hasChanges, setHasChanges] = useState(false);
@@ -213,11 +213,11 @@ const VenueLayoutEditor: React.FC<VenueLayoutEditorProps> = ({
       <StaticGlassCard intensity="medium" blur="md">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-              <Settings className="h-5 w-5 text-white/80" />
+            <h3 className={`text-lg font-semibold ${getTextColor()} flex items-center gap-2`}>
+              <Settings className={`h-5 w-5 ${getIconColor()}`} />
               Venue Layout Configuration
             </h3>
-            <p className="text-sm text-white/80 mt-1">
+            <p className={`text-sm ${getSecondaryTextColor()} mt-1`}>
               Configure capacity and assign person-in-charge for each gate
             </p>
           </div>
@@ -233,27 +233,27 @@ const VenueLayoutEditor: React.FC<VenueLayoutEditorProps> = ({
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6 p-4 bg-white/10 backdrop-blur-sm rounded-lg border border-white/20">
           <div className="text-center">
             <div className="text-2xl font-bold text-blue-300">{venueLayout.sections}</div>
-            <div className="text-sm text-white/70">Sections</div>
+            <div className={`text-sm ${getSecondaryTextColor()}`}>Sections</div>
           </div>
           <div className="text-center">
             <div className="text-2xl font-bold text-green-300">{venueLayout.layers}</div>
-            <div className="text-sm text-white/70">Layers</div>
+            <div className={`text-sm ${getSecondaryTextColor()}`}>Layers</div>
           </div>
           <div className="text-center">
             <div className="text-2xl font-bold text-orange-300">{venueLayout.exits}</div>
-            <div className="text-sm text-white/70">Exits/Gates</div>
+            <div className={`text-sm ${getSecondaryTextColor()}`}>Exits/Gates</div>
           </div>
           <div className="text-center">
             <div className="text-2xl font-bold text-purple-300">
               {venueLayout.toiletsList?.length || 0}
             </div>
-            <div className="text-sm text-white/70">Facilities</div>
+            <div className={`text-sm ${getSecondaryTextColor()}`}>Facilities</div>
           </div>
         </div>
 
         {/* Venue Layout Visualization */}
         <div className="mb-6">
-          <h4 className="text-md font-medium text-white mb-3">Layout Visualization</h4>
+          <h4 className={`text-md font-medium ${getTextColor()} mb-3`}>Layout Visualization</h4>
           <div className="border border-white/30 rounded-lg p-4 bg-white/10 backdrop-blur-sm">
             <VenueLayoutVisualization venueLayout={venueLayout} />
           </div>
@@ -263,8 +263,8 @@ const VenueLayoutEditor: React.FC<VenueLayoutEditorProps> = ({
       {/* Gate Configuration */}
       {venueLayout.exitsList && venueLayout.exitsList.length > 0 && (
         <StaticGlassCard intensity="medium" blur="md">
-          <h4 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-            <Users className="h-5 w-5 text-white/80" />
+          <h4 className={`text-lg font-semibold ${getTextColor()} mb-4 flex items-center gap-2`}>
+            <Users className={`h-5 w-5 ${getIconColor()}`} />
             Gate Configuration ({venueLayout.exitsList.length} gates)
           </h4>
           <div className="space-y-4">
@@ -276,10 +276,10 @@ const VenueLayoutEditor: React.FC<VenueLayoutEditorProps> = ({
                 <div key={exit.id} className="p-4 border border-white/10 rounded-lg">
                   <div className="flex items-center justify-between mb-3">
                     <div>
-                      <h5 className="font-medium text-white">{exit.name}</h5>
+                      <h5 className={`font-medium ${getTextColor()}`}>{exit.name}</h5>
                       
                     </div>
-                    <div className="text-sm text-white/60">
+                    <div className={`text-sm ${getSecondaryTextColor()}`}>
                       Gate #{index + 1}
                     </div>
                   </div>
@@ -290,7 +290,7 @@ const VenueLayoutEditor: React.FC<VenueLayoutEditorProps> = ({
                       <Button
                         onClick={() => handleUpdateGate(exit.id, exit.name)}
                         disabled={readOnly || !config.picPhoneNumber || !validatePhoneNumber(config.picPhoneNumber)}
-                        className="flex items-center gap-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400"
+                        className="flex items-center gap-2 disabled:bg-gray-400"
                         size="sm"
                       >
                         <CheckCircle className="h-4 w-4" />
@@ -302,8 +302,8 @@ const VenueLayoutEditor: React.FC<VenueLayoutEditorProps> = ({
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     {/* Capacity Configuration */}
                     <div>
-                      <label className="block text-sm font-medium text-white/80 mb-1">
-                        <Users className="h-4 w-4 inline mr-1 text-white/70" />
+                      <label className={`block text-sm font-medium ${getSecondaryTextColor()} mb-1`}>
+                        <Users className={`h-4 w-4 inline mr-1 ${getIconColor()}`} />
                         Capacity (people/hour)
                       </label>
                       <input
@@ -330,17 +330,21 @@ const VenueLayoutEditor: React.FC<VenueLayoutEditorProps> = ({
                           updateGateConfig(exit.id, 'capacity', value);
                         }}
                         disabled={readOnly}
-                        className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 disabled:bg-gray-100"
+                        className={`block w-full rounded-lg border px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 ${
+                          isDarkBackground 
+                            ? 'bg-white/10 border-white/20 text-white placeholder:text-white/60' 
+                            : 'bg-white border-gray-300 text-gray-900 placeholder:text-gray-500 disabled:bg-gray-100'
+                        }`}
                         placeholder="800"
                       />
-                      <p className="text-xs text-white/60 mt-1">
+                      <p className={`text-xs ${getSecondaryTextColor()} mt-1`}>
                         ~{Math.round((config.capacity || 800) / 60)} people/minute
                       </p>
                     </div>
 
                     {/* PIC Name */}
                     <div>
-                      <label className="block text-sm font-medium text-white/80 mb-1">
+                      <label className={`block text-sm font-medium ${getSecondaryTextColor()} mb-1`}>
                         PIC Name (Optional)
                       </label>
                       <input
@@ -348,15 +352,19 @@ const VenueLayoutEditor: React.FC<VenueLayoutEditorProps> = ({
                         value={config.picName || ''}
                         onChange={(e) => updateGateConfig(exit.id, 'picName', e.target.value)}
                         disabled={readOnly}
-                        className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 disabled:bg-gray-100"
+                        className={`block w-full rounded-lg border px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 ${
+                          isDarkBackground 
+                            ? 'bg-white/10 border-white/20 text-white placeholder:text-white/60' 
+                            : 'bg-white border-gray-300 text-gray-900 placeholder:text-gray-500 disabled:bg-gray-100'
+                        }`}
                         placeholder="John Doe"
                       />
                     </div>
 
                     {/* Phone Number Configuration */}
                     <div>
-                      <label className="block text-sm font-medium text-white/80 mb-1">
-                        <Phone className="h-4 w-4 inline mr-1 text-white/70" />
+                      <label className={`block text-sm font-medium ${getSecondaryTextColor()} mb-1`}>
+                        <Phone className={`h-4 w-4 inline mr-1 ${getIconColor()}`} />
                         PIC Phone Number
                       </label>
                       <input
@@ -364,10 +372,10 @@ const VenueLayoutEditor: React.FC<VenueLayoutEditorProps> = ({
                         value={config.picPhoneNumber}
                         onChange={(e) => updateGateConfig(exit.id, 'picPhoneNumber', e.target.value)}
                         disabled={readOnly}
-                        className={`block w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-1 disabled:bg-gray-100 ${
-                          isPhoneValid 
-                            ? 'border-gray-300 focus:border-primary-500 focus:ring-primary-500' 
-                            : 'border-red-300 focus:border-red-500 focus:ring-red-500'
+                        className={`block w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-1 ${
+                          isDarkBackground 
+                            ? `bg-white/10 border-white/20 text-white placeholder:text-white/60 ${!isPhoneValid ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : 'focus:border-primary-500 focus:ring-primary-500'}` 
+                            : `bg-white text-gray-900 placeholder:text-gray-500 disabled:bg-gray-100 ${isPhoneValid ? 'border-gray-300 focus:border-primary-500 focus:ring-primary-500' : 'border-red-300 focus:border-red-500 focus:ring-red-500'}`
                         }`}
                         placeholder="+60123456789"
                       />
@@ -376,7 +384,7 @@ const VenueLayoutEditor: React.FC<VenueLayoutEditorProps> = ({
                           Please enter a valid Malaysian phone number
                         </p>
                       )}
-                      <p className="text-xs text-white/60 mt-1">
+                      <p className={`text-xs ${getSecondaryTextColor()} mt-1`}>
                         WhatsApp number for gate notifications
                       </p>
                     </div>
@@ -418,11 +426,11 @@ const VenueLayoutEditor: React.FC<VenueLayoutEditorProps> = ({
       {/* File Upload Section */}
       {eventId && (
         <StaticGlassCard intensity="medium" blur="md">
-          <h4 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-            <Upload className="h-5 w-5 text-white/80" />
+          <h4 className={`text-lg font-semibold ${getTextColor()} mb-4 flex items-center gap-2`}>
+            <Upload className={`h-5 w-5 ${getIconColor()}`} />
             Event Documents & Files
           </h4>
-          <p className="text-sm text-white/80 mb-6">
+          <p className={`text-sm ${getSecondaryTextColor()} mb-6`}>
             Upload relevant documents such as workflows, procedures, floor plans, or any other files related to your event. 
             Our AI will analyze the content to provide better insights and recommendations.
           </p>
@@ -443,8 +451,8 @@ const VenueLayoutEditor: React.FC<VenueLayoutEditorProps> = ({
           {/* All Files List (Existing + New) */}
           {allAttachmentUrls.length > 0 && (
             <div className="space-y-4">
-              <h5 className="font-medium text-white flex items-center gap-2">
-                <FileText className="h-4 w-4 text-white/80" />
+              <h5 className={`font-medium ${getTextColor()} flex items-center gap-2`}>
+                <FileText className={`h-4 w-4 ${getIconColor()}`} />
                 Documents ({allAttachmentUrls.length})
               </h5>
               
@@ -460,7 +468,7 @@ const VenueLayoutEditor: React.FC<VenueLayoutEditorProps> = ({
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center space-x-2">
-                            <h6 className="text-sm font-medium text-white truncate">
+                            <h6 className={`text-sm font-medium ${getTextColor()} truncate`}>
                               {fileName}
                             </h6>
                             {isExistingFile && (

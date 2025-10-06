@@ -18,11 +18,12 @@ import { VenueLayoutCard } from './VenueLayoutCard';
 
 // Component for event time card with weather-aware colors
 const EventTimeCard: React.FC<{ currentEvent: EventData }> = ({ currentEvent }) => {
-  const { isDarkBackground } = useContext(WeatherContext);
+  const { isDarkBackground, isRainBackground } = useContext(WeatherContext);
   
-  const getTextColor = () => isDarkBackground ? 'text-white' : 'text-gray-900';
-  const getSecondaryTextColor = () => isDarkBackground ? 'text-white/80' : 'text-gray-700';
-  const getDividerColor = () => isDarkBackground ? 'text-white/60' : 'text-gray-400';
+  // Storm and Rain: white text; Clear/Sunny/Cloudy: dark text
+  const getTextColor = () => (isDarkBackground || isRainBackground) ? 'text-white' : 'text-gray-900';
+  const getSecondaryTextColor = () => (isDarkBackground || isRainBackground) ? 'text-white/80' : 'text-gray-700';
+  const getDividerColor = () => (isDarkBackground || isRainBackground) ? 'text-white/60' : 'text-gray-400';
   
   return (
     <GlassCard intensity="medium" blur="md">
@@ -60,10 +61,10 @@ const EventTimeCard: React.FC<{ currentEvent: EventData }> = ({ currentEvent }) 
 
 // Component for venue card with weather-aware colors
 const VenueCard: React.FC<{ currentEvent: EventData }> = ({ currentEvent }) => {
-  const { isDarkBackground } = useContext(WeatherContext);
+  const { isDarkBackground, isRainBackground } = useContext(WeatherContext);
   
-  const getTextColor = () => isDarkBackground ? 'text-white' : 'text-gray-900';
-  const getSecondaryTextColor = () => isDarkBackground ? 'text-white/80' : 'text-gray-700';
+  const getTextColor = () => (isDarkBackground || isRainBackground) ? 'text-white' : 'text-gray-900';
+  const getSecondaryTextColor = () => (isDarkBackground || isRainBackground) ? 'text-white/80' : 'text-gray-700';
   
   return (
     <GlassCard intensity="medium" blur="md">
@@ -80,10 +81,10 @@ const VenueCard: React.FC<{ currentEvent: EventData }> = ({ currentEvent }) => {
 
 // Component for weather card with weather-aware colors
 const WeatherCard: React.FC = () => {
-  const { isDarkBackground, weatherData, weatherCondition } = useContext(WeatherContext);
+  const { isDarkBackground, isRainBackground, weatherData, weatherCondition } = useContext(WeatherContext);
   
-  const getTextColor = () => isDarkBackground ? 'text-white' : 'text-gray-900';
-  const getSecondaryTextColor = () => isDarkBackground ? 'text-white/80' : 'text-gray-700';
+  const getTextColor = () => (isDarkBackground || isRainBackground) ? 'text-white' : 'text-gray-900';
+  const getSecondaryTextColor = () => (isDarkBackground || isRainBackground) ? 'text-white/80' : 'text-gray-700';
   
   // Get weather icon based on condition
   const getWeatherIcon = () => {
@@ -127,11 +128,11 @@ const WeatherCard: React.FC = () => {
 
 // Component for forecast not generated card with weather-aware colors
 const ForecastNotGeneratedCard: React.FC = () => {
-  const { isDarkBackground } = useContext(WeatherContext);
+  const { isDarkBackground, isRainBackground } = useContext(WeatherContext);
   
-  const getTextColor = () => isDarkBackground ? 'text-white' : 'text-gray-900';
-  const getSecondaryTextColor = () => isDarkBackground ? 'text-white/80' : 'text-gray-600';
-  const getIconColor = () => isDarkBackground ? 'text-white/60' : 'text-gray-400';
+  const getTextColor = () => (isDarkBackground || isRainBackground) ? 'text-white' : 'text-gray-900';
+  const getSecondaryTextColor = () => (isDarkBackground || isRainBackground) ? 'text-white/80' : 'text-gray-600';
+  const getIconColor = () => (isDarkBackground || isRainBackground) ? 'text-white/60' : 'text-gray-400';
   
   return (
     <GlassCard className="mb-6" intensity="medium" blur="md">
@@ -223,6 +224,7 @@ const EventDetails: React.FC = () => {
   const { eventId } = useParams<{ eventId: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { isDarkBackground, isRainBackground } = useContext(WeatherContext);
   const [forecastResult, setForecastResult] = useState<any>(null);
   const [isForecastLoading, setIsForecastLoading] = useState(false);
   const [forecastError, setForecastError] = useState<string | null>(null);
@@ -230,6 +232,9 @@ const EventDetails: React.FC = () => {
   
   // Ref to track if simulation monitoring is already started for this event
   const monitoringEventId = useRef<string | null>(null);
+  
+  // Helper for section header colors
+  const getSectionHeaderColor = () => (isDarkBackground || isRainBackground) ? 'text-white' : 'text-gray-900';
 
   // Helper function to extract gates from venue layout
   const extractGatesFromVenueLayout = (venueLayout: any): { gates: string[], gates_crowd: number[] } => {
@@ -583,7 +588,7 @@ const EventDetails: React.FC = () => {
       <WeatherBackground 
         venueLocation={null} 
         eventDate={''}
-        testMode={true}
+        testMode={false}
       >
         <div className="max-w-7xl mx-auto p-6">
           <GlassCard intensity="medium" blur="md" className="text-center py-12">
@@ -603,7 +608,7 @@ const EventDetails: React.FC = () => {
       <WeatherBackground 
         venueLocation={null} 
         eventDate={''}
-        testMode={true}
+        testMode={false}
       >
         <div className="max-w-7xl mx-auto p-6">
           <GlassCard intensity="medium" blur="md">
@@ -630,7 +635,7 @@ const EventDetails: React.FC = () => {
       <WeatherBackground 
         venueLocation={null} 
         eventDate={''}
-        testMode={true}
+        testMode={false}
       >
         <div className="max-w-7xl mx-auto p-6">
           <GlassCard intensity="medium" blur="md">
@@ -657,6 +662,7 @@ const EventDetails: React.FC = () => {
     <WeatherBackground 
       venueLocation={currentEvent?.venueLocation || null} 
       eventDate={currentEvent?.dateStart || ''}
+      testMode={true}
     >
       <div className="max-w-7xl mx-auto p-6">
         {/* Back button */}
@@ -724,12 +730,12 @@ const EventDetails: React.FC = () => {
           {/* Show message if no venue layout exists */}
           {!currentEvent?.venueLayout && (
             <GlassCard intensity="medium" blur="md">
-              <div className="text-center text-gray-500">
-                <TrendingUp className="mx-auto h-12 w-12 text-gray-400 mb-3" />
-                <h4 className="text-lg font-medium text-gray-900 mb-2">
+              <div className={`text-center ${(isDarkBackground || isRainBackground) ? 'text-white/80' : 'text-gray-500'}`}>
+                <TrendingUp className={`mx-auto h-12 w-12 mb-3 ${(isDarkBackground || isRainBackground) ? 'text-white/60' : 'text-gray-400'}`} />
+                <h4 className={`text-lg font-medium mb-2 ${(isDarkBackground || isRainBackground) ? 'text-white' : 'text-gray-900'}`}>
                   No Venue Layout
                 </h4>
-                <p className="text-gray-600">
+                <p className={(isDarkBackground || isRainBackground) ? 'text-white/80' : 'text-gray-600'}>
                   This event was created without a venue layout. You can add one by editing the event or creating a new event with the venue layout builder.
                 </p>
               </div>
@@ -745,7 +751,7 @@ const EventDetails: React.FC = () => {
           {/* Left Column - Simulation Chart and Venue Map */}
           <div className="xl:col-span-2 space-y-6">
             <GlassCard intensity="medium" blur="md">
-              <h3 className="text-lg font-semibold mb-4 text-gray-900">Crowd Density Simulation</h3>
+              <h3 className={`text-lg font-semibold mb-4 ${getSectionHeaderColor()}`}>Crowd Density Simulation</h3>
               {/* <SimulationChart
                 data={forecastResult?.crowdDensity || simulationResult?.crowdDensity || []}
                 title="Crowd Density Simulation"
@@ -757,7 +763,7 @@ const EventDetails: React.FC = () => {
             </GlassCard>
 
             <GlassCard intensity="medium" blur="md">
-              <h3 className="text-lg font-semibold mb-4 text-gray-900">Venue Layout</h3>
+              <h3 className={`text-lg font-semibold mb-4 ${getSectionHeaderColor()}`}>Venue Layout</h3>
               <VenueMap
                 hotspots={forecastResult?.hotspots || simulationResult?.hotspots || []}
                 venueLocation={currentEvent.venueLocation}
@@ -770,7 +776,7 @@ const EventDetails: React.FC = () => {
           {/* Right Column - Recommendations and Forecasts */}
           <div className="space-y-6">
             <GlassCard intensity="medium" blur="md">
-              <h3 className="text-lg font-semibold mb-4 text-gray-900">AI Recommendations</h3>
+              <h3 className={`text-lg font-semibold mb-4 ${getSectionHeaderColor()}`}>AI Recommendations</h3>
               <div className="space-y-3">
                 {(() => {
                   // Generate mock AI recommendations based on event data

@@ -16,7 +16,7 @@ const GlassCard: React.FC<GlassCardProps> = ({
   intensity = 'medium',
   blur = 'md',
 }) => {
-  const { isDarkBackground } = useContext(WeatherContext);
+  const { isDarkBackground, isRainBackground } = useContext(WeatherContext);
   const paddingClasses = {
     none: '',
     sm: 'p-4',
@@ -24,27 +24,42 @@ const GlassCard: React.FC<GlassCardProps> = ({
     lg: 'p-8',
   };
 
-  // Adjust glass intensity based on background darkness
+  // Adjust glass intensity based on background type
   const intensityClasses = isDarkBackground ? {
+    // Storm - light glass on dark background
     light: 'bg-white/15 border-white/25',
     medium: 'bg-white/5 border-white/15',
     strong: 'bg-white/35 border-white/45',
+  } : isRainBackground ? {
+    // Rain - dark glass for better text visibility
+    light: 'bg-gray-800/60 border-gray-700/70',
+    medium: 'bg-gray-800/15 border-gray-700/40',
+    strong: 'bg-gray-800/80 border-gray-700/90',
   } : {
-    light: 'bg-white/40 border-white/50',
-    medium: 'bg-white/50 border-white/60',
-    strong: 'bg-white/60 border-white/70',
+    // Clear/Sunny/Cloudy - solid white background, no glass effect
+    light: 'bg-white border-gray-200',
+    medium: 'bg-white border-gray-200',
+    strong: 'bg-white border-gray-200',
   };
 
-  const blurClasses = {
+  const blurClasses = (isDarkBackground || isRainBackground) ? {
+    // Apply blur only for storm and rain
     sm: 'backdrop-blur-sm',
     md: 'backdrop-blur-md',
     lg: 'backdrop-blur-lg',
+  } : {
+    // No blur for clear/sunny/cloudy
+    sm: '',
+    md: '',
+    lg: '',
   };
 
   const baseClasses = `
     rounded-xl 
     border 
-    shadow-xl
+    shadow-xl 
+    transition-all 
+    duration-300
   `;
 
   const combinedClasses = `

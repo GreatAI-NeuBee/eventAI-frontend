@@ -30,22 +30,28 @@ const StaticGlassCard: React.FC<StaticGlassCardProps> = ({
     light: 'bg-white/15 border-white/25',
     medium: 'bg-white/5 border-white/15',
     strong: 'bg-white/35 border-white/45',
-  } : (isRainBackground || true) ? {
-    // Rain and Clear/Sunny - dark glass for better text visibility
+  } : isRainBackground ? {
+    // Rain - dark glass for better text visibility
     light: 'bg-gray-800/60 border-gray-700/70',
     medium: 'bg-gray-800/15 border-gray-700/40',
     strong: 'bg-gray-800/80 border-gray-700/90',
   } : {
-    // Fallback (shouldn't be used)
-    light: 'bg-white/40 border-white/50',
-    medium: 'bg-white/50 border-white/60',
-    strong: 'bg-white/60 border-white/70',
+    // Clear/Sunny/Cloudy - solid white background, no glass effect
+    light: 'bg-white border-gray-200',
+    medium: 'bg-white border-gray-200',
+    strong: 'bg-white border-gray-200',
   };
 
-  const blurClasses = {
+  const blurClasses = (isDarkBackground || isRainBackground) ? {
+    // Apply blur only for storm and rain
     sm: 'backdrop-blur-sm',
     md: 'backdrop-blur-md',
     lg: 'backdrop-blur-lg',
+  } : {
+    // No blur for clear/sunny/cloudy
+    sm: '',
+    md: '',
+    lg: '',
   };
 
   const baseClasses = `

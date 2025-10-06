@@ -1,7 +1,8 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useContext } from 'react';
 import { Upload, X, AlertCircle, CheckCircle, Loader, FileText, File } from 'lucide-react';
 import Button from './Button';
 import { eventAPI } from '../../api/apiClient';
+import { WeatherContext } from './WeatherBackground';
 
 interface FileUploadResult {
   success: boolean;
@@ -39,6 +40,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
   className = '',
   existingFiles = { urls: [], filenames: [] }
 }) => {
+  const { isDarkBackground, isRainBackground } = useContext(WeatherContext);
   const [uploadingFiles, setUploadingFiles] = useState<UploadingFile[]>([]);
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -214,14 +216,14 @@ const FileUpload: React.FC<FileUploadProps> = ({
           disabled={disabled}
         />
         
-        <Upload className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-        <h3 className="text-lg font-medium text-gray-900 mb-2">
+        <Upload className={`mx-auto h-12 w-12 mb-4 ${isDarkBackground || isRainBackground ? 'text-white/60' : 'text-gray-400'}`} />
+        <h3 className={`text-lg font-medium mb-2 ${isDarkBackground || isRainBackground ? 'text-white' : 'text-gray-900'}`}>
           Upload Event Documents
         </h3>
-        <p className="text-gray-600 mb-4">
+        <p className={`mb-4 ${isDarkBackground || isRainBackground ? 'text-white/80' : 'text-gray-600'}`}>
           Drag and drop files here, or click to select files
         </p>
-        <p className="text-sm text-gray-500">
+        <p className={`text-sm ${isDarkBackground || isRainBackground ? 'text-white/80' : 'text-gray-500'}`}>
           Supports: PDF, Excel, Word, Text files (max 10MB each)
         </p>
         
