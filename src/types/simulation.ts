@@ -26,6 +26,72 @@ interface SimulationResult {
   };
 }
 
+interface PopularityContent {
+  metadata?: {
+    inputData?: {
+      feat?: string;
+      type?: string;
+      location?: string;
+    };
+    analyzedAt?: string;
+    modelVersion?: string;
+  };
+  popularityLevel?: string;
+  popularityScore?: number;
+  crowdFlowAnalysis?: {
+    entrySpeed?: string;
+    entrySpeedRationale?: string;
+    bottleneckAreas?: string[];
+    peakCongestionTimes?: string[];
+  };
+  historicalIncidents?: Array<{
+    date?: string;
+    cause?: string;
+    incident?: string;
+    casualties?: string;
+  }>;
+  audienceDemographics?: {
+    ageGroups?: {
+      teens?: number;
+      seniors?: number;
+      children?: number;
+      middleAged?: number;
+      youngAdults?: number;
+    };
+    behaviorProfile?: string;
+    primaryAgeRange?: string;
+    mobilityConsiderations?: string;
+  };
+  operationalRecommendations?: {
+    crowdControl?: string[];
+    entranceManagement?: string[];
+    staffingRequirements?: {
+      rationale?: string;
+      medicalStaff?: number;
+      assistanceStaff?: number;
+      securityPersonnel?: number;
+      crowdControlOfficers?: number;
+    };
+    emergencyPreparedness?: string[];
+    specialConsiderations?: string[];
+  };
+  expectedTurnout?: {
+    minimum?: number;
+    expected?: number;
+    maximum?: number;
+  };
+  riskAssessment?: {
+    highRisks?: string[];
+    mediumRisks?: string[];
+    weatherRelatedRisks?: string[];
+  };
+  safetyMeasures?: {
+    mandatory?: string[];
+    recommended?: string[];
+    equipmentNeeded?: string[];
+  };
+}
+
 interface EventData {
   id: string;
   name: string;
@@ -46,6 +112,7 @@ interface EventData {
   createdAt: string;
   attachmentUrls?: string[]; // Array of attachment URLs
   attachmentFilenames?: string[]; // Array of attachment filenames (corresponds to URLs by index)
+  popularityContent?: PopularityContent; // AI-analyzed popularity and crowd insights
 }
 
-export type { SimulationResult, EventData };
+export type { SimulationResult, EventData, PopularityContent };

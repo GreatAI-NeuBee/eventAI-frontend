@@ -9,6 +9,7 @@ import VenueMap from '../components/dashboard/VenueMap';
 import TransitForecast from '../components/dashboard/TransitForecast';
 import ParkingForecast from '../components/dashboard/ParkingForecast';
 import VenueLayoutEditor, { VenueLayoutEditorData } from '../components/venue/VenueLayoutEditor';
+import PopularityInsights from '../components/event/PopularityInsights';
 import { useEventStore } from '../store/eventStore';
 import { useAuth } from '../contexts/AuthContext';
 import type { EventData } from '../types/simulation';
@@ -361,6 +362,7 @@ const EventDetails: React.FC = () => {
           createdAt: eventData.createdAt,
           attachmentUrls: eventData.attachmentUrls || [],
           attachmentFilenames: eventData.attachmentFilenames || [],
+          popularityContent: eventData.popularityContent || eventData.popularity_content || eventData.popularityExtent || undefined,
         };
         
         setCurrentEvent(transformedEvent);
@@ -485,6 +487,27 @@ const EventDetails: React.FC = () => {
       const { setSimulationResult } = useEventStore.getState();
       setSimulationResult(simulationData);
       
+      // Refetch event details to get updated popularityContent
+      console.log('🔄 Refetching event details to get popularity content...');
+      try {
+        const updatedEventResponse = await eventAPI.getEvent(eventId);
+        const updatedEventData = updatedEventResponse.data.data || updatedEventResponse.data;
+        
+        // Update only the popularityContent field
+        if (updatedEventData.popularityContent || updatedEventData.popularity_content || updatedEventData.popularityExtent) {
+          const updatedEvent = {
+            ...currentEvent,
+            popularityContent: updatedEventData.popularityContent || updatedEventData.popularity_content || updatedEventData.popularityExtent
+          };
+          setCurrentEvent(updatedEvent);
+          console.log('✅ Popularity content updated:', updatedEvent.popularityContent);
+        } else {
+          console.log('⚠️ No popularity content found in updated event data');
+        }
+      } catch (refetchError) {
+        console.warn('⚠️ Failed to refetch event for popularity content:', refetchError);
+        // Don't throw error, forecast was still successful
+      }
       
     } catch (error: any) {
       console.error('❌ Error generating forecast:', error);
@@ -800,6 +823,13 @@ const EventDetails: React.FC = () => {
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {/* AI Popularity Analysis Section - Full width at bottom */}
+      {forecastResult && Object.keys(forecastResult).length > 0 && currentEvent.popularityContent && (
+        <div className="mt-6">
+          <PopularityInsights popularityContent={currentEvent.popularityContent} />
         </div>
       )}
       </div>
