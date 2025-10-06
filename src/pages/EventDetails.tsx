@@ -662,7 +662,7 @@ const EventDetails: React.FC = () => {
     <WeatherBackground 
       venueLocation={currentEvent?.venueLocation || null} 
       eventDate={currentEvent?.dateStart || ''}
-      testMode={true}
+      testMode={false}
     >
       <div className="max-w-7xl mx-auto p-6">
         {/* Back button */}
@@ -801,10 +801,17 @@ const EventDetails: React.FC = () => {
                     : mockRecommendations;
 
                   return recommendations.map((rec: any, index: number) => {
-                    const priorityColors = {
+                    // Dynamic colors based on weather
+                    const priorityColors = (isDarkBackground || isRainBackground) ? {
+                      // Storm/Rain - light text on dark backgrounds
                       high: { bg: 'bg-red-500/20', border: 'border-red-300/40', text: 'text-red-100', icon: 'text-red-200' },
                       medium: { bg: 'bg-yellow-500/20', border: 'border-yellow-300/40', text: 'text-yellow-100', icon: 'text-yellow-200' },
                       low: { bg: 'bg-blue-500/20', border: 'border-blue-300/40', text: 'text-blue-100', icon: 'text-blue-200' }
+                    } : {
+                      // Clear/Sunny/Cloudy - dark text on light backgrounds
+                      high: { bg: 'bg-red-100', border: 'border-red-300', text: 'text-red-900', icon: 'text-red-700' },
+                      medium: { bg: 'bg-yellow-100', border: 'border-yellow-300', text: 'text-yellow-900', icon: 'text-yellow-700' },
+                      low: { bg: 'bg-blue-100', border: 'border-blue-300', text: 'text-blue-900', icon: 'text-blue-700' }
                     };
                     
                     const colors = priorityColors[rec.priority as keyof typeof priorityColors] || priorityColors.medium;
@@ -818,9 +825,13 @@ const EventDetails: React.FC = () => {
                               <h4 className={`text-sm font-medium ${colors.text}`}>{rec.title}</h4>
                               {rec.priority && (
                                 <span className={`text-xs px-2 py-1 rounded-full font-medium ${
-                                  rec.priority === 'high' ? 'bg-red-400/30 text-red-100 border border-red-300/40' :
-                                  rec.priority === 'medium' ? 'bg-yellow-400/30 text-yellow-100 border border-yellow-300/40' :
-                                  'bg-blue-400/30 text-blue-100 border border-blue-300/40'
+                                  (isDarkBackground || isRainBackground) 
+                                    ? (rec.priority === 'high' ? 'bg-red-400/30 text-red-100 border border-red-300/40' :
+                                       rec.priority === 'medium' ? 'bg-yellow-400/30 text-yellow-100 border border-yellow-300/40' :
+                                       'bg-blue-400/30 text-blue-100 border border-blue-300/40')
+                                    : (rec.priority === 'high' ? 'bg-red-200 text-red-900 border border-red-400' :
+                                       rec.priority === 'medium' ? 'bg-yellow-200 text-yellow-900 border border-yellow-400' :
+                                       'bg-blue-200 text-blue-900 border border-blue-400')
                                 }`}>
                                   {rec.priority.toUpperCase()}
                                 </span>
@@ -828,7 +839,11 @@ const EventDetails: React.FC = () => {
                             </div>
                             <p className={`text-sm ${colors.text} mt-1 opacity-90`}>{rec.description}</p>
                             {rec.action && (
-                              <div className={`mt-2 text-xs ${colors.text} bg-white/10 backdrop-blur-sm rounded px-2 py-1 border border-white/20`}>
+                              <div className={`mt-2 text-xs ${colors.text} rounded px-2 py-1 border ${
+                                (isDarkBackground || isRainBackground) 
+                                  ? 'bg-white/10 backdrop-blur-sm border-white/20' 
+                                  : 'bg-white/50 border-gray-300'
+                              }`}>
                                 <span className="font-medium">💡 Action:</span> {rec.action}
                               </div>
                             )}

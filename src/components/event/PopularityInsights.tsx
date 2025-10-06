@@ -9,12 +9,25 @@ interface PopularityInsightsProps {
 }
 
 const PopularityInsights: React.FC<PopularityInsightsProps> = ({ popularityContent }) => {
-  const { isDarkBackground } = useContext(WeatherContext);
+  const { isDarkBackground, isRainBackground } = useContext(WeatherContext);
   
-  const getTextColor = () => isDarkBackground ? 'text-white' : 'text-gray-900';
-  const getSecondaryTextColor = () => isDarkBackground ? 'text-white/80' : 'text-gray-700';
-  const getMutedTextColor = () => isDarkBackground ? 'text-white/60' : 'text-gray-500';
-  const getBorderColor = () => isDarkBackground ? 'border-white/20' : 'border-gray-200';
+  const getTextColor = () => (isDarkBackground || isRainBackground) ? 'text-white' : 'text-gray-900';
+  const getSecondaryTextColor = () => (isDarkBackground || isRainBackground) ? 'text-white/80' : 'text-gray-700';
+  const getMutedTextColor = () => (isDarkBackground || isRainBackground) ? 'text-white/60' : 'text-gray-500';
+  const getBorderColor = () => (isDarkBackground || isRainBackground) ? 'border-white/20' : 'border-gray-200';
+  
+  // Special background for sections in rain
+  const getSectionBgColor = () => {
+    if (isDarkBackground) return 'bg-white/5'; // Storm - light
+    if (isRainBackground) return 'bg-gray-800/40'; // Rain - darker
+    return 'bg-gray-50'; // Clear/Sunny
+  };
+  
+  const getHighlightBgColor = () => {
+    if (isDarkBackground) return 'bg-orange-500/10'; // Storm
+    if (isRainBackground) return 'bg-orange-900/30'; // Rain - darker orange
+    return 'bg-orange-50'; // Clear/Sunny
+  };
 
   const {
     popularityLevel,
@@ -81,7 +94,7 @@ const PopularityInsights: React.FC<PopularityInsightsProps> = ({ popularityConte
 
       {/* Event Type Info */}
       {metadata?.inputData && (
-        <div className={`mb-6 p-3 rounded-lg border ${getBorderColor()} ${isDarkBackground ? 'bg-white/5' : 'bg-gray-50'}`}>
+        <div className={`mb-6 p-3 rounded-lg border ${getBorderColor()} ${getSectionBgColor()}`}>
           <div className="flex flex-wrap gap-4">
             {metadata.inputData.type && (
               <div className="flex items-center gap-2">
@@ -143,19 +156,19 @@ const PopularityInsights: React.FC<PopularityInsightsProps> = ({ popularityConte
           {(audienceDemographics.behaviorProfile || audienceDemographics.primaryAgeRange || audienceDemographics.mobilityConsiderations) && (
             <div className="space-y-2">
               {audienceDemographics.behaviorProfile && (
-                <div className={`p-3 rounded-lg border ${getBorderColor()} ${isDarkBackground ? 'bg-white/5' : 'bg-gray-50'}`}>
+                <div className={`p-3 rounded-lg border ${getBorderColor()} ${getSectionBgColor()}`}>
                   <span className={`text-xs font-medium ${getMutedTextColor()}`}>Behavior Profile</span>
                   <p className={`text-sm ${getSecondaryTextColor()} mt-1`}>{audienceDemographics.behaviorProfile}</p>
                 </div>
               )}
               {audienceDemographics.primaryAgeRange && (
-                <div className={`p-3 rounded-lg border ${getBorderColor()} ${isDarkBackground ? 'bg-white/5' : 'bg-gray-50'}`}>
+                <div className={`p-3 rounded-lg border ${getBorderColor()} ${getSectionBgColor()}`}>
                   <span className={`text-xs font-medium ${getMutedTextColor()}`}>Primary Age Range</span>
                   <p className={`text-sm ${getSecondaryTextColor()} mt-1`}>{audienceDemographics.primaryAgeRange}</p>
                 </div>
               )}
               {audienceDemographics.mobilityConsiderations && (
-                <div className={`p-3 rounded-lg border ${getBorderColor()} ${isDarkBackground ? 'bg-white/5' : 'bg-gray-50'}`}>
+                <div className={`p-3 rounded-lg border ${getBorderColor()} ${getSectionBgColor()}`}>
                   <span className={`text-xs font-medium ${getMutedTextColor()}`}>Mobility Considerations</span>
                   <p className={`text-sm ${getSecondaryTextColor()} mt-1`}>{audienceDemographics.mobilityConsiderations}</p>
                 </div>
@@ -171,7 +184,7 @@ const PopularityInsights: React.FC<PopularityInsightsProps> = ({ popularityConte
           <h3 className={`text-lg font-semibold ${getTextColor()} mb-4`}>Historical Incidents</h3>
           <div className="space-y-3">
             {historicalIncidents.map((incident, index) => (
-              <div key={index} className={`p-4 rounded-lg border ${getBorderColor()} ${isDarkBackground ? 'bg-orange-500/10' : 'bg-orange-50'}`}>
+              <div key={index} className={`p-4 rounded-lg border ${getBorderColor()} ${getHighlightBgColor()}`}>
                 <div className="flex items-start justify-between mb-2">
                   <span className={`text-sm font-medium ${getTextColor()}`}>{incident.incident}</span>
                   {incident.date && (
