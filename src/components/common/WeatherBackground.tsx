@@ -13,10 +13,12 @@ export const WeatherContext = React.createContext<{
   weatherCondition: string;
   isDarkBackground: boolean;
   isRainBackground: boolean;
+  weatherData: WeatherData | null;
 }>({
   weatherCondition: 'clear',
   isDarkBackground: false,
   isRainBackground: false,
+  weatherData: null,
 });
 
 const WeatherBackground: React.FC<WeatherBackgroundProps> = ({
@@ -281,21 +283,11 @@ const WeatherBackground: React.FC<WeatherBackgroundProps> = ({
       
       {/* Content */}
       <div className="relative z-20">
-        <WeatherContext.Provider value={{ weatherCondition, isDarkBackground, isRainBackground }}>
+        <WeatherContext.Provider value={{ weatherCondition, isDarkBackground, isRainBackground, weatherData }}>
           {children}
         </WeatherContext.Provider>
       </div>
       
-      {/* Weather indicator (subtle) */}
-      {weatherData && weatherCondition !== 'clear' && !testMode && (
-        <div className="fixed top-4 right-4 z-30 bg-white/80 backdrop-blur-sm rounded-lg px-3 py-2 shadow-sm">
-          <div className="flex items-center space-x-2 text-sm text-gray-700">
-            <span>{weatherData.current.condition}</span>
-            <span className="font-medium">{weatherData.current.temperature}°C</span>
-          </div>
-        </div>
-      )}
-
       {/* Test Mode Dropdown */}
       {testMode && (
         <div className="fixed top-4 right-4 z-30 bg-white/90 backdrop-blur-sm rounded-lg p-4 shadow-lg border">

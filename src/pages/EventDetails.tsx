@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef, useContext } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { AlertTriangle, CheckCircle, TrendingUp, Calendar, MapPin, Play } from 'lucide-react';
+import { AlertTriangle, TrendingUp, Calendar, MapPin, Play } from 'lucide-react';
 import GlassCard from '../components/common/GlassCard';
 import Button from '../components/common/Button';
 import Spinner from '../components/common/Spinner';
@@ -78,25 +78,47 @@ const VenueCard: React.FC<{ currentEvent: EventData }> = ({ currentEvent }) => {
   );
 };
 
-// Component for hotspots card with weather-aware colors
-const HotspotsCard: React.FC<{ forecastResult: any; simulationResult: any }> = ({ forecastResult, simulationResult }) => {
-  const { isDarkBackground } = useContext(WeatherContext);
+// Component for weather card with weather-aware colors
+const WeatherCard: React.FC = () => {
+  const { isDarkBackground, weatherData, weatherCondition } = useContext(WeatherContext);
   
   const getTextColor = () => isDarkBackground ? 'text-white' : 'text-gray-900';
   const getSecondaryTextColor = () => isDarkBackground ? 'text-white/80' : 'text-gray-700';
   
+  // Get weather icon based on condition
+  const getWeatherIcon = () => {
+    switch (weatherCondition) {
+      case 'rain':
+        return '🌧️';
+      case 'storm':
+        return '⛈️';
+      case 'snow':
+        return '❄️';
+      case 'cloudy':
+        return '☁️';
+      default:
+        return '☀️';
+    }
+  };
+  
   return (
     <GlassCard intensity="medium" blur="md">
       <div className="flex items-center">
-        <CheckCircle className="h-8 w-8 text-purple-500" />
+        <div className="text-4xl">
+          {getWeatherIcon()}
+        </div>
         <div className="ml-4">
-          <p className={`text-sm font-medium ${getSecondaryTextColor()}`}>Hotspots</p>
-          <p className={`text-lg font-semibold ${getTextColor()}`}>
-            {forecastResult && Object.keys(forecastResult).length > 0
-              ? (forecastResult?.hotspots?.length || simulationResult?.hotspots?.length || 0)
-              : 'N/A'
-            }
-          </p>
+          <p className={`text-sm font-medium ${getSecondaryTextColor()}`}>Weather</p>
+          <div className="flex items-baseline gap-2">
+            <p className={`text-lg font-semibold ${getTextColor()}`}>
+              {weatherData ? `${weatherData.current.temperature}°C` : 'N/A'}
+            </p>
+            {weatherData && (
+              <p className={`text-xs ${getSecondaryTextColor()} capitalize`}>
+                {weatherData.current.condition}
+              </p>
+            )}
+          </div>
         </div>
       </div>
     </GlassCard>
@@ -678,7 +700,7 @@ const EventDetails: React.FC = () => {
 
         <VenueCard currentEvent={currentEvent} />
 
-        <HotspotsCard forecastResult={forecastResult} simulationResult={simulationResult} />
+        <WeatherCard />
       </div>
 
       {/* Show venue layout configuration when no forecast is available */}
