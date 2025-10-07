@@ -1,4 +1,5 @@
 import React from "react";
+import { ExternalLink, Palette } from "lucide-react";
 
 export const DesignInCanvaCTA: React.FC = () => {
   return (
@@ -6,17 +7,11 @@ export const DesignInCanvaCTA: React.FC = () => {
       href="/design-in-canva.html"
       target="_blank"
       rel="noopener noreferrer"
-      style={{
-        display: "inline-block",
-        background: "#7c5cff",
-        color: "#fff",
-        padding: "10px 14px",
-        borderRadius: 10,
-        fontWeight: 700,
-        textDecoration: "none",
-      }}
+      className="inline-flex items-center gap-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white px-4 py-2 rounded-lg font-semibold text-sm transition-all duration-200 shadow-md hover:shadow-lg"
     >
+      <Palette className="h-4 w-4" />
       Design in Canva
+      <ExternalLink className="h-3 w-3" />
     </a>
   );
 };

@@ -1,49 +1,50 @@
 <svg viewBox="0 0 1000 625" xmlns="http://www.w3.org/2000/svg">
-  <!-- Stadium outline -->
-  <rect x="50" y="50" width="900" height="525" fill="none" stroke="#333" stroke-width="2"/>
+  <!-- Title -->
+  <text x="500" y="40" text-anchor="middle" font-family="Arial, sans-serif" font-size="24" font-weight="bold" fill="#333">Venue Layout Template</text>
   
-  <!-- Sample zones (polygons) -->
-  <polygon points="100,100 300,100 300,200 100,200" fill="#e3f2fd" stroke="#1976d2" stroke-width="1"/>
-  <polygon points="350,100 550,100 550,200 350,200" fill="#e8f5e8" stroke="#388e3c" stroke-width="1"/>
-  <polygon points="600,100 800,100 800,200 600,200" fill="#fff3e0" stroke="#f57c00" stroke-width="1"/>
+  <!-- Outer boundary: large rounded-corner rectangle -->
+  <rect x="100" y="80" width="800" height="500" rx="20" ry="20" fill="none" stroke="#333" stroke-width="2"/>
   
-  <polygon points="100,250 300,250 300,350 100,350" fill="#fce4ec" stroke="#c2185b" stroke-width="1"/>
-  <polygon points="350,250 550,250 550,350 350,350" fill="#f3e5f5" stroke="#7b1fa2" stroke-width="1"/>
-  <polygon points="600,250 800,250 800,350 600,350" fill="#e0f2f1" stroke="#00695c" stroke-width="1"/>
+  <!-- EXITS: 8 orange circles on the boundary -->
+  <!-- Top edge: 3 exits -->
+  <circle class="exit" data-type="exit" data-id="exit-1" data-name="North Left" data-capacity="600" cx="200" cy="100" r="12" fill="#ff8c00"/>
+  <circle class="exit" data-type="exit" data-id="exit-2" data-name="North Center" data-capacity="800" cx="500" cy="100" r="12" fill="#ff8c00"/>
+  <circle class="exit" data-type="exit" data-id="exit-3" data-name="North Right" data-capacity="600" cx="800" cy="100" r="12" fill="#ff8c00"/>
   
-  <polygon points="100,400 300,400 300,500 100,500" fill="#fff8e1" stroke="#f9a825" stroke-width="1"/>
-  <polygon points="350,400 550,400 550,500 350,500" fill="#e8eaf6" stroke="#3f51b5" stroke-width="1"/>
-  <polygon points="600,400 800,400 800,500 600,500" fill="#f1f8e9" stroke="#689f38" stroke-width="1"/>
+  <!-- Bottom edge: 3 exits -->
+  <circle class="exit" data-type="exit" data-id="exit-4" data-name="South Left" data-capacity="600" cx="200" cy="580" r="12" fill="#ff8c00"/>
+  <circle class="exit" data-type="exit" data-id="exit-5" data-name="South Center" data-capacity="800" cx="500" cy="580" r="12" fill="#ff8c00"/>
+  <circle class="exit" data-type="exit" data-id="exit-6" data-name="South Right" data-capacity="600" cx="800" cy="580" r="12" fill="#ff8c00"/>
   
-  <!-- Sample exits (circles) -->
-  <circle cx="150" cy="50" r="15" fill="#ff5722" stroke="#d32f2f" stroke-width="1"/>
-  <circle cx="500" cy="50" r="15" fill="#ff5722" stroke="#d32f2f" stroke-width="1"/>
-  <circle cx="850" cy="50" r="15" fill="#ff5722" stroke="#d32f2f" stroke-width="1"/>
+  <!-- Mid-left: 1 exit -->
+  <circle class="exit" data-type="exit" data-id="exit-7" data-name="West Center" data-capacity="500" cx="100" cy="340" r="12" fill="#ff8c00"/>
   
-  <circle cx="50" cy="200" r="15" fill="#ff5722" stroke="#d32f2f" stroke-width="1"/>
-  <circle cx="950" cy="200" r="15" fill="#ff5722" stroke="#d32f2f" stroke-width="1"/>
+  <!-- SECTIONS: 3×3 grid of pastel rounded rectangles -->
+  <!-- Row 1: light blue, light green, light orange -->
+  <polygon class="zone" data-type="zone" data-id="zone-1" data-name="Section A1" data-layer="1" points="150,150 250,150 250,250 150,250" fill="#e3f2fd" stroke="#1976d2" stroke-width="2" rx="10" ry="10"/>
+  <polygon class="zone" data-type="zone" data-id="zone-2" data-name="Section A2" data-layer="1" points="350,150 450,150 450,250 350,250" fill="#e8f5e8" stroke="#388e3c" stroke-width="2" rx="10" ry="10"/>
+  <polygon class="zone" data-type="zone" data-id="zone-3" data-name="Section A3" data-layer="1" points="550,150 650,150 650,250 550,250" fill="#fff3e0" stroke="#f57c00" stroke-width="2" rx="10" ry="10"/>
   
-  <circle cx="150" cy="575" r="15" fill="#ff5722" stroke="#d32f2f" stroke-width="1"/>
-  <circle cx="500" cy="575" r="15" fill="#ff5722" stroke="#d32f2f" stroke-width="1"/>
-  <circle cx="850" cy="575" r="15" fill="#ff5722" stroke="#d32f2f" stroke-width="1"/>
+  <!-- Row 2: light pink, light lavender, light teal -->
+  <polygon class="zone" data-type="zone" data-id="zone-4" data-name="Section B1" data-layer="1" points="150,280 250,280 250,380 150,380" fill="#fce4ec" stroke="#c2185b" stroke-width="2" rx="10" ry="10"/>
+  <polygon class="zone" data-type="zone" data-id="zone-5" data-name="Section B2" data-layer="1" points="350,280 450,280 450,380 350,380" fill="#f3e5f5" stroke="#7b1fa2" stroke-width="2" rx="10" ry="10"/>
+  <polygon class="zone" data-type="zone" data-id="zone-6" data-name="Section B3" data-layer="1" points="550,280 650,280 650,380 550,380" fill="#e0f2f1" stroke="#00695c" stroke-width="2" rx="10" ry="10"/>
   
-  <!-- Sample toilets (circles) -->
-  <circle cx="200" cy="150" r="12" fill="#4caf50" stroke="#2e7d32" stroke-width="1"/>
-  <circle cx="400" cy="150" r="12" fill="#4caf50" stroke="#2e7d32" stroke-width="1"/>
-  <circle cx="700" cy="150" r="12" fill="#4caf50" stroke="#2e7d32" stroke-width="1"/>
+  <!-- Row 3: light cream, light periwinkle, light desaturated green -->
+  <polygon class="zone" data-type="zone" data-id="zone-7" data-name="Section C1" data-layer="2" points="150,410 250,410 250,510 150,510" fill="#fff8e1" stroke="#f9a825" stroke-width="2" rx="10" ry="10"/>
+  <polygon class="zone" data-type="zone" data-id="zone-8" data-name="Section C2" data-layer="2" points="350,410 450,410 450,510 350,510" fill="#e8eaf6" stroke="#3f51b5" stroke-width="2" rx="10" ry="10"/>
+  <polygon class="zone" data-type="zone" data-id="zone-9" data-name="Section C3" data-layer="2" points="550,410 650,410 650,510 550,510" fill="#e8f5e8" stroke="#689f38" stroke-width="2" rx="10" ry="10"/>
   
-  <circle cx="200" cy="300" r="12" fill="#4caf50" stroke="#2e7d32" stroke-width="1"/>
-  <circle cx="400" cy="300" r="12" fill="#4caf50" stroke="#2e7d32" stroke-width="1"/>
-  <circle cx="700" cy="300" r="12" fill="#4caf50" stroke="#2e7d32" stroke-width="1"/>
+  <!-- SECTION MARKERS: green dots centered in each rectangle -->
+  <circle class="toilet" data-type="toilet" data-id="toilet-1" data-label="Section A1 Marker" data-fixtures="1" cx="200" cy="200" r="8" fill="#4caf50" stroke="#2e7d32" stroke-width="1"/>
+  <circle class="toilet" data-type="toilet" data-id="toilet-2" data-label="Section A2 Marker" data-fixtures="1" cx="400" cy="200" r="8" fill="#4caf50" stroke="#2e7d32" stroke-width="1"/>
+  <circle class="toilet" data-type="toilet" data-id="toilet-3" data-label="Section A3 Marker" data-fixtures="1" cx="600" cy="200" r="8" fill="#4caf50" stroke="#2e7d32" stroke-width="1"/>
   
-  <circle cx="200" cy="450" r="12" fill="#4caf50" stroke="#2e7d32" stroke-width="1"/>
-  <circle cx="400" cy="450" r="12" fill="#4caf50" stroke="#2e7d32" stroke-width="1"/>
-  <circle cx="700" cy="450" r="12" fill="#4caf50" stroke="#2e7d32" stroke-width="1"/>
+  <circle class="toilet" data-type="toilet" data-id="toilet-4" data-label="Section B1 Marker" data-fixtures="1" cx="200" cy="330" r="8" fill="#4caf50" stroke="#2e7d32" stroke-width="1"/>
+  <circle class="toilet" data-type="toilet" data-id="toilet-5" data-label="Section B2 Marker" data-fixtures="1" cx="400" cy="330" r="8" fill="#4caf50" stroke="#2e7d32" stroke-width="1"/>
+  <circle class="toilet" data-type="toilet" data-id="toilet-6" data-label="Section B3 Marker" data-fixtures="1" cx="600" cy="330" r="8" fill="#4caf50" stroke="#2e7d32" stroke-width="1"/>
   
-  <!-- Labels -->
-  <text x="500" y="30" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" fill="#333">Venue Layout Template</text>
-  <text x="20" y="320" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#666" transform="rotate(-90 20 320)">Zones (polygons)</text>
-  <text x="20" y="100" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#666" transform="rotate(-90 20 100)">Exits (red circles)</text>
-  <text x="20" y="200" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#666" transform="rotate(-90 20 200)">Toilets (green circles)</text>
+  <circle class="toilet" data-type="toilet" data-id="toilet-7" data-label="Section C1 Marker" data-fixtures="1" cx="200" cy="460" r="8" fill="#4caf50" stroke="#2e7d32" stroke-width="1"/>
+  <circle class="toilet" data-type="toilet" data-id="toilet-8" data-label="Section C2 Marker" data-fixtures="1" cx="400" cy="460" r="8" fill="#4caf50" stroke="#2e7d32" stroke-width="1"/>
+  <circle class="toilet" data-type="toilet" data-id="toilet-9" data-label="Section C3 Marker" data-fixtures="1" cx="600" cy="460" r="8" fill="#4caf50" stroke="#2e7d32" stroke-width="1"/>
 </svg>
-

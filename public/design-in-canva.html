@@ -36,11 +36,26 @@
 
     <div class="card">
       <h2 style="margin-top:0">Step 2 — Export from Canva</h2>
-      <p>Choose <b>Download → SVG</b>. Your file should include a <code>viewBox</code> on the root <code>&lt;svg&gt;</code>.</p>
+      <p>Choose <b>Download → SVG</b> for best results. Your file should include a <code>viewBox</code> on the root <code>&lt;svg&gt;</code>.</p>
+      <p><small>If you only used circles and rectangles, you can also export as PNG and convert it.</small></p>
     </div>
 
     <div class="card">
-      <h2 style="margin-top:0">Step 3 — Add required metadata</h2>
+      <h2 style="margin-top:0">Step 2.5 — Convert PNG to SVG (if needed)</h2>
+      <p>If you exported as PNG (circles and rectangles only), convert it to SVG first:</p>
+      <a class="btn" href="/png-to-svg-converter.html">Open PNG to SVG Converter</a>
+      <p><small>Upload your PNG, set canvas size, add circles/rectangles, and download as SVG with proper metadata.</small></p>
+    </div>
+
+    <div class="card">
+      <h2 style="margin-top:0">Step 3 — Fix viewBox (if needed)</h2>
+      <p>Canva exports sometimes have incorrect <code>viewBox</code> or hard <code>width/height</code>. Fix this first:</p>
+      <a class="btn" href="/viewbox-fixer.html">Open ViewBox Fixer</a>
+      <p><small>This automatically computes content bounds, adds proper <code>viewBox</code>, and removes hard dimensions for responsive scaling.</small></p>
+    </div>
+
+    <div class="card">
+      <h2 style="margin-top:0">Step 4 — Add required metadata</h2>
       <p>Canva SVGs are visual-only. Add <code>class</code> and <code>data-*</code> attributes using this tool:</p>
       <a class="btn" href="/attribute-tagger.html">Open Attribute Tagger</a>
       <p><small>This injects <code>class="zone|exit|toilet"</code> and attributes like <code>data-id</code>, <code>data-name</code>, <code>data-layer</code> so your importer can parse it.</small></p>

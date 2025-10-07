@@ -11,7 +11,10 @@ import { eventAPI } from '../api/apiClient';
 import StadiumMapEditor from "../components/maps/StadiumMapEditor";
 import type { StadiumMapJSON } from '../components/maps/StadiumMapEditor';
 import { useAuth } from '../contexts/AuthContext';
-// ⛔️ Removed: import { DesignInCanvaCTA } from '../components/DesignInCanvaCTA';
+import { DesignInCanvaCTA } from '../components/DesignInCanvaCTA';
+import { CanvaTemplateDownload } from '../components/CanvaTemplateDownload';
+import { ViewBoxFixerCTA } from '../components/ViewBoxFixerCTA';
+import { PNGToSVGCTA } from '../components/PNGToSVGCTA';
 
 const NewEvent: React.FC = () => {
   // SVG upload functionality moved to VenueLayoutEditor
@@ -29,7 +32,6 @@ const NewEvent: React.FC = () => {
   });
 
   const [venueLayoutJson, setVenueLayoutJson] = useState<StadiumMapJSON | null>(null);
-  const [uploadStatus, setUploadStatus] = useState<string>('');
 
   const [venueLocation, setVenueLocation] = useState<{
     lat: number;
@@ -289,31 +291,67 @@ const NewEvent: React.FC = () => {
               <h2 className="text-xl font-semibold text-gray-900">Venue Layout Builder</h2>
               <p className="text-sm text-gray-600 mt-1">Design your venue sections and exits</p>
             </div>
-            <div className="text-right">
-              {venueLayoutJson ? (
-                <div className="text-sm space-y-1">
-                  <div className="text-green-600 font-medium">
-                    ✓ {venueLayoutJson.sections} sections, {venueLayoutJson.exits} exits
-                  </div>
-                  {venueLayoutJson.toiletsList && venueLayoutJson.toiletsList.length > 0 && (
-                    <div className="text-blue-600 text-xs">
-                      + {venueLayoutJson.toiletsList.length} facilities
+            <div className="flex items-center gap-3">
+              <DesignInCanvaCTA />
+              <CanvaTemplateDownload />
+              <PNGToSVGCTA />
+              <ViewBoxFixerCTA />
+              <div className="text-right">
+                {venueLayoutJson ? (
+                  <div className="text-sm space-y-1">
+                    <div className="text-green-600 font-medium">
+                      ✓ {venueLayoutJson.sections} sections, {venueLayoutJson.exits} exits
                     </div>
-                  )}
-                </div>
-              ) : (
-                <div className="text-sm text-gray-500">
-                  No layout configured
-                </div>
-              )}
+                    {venueLayoutJson.toiletsList && venueLayoutJson.toiletsList.length > 0 && (
+                      <div className="text-blue-600 text-xs">
+                        + {venueLayoutJson.toiletsList.length} facilities
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-sm text-gray-500">
+                    No layout configured
+                  </div>
+                )}
+              </div>
             </div>
           </div>
-
 
           <StadiumMapEditor
             initialLayers={2}
             onChange={handleVenueLayoutChange}
           />
+          
+          {/* Canva Design Workflow Info */}
+          <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex items-start gap-3">
+              <div className="flex-shrink-0">
+                <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                  <span className="text-blue-600 text-sm font-semibold">💡</span>
+                </div>
+              </div>
+              <div className="flex-1">
+                <h3 className="text-sm font-semibold text-blue-900 mb-1">Design in Canva</h3>
+                <p className="text-sm text-blue-700 mb-2">
+                  For more complex layouts, design your venue in Canva and import it back. 
+                  Use the template above as a starting point. You can export as SVG or PNG (circles/rectangles only).
+                </p>
+                <div className="flex items-center gap-2 text-xs text-blue-600">
+                  <span>1. Download template</span>
+                  <span>→</span>
+                  <span>2. Design in Canva</span>
+                  <span>→</span>
+                  <span>3. Convert PNG (if needed)</span>
+                  <span>→</span>
+                  <span>4. Fix viewBox</span>
+                  <span>→</span>
+                  <span>5. Add metadata</span>
+                  <span>→</span>
+                  <span>6. Upload back</span>
+                </div>
+              </div>
+            </div>
+          </div>
         </Card>
         
         {errors.userEmail && (
