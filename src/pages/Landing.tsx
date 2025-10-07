@@ -5,6 +5,7 @@ import { Calendar, TrendingUp, Users, CheckCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import Logo from '../components/common/Logo';
 import Spinner from '../components/common/Spinner';
+import GoogleIcon from '../components/icons/GoogleIcon';
 
 const Landing: React.FC = () => {
   const navigate = useNavigate();
@@ -77,9 +78,19 @@ const Landing: React.FC = () => {
           <button
             onClick={handleSignIn}
             disabled={loading}
-            className="bg-black hover:bg-gray-800 text-white px-6 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="bg-white hover:bg-gray-50 border-2 border-black-400 text-black px-6 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
-            {loading ? 'Signing in...' : 'Sign in with Google'}
+            {loading ? (
+              <>
+                <Spinner size="sm" />
+                <span>Signing in...</span>
+              </>
+            ) : (
+              <>
+                <GoogleIcon size={20} />
+                <span>Sign in with Google</span>
+              </>
+            )}
           </button>
         </div>
       </nav>
@@ -99,7 +110,7 @@ const Landing: React.FC = () => {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 1.2, ease: "easeOut" }}
         >
-          Powered by AI
+          Powered by AWS x AI
         </motion.p>
         
         <motion.h1 
