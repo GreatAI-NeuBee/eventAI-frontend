@@ -13,6 +13,7 @@ import QRCodeAttachments from './pages/QRCodeAttachments';
 
 // Import API testing utilities (available in browser console)
 import './utils/apiTest';
+// import AdminQRCodeAttachments from './pages/AdminQRCodeAttachments';
 
 function App() {
   return (
@@ -23,6 +24,7 @@ function App() {
           {/* Public pages (no authentication required) */}
           <Route path="/" element={<Landing />} />
           <Route path="/qrCodeAttachments" element={<QRCodeAttachments />} />
+          {/* <Route path="/adminQRCodeAttachments" element={<AdminQRCodeAttachments />} /> */}
           
           {/* Protected Dashboard routes (with layout) */}
           <Route path="/dashboard" element={
