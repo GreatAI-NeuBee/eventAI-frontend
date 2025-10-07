@@ -40,9 +40,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const processedUsers = useRef<Set<string>>(new Set());
 
   // Fetch backend user data by email
-  const fetchBackendUser = async (email: string) => {
+  const fetchBackendUser = async (email: string, setLoading: boolean = true) => {
     try {
-      setBackendUserLoading(true);
+      if (setLoading) {
+        setBackendUserLoading(true);
+      }
       const response = await UserService.getUserByEmail(email);
       
       if (response && response.data) {
@@ -54,7 +56,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       console.error('Failed to fetch backend user:', err);
       setBackendUser(null);
     } finally {
-      setBackendUserLoading(false);
+      if (setLoading) {
+        setBackendUserLoading(false);
+      }
     }
   };
 
@@ -87,11 +91,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
     
     userCreationInProgress.current.add(userEmail);
+    setBackendUserLoading(true); // Set loading state for the entire process
     
     try {
       console.log('🔍 Checking if user exists in backend:', userEmail);
       
-      // Try to fetch user first
+      // Try to fetch user first (don't let it control loading state)
       try {
         const existingUser = await UserService.getUserByEmail(userEmail);
         
@@ -129,8 +134,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         processedUsers.current.add(userEmail);
       } else {
         console.error('❌ User creation succeeded but no data returned');
-        // Try to fetch the user again
-        await fetchBackendUser(userEmail);
+        // Try to fetch the user again (don't let it control loading state)
+        await fetchBackendUser(userEmail, false);
         processedUsers.current.add(userEmail);
       }
       
@@ -140,8 +145,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       // Handle creation errors specifically
       if (generalErr?.isUserExists || generalErr?.status === 409) {
         console.log('🔄 User already exists (409), fetching data...');
-        // User was created by another process, just fetch the data
-        await fetchBackendUser(userEmail);
+        // User was created by another process, just fetch the data (don't let it control loading state)
+        await fetchBackendUser(userEmail, false);
         processedUsers.current.add(userEmail);
       } else {
         // Actual error occurred
@@ -151,6 +156,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     } finally {
       // Always remove from in-progress set when done
       userCreationInProgress.current.delete(userEmail);
+      setBackendUserLoading(false); // Clear loading state
     }
   };
 
