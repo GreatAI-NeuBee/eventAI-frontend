@@ -12,9 +12,6 @@ import StadiumMapEditor from "../components/maps/StadiumMapEditor";
 import type { StadiumMapJSON } from '../components/maps/StadiumMapEditor';
 import { useAuth } from '../contexts/AuthContext';
 import { DesignInCanvaCTA } from '../components/DesignInCanvaCTA';
-import { CanvaTemplateDownload } from '../components/CanvaTemplateDownload';
-import { ViewBoxFixerCTA } from '../components/ViewBoxFixerCTA';
-import { PNGToSVGCTA } from '../components/PNGToSVGCTA';
 
 const NewEvent: React.FC = () => {
   // SVG upload functionality moved to VenueLayoutEditor
@@ -293,9 +290,6 @@ const NewEvent: React.FC = () => {
             </div>
             <div className="flex items-center gap-3">
               <DesignInCanvaCTA />
-              <CanvaTemplateDownload />
-              <PNGToSVGCTA />
-              <ViewBoxFixerCTA />
               <div className="text-right">
                 {venueLayoutJson ? (
                   <div className="text-sm space-y-1">
@@ -337,17 +331,11 @@ const NewEvent: React.FC = () => {
                   Use the template above as a starting point. You can export as SVG or PNG (circles/rectangles only).
                 </p>
                 <div className="flex items-center gap-2 text-xs text-blue-600">
-                  <span>1. Download template</span>
+                  <span>1. Design in Canva</span>
                   <span>→</span>
-                  <span>2. Design in Canva</span>
+                  <span>2. Add metadata</span>
                   <span>→</span>
-                  <span>3. Convert PNG (if needed)</span>
-                  <span>→</span>
-                  <span>4. Fix viewBox</span>
-                  <span>→</span>
-                  <span>5. Add metadata</span>
-                  <span>→</span>
-                  <span>6. Upload back</span>
+                  <span>3. Upload back</span>
                 </div>
               </div>
             </div>

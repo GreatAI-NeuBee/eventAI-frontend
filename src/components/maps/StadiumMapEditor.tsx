@@ -192,7 +192,7 @@ const StadiumMapEditor: React.FC<{
 
   // Tools
   const [tool, setTool] = React.useState<
-    "idle" | "draw-section" | "add-exit" | "add-rect" | "move" | "add-toilet"
+    "idle" | "draw-section" | "add-exit" | "add-rect" | "add-circle" | "move" | "add-toilet"
   >("idle");
 
   // Drafting (free polygon for custom)
@@ -205,6 +205,19 @@ const StadiumMapEditor: React.FC<{
   const dragStartRef = React.useRef<{ id: string; start: [number, number] } | null>(
     null
   );
+
+  // Resize state
+  const [resizingId, setResizingId] = React.useState<string | null>(null);
+  const [resizeDirection, setResizeDirection] = React.useState<string | null>(null);
+  const resizeStartRef = React.useRef<{ 
+    id: string; 
+    start: [number, number]; 
+    originalPoints: PctPoint[];
+    originalBounds: { x: number; y: number; width: number; height: number };
+  } | null>(null);
+
+  // Selection state
+  const [selectedShapeId, setSelectedShapeId] = React.useState<string | null>(null);
 
   /* =========================
      Candidate exits
@@ -335,6 +348,85 @@ const StadiumMapEditor: React.FC<{
     return Math.sqrt(best.dist2) <= TOILET_HIT_R ? list[best.idx] : null;
   };
 
+  // Helper functions for shape manipulation
+  const getShapeBounds = (points: PctPoint[]) => {
+    if (points.length === 0) return { x: 0, y: 0, width: 0, height: 0 };
+    
+    const xs = points.map(p => p[0]);
+    const ys = points.map(p => p[1]);
+    const minX = Math.min(...xs);
+    const maxX = Math.max(...xs);
+    const minY = Math.min(...ys);
+    const maxY = Math.max(...ys);
+    
+    return {
+      x: minX,
+      y: minY,
+      width: maxX - minX,
+      height: maxY - minY
+    };
+  };
+
+  const updateShapePoints = (shapeId: string, newPoints: PctPoint[]) => {
+    setZones(prev => prev.map(zone => 
+      zone.id === shapeId ? { ...zone, points: newPoints } : zone
+    ));
+  };
+
+  const handleResize = (direction: string, deltaX: number, deltaY: number, originalBounds: any, originalPoints: PctPoint[]) => {
+    const centerX = originalBounds.x + originalBounds.width / 2;
+    const centerY = originalBounds.y + originalBounds.height / 2;
+    
+    // Calculate scale factors based on direction and drag distance
+    let scaleX = 1;
+    let scaleY = 1;
+    
+    switch (direction) {
+      case 'nw':
+        scaleX = 1 - (deltaX / originalBounds.width);
+        scaleY = 1 - (deltaY / originalBounds.height);
+        break;
+      case 'n':
+        scaleX = 1;
+        scaleY = 1 - (deltaY / originalBounds.height);
+        break;
+      case 'ne':
+        scaleX = 1 + (deltaX / originalBounds.width);
+        scaleY = 1 - (deltaY / originalBounds.height);
+        break;
+      case 'e':
+        scaleX = 1 + (deltaX / originalBounds.width);
+        scaleY = 1;
+        break;
+      case 'se':
+        scaleX = 1 + (deltaX / originalBounds.width);
+        scaleY = 1 + (deltaY / originalBounds.height);
+        break;
+      case 's':
+        scaleX = 1;
+        scaleY = 1 + (deltaY / originalBounds.height);
+        break;
+      case 'sw':
+        scaleX = 1 - (deltaX / originalBounds.width);
+        scaleY = 1 + (deltaY / originalBounds.height);
+        break;
+      case 'w':
+        scaleX = 1 - (deltaX / originalBounds.width);
+        scaleY = 1;
+        break;
+    }
+    
+    // Ensure minimum scale to prevent negative sizes
+    scaleX = Math.max(0.1, scaleX);
+    scaleY = Math.max(0.1, scaleY);
+    
+    return originalPoints.map(([x, y]) => {
+      const newX = centerX + (x - centerX) * scaleX;
+      const newY = centerY + (y - centerY) * scaleY;
+      return [newX, newY] as PctPoint;
+    });
+  };
+
   // Export JSON
   const exportJSON: StadiumMapJSON = React.useMemo(() => {
     const maxLayer =
@@ -375,6 +467,20 @@ const StadiumMapEditor: React.FC<{
     onChange?.(exportJSON);
   }, [exportJSON, onChange]);
 
+  // Keyboard shortcuts
+  React.useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Delete' || event.key === 'Backspace') {
+        if (selectedShapeId && layout === "custom") {
+          deleteSelectedShape();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedShapeId, layout]);
+
   /* ============ Canvas helpers ============ */
   const svgRef = React.useRef<SVGSVGElement | null>(null);
   const toPct = (
@@ -392,6 +498,17 @@ const StadiumMapEditor: React.FC<{
   const onCanvasClick = (evt: React.MouseEvent<SVGSVGElement>) => {
     const p = toPct(evt);
     if (!p) return;
+
+    // Check if clicking on empty space (not on a shape)
+    const target = evt.target as SVGElement;
+    const isShape = target.closest('g[data-shape-id]') || target.classList.contains('resize-handle');
+    const isSVGCanvas = target.tagName === 'svg' || target.tagName === 'rect' || target.tagName === 'circle';
+    
+    // If clicking on empty space, deselect current shape
+    if (layout === "custom" && (isSVGCanvas || !isShape) && selectedShapeId) {
+      setSelectedShapeId(null);
+      return;
+    }
 
     // Toilets: toggle add/remove on click (per current layout)
     if (tool === "add-toilet") {
@@ -469,42 +586,110 @@ const StadiumMapEditor: React.FC<{
     ]);
   };
 
+  const addCircleZone = () => {
+    const radius = 6;
+    const cx = vbW / 2;
+    const cy = vbH / 2;
+    const id = `circle-${Date.now()}`;
+    
+    // Create a circle as a polygon with many points for smooth appearance
+    const points: PctPoint[] = [];
+    const segments = 32;
+    for (let i = 0; i < segments; i++) {
+      const angle = (i * 2 * Math.PI) / segments;
+      const x = cx + radius * Math.cos(angle);
+      const y = cy + radius * Math.sin(angle);
+      points.push([x, y]);
+    }
+    
+    setZones((prev) => [
+      ...prev,
+      {
+        id,
+        name: `Circle ${prev.length + 1}`,
+        layer: 1,
+        points,
+      },
+    ]);
+  };
+
   const onZoneMouseDown = (zid: string, evt: React.MouseEvent<SVGGElement>) => {
-    if (!(layout === "custom" && tool === "move")) return;
+    if (layout !== "custom") return;
     const p = toPct(evt as unknown as React.MouseEvent<SVGSVGElement>);
     if (!p) return;
+    
+    // Check if clicking on a resize handle
+    const target = evt.target as SVGElement;
+    const isResizeHandle = target.classList.contains('resize-handle');
+    
+    if (isResizeHandle) {
+      const direction = target.getAttribute('data-direction');
+      if (direction) {
+        setResizingId(zid);
+        setResizeDirection(direction);
+        const zone = zones.find(z => z.id === zid);
+        if (zone) {
+          const bounds = getShapeBounds(zone.points);
+          resizeStartRef.current = {
+            id: zid,
+            start: p,
+            originalPoints: zone.points,
+            originalBounds: bounds
+          };
+        }
+        return;
+      }
+    }
+    
+    // Regular drag operation - always allow dragging in custom mode
+    setSelectedShapeId(zid);
     setDraggingId(zid);
     dragStartRef.current = { id: zid, start: p };
   };
 
   const onCanvasMouseMove = (evt: React.MouseEvent<SVGSVGElement>) => {
-    if (
-      !(
-        layout === "custom" &&
-        tool === "move" &&
-        draggingId &&
-        dragStartRef.current
-      )
-    )
-      return;
     const p = toPct(evt);
     if (!p) return;
-    const prev = dragStartRef.current.start;
-    const dx = p[0] - prev[0];
-    const dy = p[1] - prev[1];
-    setZones((zs) =>
-      zs.map((z) =>
-        z.id === draggingId
-          ? { ...z, points: z.points.map(([x, y]) => [x + dx, y + dy] as PctPoint) }
-          : z
-      )
-    );
-    dragStartRef.current = { id: draggingId, start: p };
+
+    // Handle resize operation
+    if (layout === "custom" && resizingId && resizeStartRef.current && resizeDirection) {
+      const deltaX = p[0] - resizeStartRef.current.start[0];
+      const deltaY = p[1] - resizeStartRef.current.start[1];
+      
+      const newPoints = handleResize(
+        resizeDirection,
+        deltaX,
+        deltaY,
+        resizeStartRef.current.originalBounds,
+        resizeStartRef.current.originalPoints
+      );
+      
+      updateShapePoints(resizingId, newPoints);
+      return;
+    }
+
+    // Handle drag operation - always allow in custom mode
+    if (layout === "custom" && draggingId && dragStartRef.current) {
+      const prev = dragStartRef.current.start;
+      const dx = p[0] - prev[0];
+      const dy = p[1] - prev[1];
+      setZones((zs) =>
+        zs.map((z) =>
+          z.id === draggingId
+            ? { ...z, points: z.points.map(([x, y]) => [x + dx, y + dy] as PctPoint) }
+            : z
+        )
+      );
+      dragStartRef.current = { id: draggingId, start: p };
+    }
   };
 
   const onCanvasMouseUp = () => {
     setDraggingId(null);
+    setResizingId(null);
+    setResizeDirection(null);
     dragStartRef.current = null;
+    resizeStartRef.current = null;
   };
 
   // const onCanvasMouseLeave = () => {
@@ -535,7 +720,62 @@ const StadiumMapEditor: React.FC<{
     setDraftPoints([]);
     setDraftName("");
     setTool("idle");
+    setSelectedShapeId(null);
     // keep toilets — they are per-layout and should persist by design
+  };
+
+  const deleteSelectedShape = () => {
+    if (selectedShapeId) {
+      setZones(prev => prev.filter(zone => zone.id !== selectedShapeId));
+      setSelectedShapeId(null);
+    }
+  };
+
+  // Render resize handles for selected shape
+  const renderResizeHandles = (zone: EditorZone) => {
+    if (selectedShapeId !== zone.id) return null;
+    
+    const bounds = getShapeBounds(zone.points);
+    const handleSize = 1.0; // Reduced from 1.5 to 1.0
+    const handles = [
+      { direction: 'nw', x: bounds.x, y: bounds.y },
+      { direction: 'n', x: bounds.x + bounds.width / 2, y: bounds.y },
+      { direction: 'ne', x: bounds.x + bounds.width, y: bounds.y },
+      { direction: 'e', x: bounds.x + bounds.width, y: bounds.y + bounds.height / 2 },
+      { direction: 'se', x: bounds.x + bounds.width, y: bounds.y + bounds.height },
+      { direction: 's', x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height },
+      { direction: 'sw', x: bounds.x, y: bounds.y + bounds.height },
+      { direction: 'w', x: bounds.x, y: bounds.y + bounds.height / 2 }
+    ];
+
+    return handles.map((handle, index) => (
+      <circle
+        key={index}
+        className="resize-handle"
+        data-direction={handle.direction}
+        cx={handle.x}
+        cy={handle.y}
+        r={handleSize}
+        fill="#3b82f6"
+        stroke="#ffffff"
+        strokeWidth={0.2}
+        style={{ cursor: getResizeCursor(handle.direction) }}
+      />
+    ));
+  };
+
+  const getResizeCursor = (direction: string) => {
+    const cursors: { [key: string]: string } = {
+      'nw': 'nw-resize',
+      'n': 'n-resize',
+      'ne': 'ne-resize',
+      'e': 'e-resize',
+      'se': 'se-resize',
+      's': 's-resize',
+      'sw': 'sw-resize',
+      'w': 'w-resize'
+    };
+    return cursors[direction] || 'default';
   };
 
   const handleSvgUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -1084,6 +1324,17 @@ const StadiumMapEditor: React.FC<{
               </button>
               <button
                 type="button"
+                onClick={() => setTool((t) => (t === "add-circle" ? "idle" : "add-circle"))}
+                className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${
+                  tool === "add-circle"
+                    ? "bg-blue-600 text-white"
+                    : "bg-white text-gray-800 border border-gray-300 hover:bg-gray-50"
+                }`}
+              >
+                <div className="h-4 w-4 rounded-full border-2 border-current" /> Circle
+              </button>
+              <button
+                type="button"
                 onClick={() =>
                   setTool((t) => (t === "draw-section" ? "idle" : "draw-section"))
                 }
@@ -1095,25 +1346,26 @@ const StadiumMapEditor: React.FC<{
               >
                 <Map className="h-4 w-4" /> Polygon
               </button>
-              <button
-                type="button"
-                onClick={() => setTool((t) => (t === "move" ? "idle" : "move"))}
-                className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${
-                  tool === "move"
-                    ? "bg-blue-600 text-white"
-                    : "bg-white text-gray-800 border border-gray-300 hover:bg-gray-50"
-                }`}
-              >
-                <MousePointer2 className="h-4 w-4" /> Move
-              </button>
 
-              {(tool === "add-rect" ||
+              {selectedShapeId && (
+                <button
+                  type="button"
+                  onClick={deleteSelectedShape}
+                  className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm bg-red-600 text-white hover:bg-red-700"
+                >
+                  🗑️ Delete Selected
+                </button>
+              )}
+
+              {(tool === "add-rect" || tool === "add-circle" ||
                 (tool === "draw-section" && draftPoints.length >= 3)) && (
                 <button
                   type="button"
                   onClick={() => {
                     if (tool === "add-rect") {
                       addRectZone();
+                    } else if (tool === "add-circle") {
+                      addCircleZone();
                     } else if (tool === "draw-section") {
                       finishSection();
                     }
@@ -1278,14 +1530,17 @@ const StadiumMapEditor: React.FC<{
                 {(layout === "custom" ? zones : fixedZones).map((z) => (
                   <g
                     key={z.id}
+                    data-shape-id={z.id}
                     onMouseDown={(e) => onZoneMouseDown(z.id, e)}
-                    style={{ cursor: layout === "custom" && tool === "move" ? "move" : "default" }}
+                    style={{ 
+                      cursor: layout === "custom" ? "move" : "default" 
+                    }}
                   >
                     <polygon
                       points={z.points.map((p) => `${p[0]},${p[1]}`).join(" ")}
-                      fill={Z_FILL}
-                      stroke={Z_STROKE}
-                      strokeWidth={0.4}
+                      fill={selectedShapeId === z.id ? "rgba(59,130,246,0.3)" : Z_FILL}
+                      stroke={selectedShapeId === z.id ? "#3b82f6" : Z_STROKE}
+                      strokeWidth={selectedShapeId === z.id ? 0.8 : 0.4}
                     />
                     <text
                       x={z.points.reduce((s, p) => s + p[0], 0) / z.points.length}
@@ -1298,6 +1553,8 @@ const StadiumMapEditor: React.FC<{
                     >
                       {z.name}
                     </text>
+                    {/* Render resize handles for selected custom shapes */}
+                    {layout === "custom" && renderResizeHandles(z)}
                   </g>
                 ))}
               </>
@@ -1360,11 +1617,13 @@ const StadiumMapEditor: React.FC<{
           <div className="absolute bottom-3 left-3 text-xs text-gray-600 bg-white/90 backdrop-blur rounded-lg px-3 py-2 border border-gray-200 shadow-sm">
             {layout === "custom"
               ? tool === "add-rect"
-                ? "Click 'Confirm' to add a rectangle at the center, then use the Move tool to reposition it"
+                ? "Click 'Confirm' to add a rectangle at the center, then drag to move it"
+                : tool === "add-circle"
+                ? "Click 'Confirm' to add a circle at the center, then drag to move it"
                 : tool === "draw-section"
                 ? "Click to add polygon vertices • Click 'Finish' when done"
-                : tool === "move"
-                ? "Click and drag to move shapes"
+                : tool === "idle"
+                ? "Click shapes to select them • Drag to move • Use resize handles to resize"
                 : tool === "add-exit"
                 ? "Click anywhere to place an exit"
                 : "Select a tool to begin editing"
