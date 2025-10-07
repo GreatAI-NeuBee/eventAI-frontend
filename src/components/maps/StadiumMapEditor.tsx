@@ -156,8 +156,9 @@ type LayoutMode = "circular" | "rect" | "custom";
 
 const StadiumMapEditor: React.FC<{
   initialLayers?: number;
+  maxExits?: number;
   onChange?: (json: StadiumMapJSON) => void;
-}> = ({ initialLayers = 2, onChange }) => {
+}> = ({ initialLayers = 2, maxExits = 7, onChange }) => {
   // UI State
   const [layout, setLayout] = React.useState<LayoutMode>("circular");
 
@@ -174,11 +175,11 @@ const StadiumMapEditor: React.FC<{
 
   // Circular config
   const [layers, setLayers] = React.useState<number>(
-    clamp(Math.max(initialLayers, 1), LIMITS.LAYERS_MIN, LIMITS.LAYERS_MAX)
+    clamp(Math.max(initialLayers, 2), LIMITS.LAYERS_MIN, LIMITS.LAYERS_MAX)
   );
   const [sectionsPerLayer, setSectionsPerLayer] = React.useState<number[]>(
     Array.from({ length: layers }, (_, i) =>
-      clamp(i === 0 ? 1 : 4, LIMITS.SECTIONS_MIN, LIMITS.SECTIONS_MAX)
+      clamp(i === 0 ? 2 : 4, LIMITS.SECTIONS_MIN, LIMITS.SECTIONS_MAX)
     )
   );
 
@@ -521,6 +522,9 @@ const StadiumMapEditor: React.FC<{
     // Exits
     if (tool === "add-exit") {
       if (layout === "custom") {
+        if (exits.length >= maxExits) {
+          return; // Don't add more exits if limit reached
+        }
         const id = `exit-${Date.now()}`;
         setExits((prev) => [
           ...prev,
@@ -553,6 +557,9 @@ const StadiumMapEditor: React.FC<{
         if (existingIdx >= 0) {
           setExits((prev) => prev.filter((_, i) => i !== existingIdx));
         } else {
+          if (exits.length >= maxExits) {
+            return; // Don't add more exits if limit reached
+          }
           const id = `exit-${Date.now()}`;
           setExits((prev) => [
             ...prev,
@@ -1056,14 +1063,15 @@ const StadiumMapEditor: React.FC<{
   React.useEffect(() => {
     setSectionsPerLayer((prev) => {
       const next = [...prev];
-      // Extend or shrink to match layers
-      if (layers > next.length) {
-        while (next.length < layers) {
-          next.push(clamp(4, LIMITS.SECTIONS_MIN, LIMITS.SECTIONS_MAX));
-        }
-      } else {
-        next.length = layers;
-      }
+       // Extend or shrink to match layers
+       if (layers > next.length) {
+         while (next.length < layers) {
+           const defaultSections = next.length === 0 ? 2 : 4; // First layer gets 2, others get 4
+           next.push(clamp(defaultSections, LIMITS.SECTIONS_MIN, LIMITS.SECTIONS_MAX));
+         }
+       } else {
+         next.length = layers;
+       }
       // Clamp each layer’s sections
       for (let i = 0; i < next.length; i++) {
         next[i] = clamp(
@@ -1264,19 +1272,28 @@ const StadiumMapEditor: React.FC<{
             <button
               type="button"
               onClick={() => setTool((t) => (t === "add-exit" ? "idle" : "add-exit"))}
+              disabled={exits.length >= maxExits}
               className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${
-                tool === "add-exit"
-                  ? "bg-red-600 text-white"
-                  : "bg-white text-gray-800 border border-gray-300 hover:bg-gray-50"
+                exits.length >= maxExits
+                  ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                  : tool === "add-exit"
+                  ? "bg-red-600 text-white cursor-pointer"
+                  : "bg-white text-gray-800 border border-gray-300 hover:bg-gray-50 cursor-pointer"
               }`}
               title={
-                layout === "custom"
+                exits.length >= maxExits
+                  ? `Maximum ${maxExits} exits reached`
+                  : layout === "custom"
                   ? "Click anywhere to place exit"
                   : "Click highlighted spots to place/remove exit"
               }
             >
               <Triangle className="h-4 w-4" />
-              {tool === "add-exit" ? "Placing Exits" : "Add Exit"}
+              {exits.length >= maxExits 
+                ? `Exits (${exits.length}/${maxExits})` 
+                : tool === "add-exit" 
+                ? "Placing Exits" 
+                : "Add Exit"}
             </button>
 
             <button
@@ -1286,8 +1303,8 @@ const StadiumMapEditor: React.FC<{
               }
               className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${
                 tool === "add-toilet"
-                  ? "bg-emerald-600 text-white"
-                  : "bg-white text-gray-800 border border-gray-300 hover:bg-gray-50"
+                  ? "bg-emerald-600 text-white cursor-pointer"
+                  : "bg-white text-gray-800 border border-gray-300 hover:bg-gray-50 cursor-pointer"
               }`}
               title="Click anywhere to place a toilet"
             >
@@ -1298,7 +1315,7 @@ const StadiumMapEditor: React.FC<{
             <button
               type="button"
               onClick={clearAll}
-              className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 hover:bg-gray-50"
+              className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 hover:bg-gray-50 cursor-pointer"
             >
               <RotateCcw className="h-4 w-4" /> Reset
             </button>
@@ -1316,8 +1333,8 @@ const StadiumMapEditor: React.FC<{
                 onClick={() => setTool((t) => (t === "add-rect" ? "idle" : "add-rect"))}
                 className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${
                   tool === "add-rect"
-                    ? "bg-blue-600 text-white"
-                    : "bg-white text-gray-800 border border-gray-300 hover:bg-gray-50"
+                    ? "bg-blue-600 text-white cursor-pointer"
+                    : "bg-white text-gray-800 border border-gray-300 hover:bg-gray-50 cursor-pointer"
                 }`}
               >
                 <Square className="h-4 w-4" /> Rectangle
@@ -1326,9 +1343,9 @@ const StadiumMapEditor: React.FC<{
                 type="button"
                 onClick={() => setTool((t) => (t === "add-circle" ? "idle" : "add-circle"))}
                 className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${
-                  tool === "add-circle"
-                    ? "bg-blue-600 text-white"
-                    : "bg-white text-gray-800 border border-gray-300 hover:bg-gray-50"
+                  tool === "draw-section"
+                    ? "bg-blue-600 text-white cursor-pointer"
+                    : "bg-white text-gray-800 border border-gray-300 hover:bg-gray-50 cursor-pointer"
                 }`}
               >
                 <div className="h-4 w-4 rounded-full border-2 border-current" /> Circle
@@ -1339,9 +1356,9 @@ const StadiumMapEditor: React.FC<{
                   setTool((t) => (t === "draw-section" ? "idle" : "draw-section"))
                 }
                 className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${
-                  tool === "draw-section"
-                    ? "bg-blue-600 text-white"
-                    : "bg-white text-gray-800 border border-gray-300 hover:bg-gray-50"
+                  tool === "move"
+                    ? "bg-blue-600 text-white cursor-pointer"
+                    : "bg-white text-gray-800 border border-gray-300 hover:bg-gray-50 cursor-pointer"
                 }`}
               >
                 <Map className="h-4 w-4" /> Polygon
@@ -1370,7 +1387,7 @@ const StadiumMapEditor: React.FC<{
                       finishSection();
                     }
                   }}
-                  className="inline-flex items-center gap-2 rounded-lg bg-green-600 px-3 py-2 text-sm text-white hover:bg-green-700"
+                  className="inline-flex items-center gap-2 rounded-lg bg-green-600 px-3 py-2 text-sm text-white hover:bg-green-700 cursor-pointer"
                 >
                   Confirm
                 </button>
@@ -1414,7 +1431,7 @@ const StadiumMapEditor: React.FC<{
               type="button"
               onClick={removeLastPoint}
               disabled={!draftPoints.length}
-              className="flex-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm hover:bg-gray-50 disabled:opacity-50"
+              className="flex-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm hover:bg-gray-50 disabled:opacity-50 cursor-pointer"
             >
               Undo Last
             </button>
@@ -1422,7 +1439,7 @@ const StadiumMapEditor: React.FC<{
               type="button"
               onClick={clearDraft}
               disabled={!draftPoints.length}
-              className="flex-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm hover:bg-gray-50 disabled:opacity-50"
+              className="flex-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm hover:bg-gray-50 disabled:opacity-50 cursor-pointer"
             >
               Clear
             </button>
@@ -1430,7 +1447,7 @@ const StadiumMapEditor: React.FC<{
               type="button"
               onClick={finishSection}
               disabled={draftPoints.length < 3}
-              className="flex-1 rounded-lg bg-blue-600 px-3 py-2 text-sm text-white hover:bg-blue-700 disabled:opacity-50"
+              className="flex-1 rounded-lg bg-blue-600 px-3 py-2 text-sm text-white hover:bg-blue-700 disabled:opacity-50 cursor-pointer"
             >
               Finish
             </button>
@@ -1515,7 +1532,7 @@ const StadiumMapEditor: React.FC<{
                       <defs>
                         <path id={pathId} d={d} />
                       </defs>
-                      <text fontSize={2.2} fill="#111827" fontWeight="bold">
+                      <text fontSize={2.2} fill="#111827" fontWeight="bold" style={{ userSelect: "none" }}>
                         <textPath href={`#${pathId}`} startOffset="50%" textAnchor="middle">
                           {`S${z.sectionIndex ?? 1}`}
                         </textPath>
@@ -1550,6 +1567,7 @@ const StadiumMapEditor: React.FC<{
                       fontSize={2.2}
                       fill="#111827"
                       fontWeight="bold"
+                      style={{ userSelect: "none" }}
                     >
                       {z.name}
                     </text>
@@ -1562,7 +1580,7 @@ const StadiumMapEditor: React.FC<{
 
             {/* ==== EXITS (rendered outside clipped area for circular) ==== */}
             {exits.map((e) => (
-              <g key={e.id}>
+              <g key={e.id} style={{ cursor: "pointer" }}>
                 <circle cx={e.position[0]} cy={e.position[1]} r={1.2} fill={EXIT_FILL} />
                 {/* label on hover only? If you want capacity on hover, add hover state like exitsHoverId */}
                 {/* Keeping text hidden per your last change */}
@@ -1576,7 +1594,7 @@ const StadiumMapEditor: React.FC<{
                   key={t.id}
                   onMouseEnter={() => setHoverToiletId(t.id)}
                   onMouseLeave={() => setHoverToiletId(null)}
-                  style={{ cursor: tool === "add-toilet" ? "pointer" : "default" }}
+                  style={{ cursor: "pointer" }}
                 >
                   <text
                     x={t.position[0]}
@@ -1609,7 +1627,7 @@ const StadiumMapEditor: React.FC<{
             {layout !== "custom" &&
               tool === "add-exit" &&
               candidateExits.map((p, i) => (
-                <circle key={i} cx={p[0]} cy={p[1]} r={1.0} fill="rgba(34,197,94,0.6)" />
+                <circle key={i} cx={p[0]} cy={p[1]} r={1.0} fill="rgba(34,197,94,0.6)" style={{ cursor: "pointer" }} />
               ))}
           </svg>
 

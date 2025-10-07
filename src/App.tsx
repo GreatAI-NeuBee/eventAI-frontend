@@ -9,6 +9,7 @@ import NewEvent from './pages/NewEvent';
 import EventDetails from './pages/EventDetails';
 import OnGoingEvent from './pages/OnGoingEvent';
 import User from './pages/User';
+import QRCodeAttachments from './pages/QRCodeAttachments';
 
 // Import API testing utilities (available in browser console)
 import './utils/apiTest';
@@ -19,8 +20,9 @@ function App() {
       <GoogleMapsProvider>
         <Router>
           <Routes>
-          {/* Landing page (no layout) */}
+          {/* Public pages (no authentication required) */}
           <Route path="/" element={<Landing />} />
+          <Route path="/qrCodeAttachments" element={<QRCodeAttachments />} />
           
           {/* Protected Dashboard routes (with layout) */}
           <Route path="/dashboard" element={

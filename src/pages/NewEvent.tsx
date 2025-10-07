@@ -288,13 +288,20 @@ const NewEvent: React.FC = () => {
               <h2 className="text-xl font-semibold text-gray-900">Venue Layout Builder</h2>
               <p className="text-sm text-gray-600 mt-1">Design your venue sections and exits</p>
             </div>
-            <div className="flex items-center gap-3">
-              <DesignInCanvaCTA />
-              <div className="text-right">
-                {venueLayoutJson ? (
-                  <div className="text-sm space-y-1">
-                    <div className="text-green-600 font-medium">
-                      ✓ {venueLayoutJson.sections} sections, {venueLayoutJson.exits} exits
+            <div className="text-right">
+              {venueLayoutJson ? (
+                <div className="text-sm space-y-1">
+                  <div className="text-green-600 font-medium">
+                    ✓ {venueLayoutJson.sections} sections, {venueLayoutJson.exits}/7 exits
+                  </div>
+                  {venueLayoutJson.exits >= 7 && (
+                    <div className="text-orange-600 text-xs">
+                      ⚠️ Maximum exits reached
+                    </div>
+                  )}
+                  {venueLayoutJson.toiletsList && venueLayoutJson.toiletsList.length > 0 && (
+                    <div className="text-blue-600 text-xs">
+                      + {venueLayoutJson.toiletsList.length} facilities
                     </div>
                     {venueLayoutJson.toiletsList && venueLayoutJson.toiletsList.length > 0 && (
                       <div className="text-blue-600 text-xs">
@@ -310,9 +317,9 @@ const NewEvent: React.FC = () => {
               </div>
             </div>
           </div>
-
-          <StadiumMapEditor
-            initialLayers={2}
+          <StadiumMapEditor 
+            initialLayers={2} 
+            maxExits={7}
             onChange={handleVenueLayoutChange}
           />
           
