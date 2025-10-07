@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef, useContext } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { AlertTriangle, TrendingUp, Calendar, MapPin, Play } from 'lucide-react';
+import { AlertTriangle, TrendingUp, Calendar, MapPin, Play, FileDown } from 'lucide-react';
 import GlassCard from '../components/common/GlassCard';
 import Button from '../components/common/Button';
 import Spinner from '../components/common/Spinner';
@@ -157,13 +157,17 @@ const EventHeader: React.FC<{
   isForecastLoading: boolean;
   handleGenerateForecast: () => void;
   handleViewOngoingEvent: () => void;
+  handleGenerateReport: () => void;
+  isGeneratingReport: boolean;
   getStatusBadge: (status: EventData['status']) => React.ReactNode;
 }> = ({ 
   currentEvent, 
   forecastResult, 
   isForecastLoading, 
   handleGenerateForecast, 
-  handleViewOngoingEvent, 
+  handleViewOngoingEvent,
+  handleGenerateReport,
+  isGeneratingReport,
   getStatusBadge 
 }) => {
   const { isDarkBackground, isRainBackground } = useContext(WeatherContext);
@@ -205,14 +209,34 @@ const EventHeader: React.FC<{
             </Button>
           )}
           {forecastResult && Object.keys(forecastResult).length > 0 && (
-            <Button 
-              onClick={handleViewOngoingEvent}
-              variant="primary"
-              className="bg-green-600 hover:scale-100 hover:bg-green-600 hover:shadow-md"
-            >
-              <Play className="h-4 w-4 mr-2" />
-              View Ongoing Event
-            </Button>
+            <>
+              <Button 
+                onClick={handleGenerateReport}
+                disabled={isGeneratingReport}
+                variant="secondary"
+                className="bg-indigo-600 hover:scale-100 hover:bg-indigo-700 hover:shadow-md"
+              >
+                {isGeneratingReport ? (
+                  <>
+                    <Spinner size="sm" className="mr-2" />
+                    Generating...
+                  </>
+                ) : (
+                  <>
+                    <FileDown className="h-4 w-4 mr-2" />
+                    Generate Report
+                  </>
+                )}
+              </Button>
+              <Button 
+                onClick={handleViewOngoingEvent}
+                variant="primary"
+                className="bg-green-600 hover:scale-100 hover:bg-green-600 hover:shadow-md"
+              >
+                <Play className="h-4 w-4 mr-2" />
+                View Ongoing Event
+              </Button>
+            </>
           )}
         </div>
       </div>
@@ -229,6 +253,7 @@ const EventDetails: React.FC = () => {
   const [isForecastLoading, setIsForecastLoading] = useState(false);
   const [forecastError, setForecastError] = useState<string | null>(null);
   const [isLoadingEventDetails, setIsLoadingEventDetails] = useState(true);
+  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
   
   // Ref to track if simulation monitoring is already started for this event
   const monitoringEventId = useRef<string | null>(null);
@@ -544,6 +569,43 @@ const EventDetails: React.FC = () => {
     }
   };
 
+  // Handle report generation
+  const handleGenerateReport = async () => {
+    if (!eventId || !currentEvent) return;
+    
+    setIsGeneratingReport(true);
+    
+    try {
+      console.log('📄 Generating report for event:', eventId);
+      
+      // Call API with only eventId - backend will handle all data collection
+      const response = await eventAPI.generateForecastReport(eventId);
+      const reportResult = response.data.data;
+      
+      console.log('✅ Report generated successfully:', reportResult);
+      
+      // Download the file
+      if (reportResult.reportUrl) {
+        // Create a temporary link and trigger download
+        const link = document.createElement('a');
+        link.href = reportResult.reportUrl;
+        link.download = reportResult.filename || 'forecast-report.pdf';
+        link.target = '_blank';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        console.log(`✅ Report downloaded: ${reportResult.filename}`);
+      }
+      
+    } catch (error: any) {
+      console.error('❌ Error generating report:', error);
+      setForecastError(error.response?.data?.message || error.message || 'Failed to generate report');
+    } finally {
+      setIsGeneratingReport(false);
+    }
+  };
+
   // Handle venue configuration save
   const handleVenueConfigSave = async (updatedConfig: VenueLayoutEditorData) => {
     try {
@@ -675,6 +737,8 @@ const EventDetails: React.FC = () => {
           isForecastLoading={isForecastLoading}
           handleGenerateForecast={handleGenerateForecast}
           handleViewOngoingEvent={handleViewOngoingEvent}
+          handleGenerateReport={handleGenerateReport}
+          isGeneratingReport={isGeneratingReport}
           getStatusBadge={getStatusBadge}
         />
 

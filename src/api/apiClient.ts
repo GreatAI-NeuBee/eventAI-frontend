@@ -179,4 +179,53 @@ export const eventAPI = {
       }
     });
   },
+
+  // Generate forecast report
+  generateForecastReport: (eventId: string, reportData?: {
+    aiPopularityAnalysis?: {
+      popularityLevel?: string;
+      popularityScore?: number;
+      audienceDemographics?: {
+        families?: number;
+        youngAdults?: number;
+        seniors?: number;
+        tourists?: number;
+      };
+      historicalIncidents?: string[];
+    };
+    weatherForecast?: {
+      temperature?: number;
+      condition?: string;
+      precipitation?: number;
+      windSpeed?: number;
+      recommendations?: string[];
+    };
+    nearestParking?: {
+      facilities?: Array<{
+        name?: string;
+        distance?: string;
+        capacity?: number;
+        walkingTime?: number;
+        availability?: string;
+      }>;
+      recommendations?: string[];
+    };
+    transitForecast?: {
+      options?: Array<{
+        name?: string;
+        type?: string;
+        route?: string;
+        frequency?: number;
+        walkingDistance?: string;
+        expectedCrowding?: string;
+      }>;
+      recommendations?: string[];
+    };
+  }) => {
+    console.log('📄 Using real API for generateForecastReport:', `${apiClient.defaults.baseURL}/forecast/${eventId}/report`);
+    console.log('📊 Report data being sent:', reportData);
+    return apiClient.post(`/forecast/${eventId}/report`, reportData || {}, {
+      headers: { 'Content-Type': 'application/json' }
+    });
+  },
 };
