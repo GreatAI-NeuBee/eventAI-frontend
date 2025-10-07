@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Design Your Venue Layout in Canva</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root { color-scheme: light dark; }
+    body{font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;margin:0;background:#0b1220;color:#e7ecf3}
+    .wrap{max-width:900px;margin:0 auto;padding:32px}
+    h1{font-size:28px;margin:0 0 8px}
+    p{color:#b8c0cc}
+    .card{background:#111827;border:1px solid #1f2a3a;border-radius:14px;padding:20px;margin:20px 0}
+    .btn{display:inline-block;background:#7c5cff;color:white;text-decoration:none;padding:12px 16px;border-radius:10px;font-weight:700}
+    .btn:hover{opacity:.9}
+    .btn-ghost{background:transparent;border:1px solid #374151;color:#e7ecf3}
+    .grid{display:grid;gap:16px;grid-template-columns:1fr 1fr}
+    @media (max-width:720px){.grid{grid-template-columns:1fr}}
+    code{background:#0e1726;border:1px solid #1e293b;padding:2px 6px;border-radius:6px}
+    small{color:#9aa6b2}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Design Your Venue Layout in Canva</h1>
+    <p>Draw zones (polygons), exits (circles), and toilets (circles) visually. Export SVG from Canva, then tag it with metadata so our importer can read it.</p>
+
+    <div class="card">
+      <h2 style="margin-top:0">Step 1 — Open Canva</h2>
+      <p>Start a design, keep shapes simple (polygons for zones, circles for exits & toilets), avoid flatten/masks.</p>
+      <!-- Replace the href with your real Canva template share URL if you have one -->
+      <a class="btn" href="https://www.canva.com/" target="_blank" rel="noopener">Open Canva</a>
+      <a class="btn btn-ghost" href="/canva-venue-template.svg" download>Download SVG Template (optional)</a>
+      <p style="margin-top:12px"><small>Tip: Upload the SVG template into Canva and just reposition/resize shapes.</small></p>
+    </div>
+
+    <div class="card">
+      <h2 style="margin-top:0">Step 2 — Export from Canva</h2>
+      <p>Choose <b>Download → SVG</b>. Your file should include a <code>viewBox</code> on the root <code>&lt;svg&gt;</code>.</p>
+    </div>
+
+    <div class="card">
+      <h2 style="margin-top:0">Step 3 — Add required metadata</h2>
+      <p>Canva SVGs are visual-only. Add <code>class</code> and <code>data-*</code> attributes using this tool:</p>
+      <a class="btn" href="/attribute-tagger.html">Open Attribute Tagger</a>
+      <p><small>This injects <code>class="zone|exit|toilet"</code> and attributes like <code>data-id</code>, <code>data-name</code>, <code>data-layer</code> so your importer can parse it.</small></p>
+    </div>
+
+    <div class="card">
+      <h2 style="margin-top:0">Importer Requirements (summary)</h2>
+      <div class="grid">
+        <div>
+          <h3>Zones (polygons)</h3>
+          <code>&lt;polygon class="zone" data-id="z-101" data-name="North A" data-layer="1" points="x,y ..." /&gt;</code>
+        </div>
+        <div>
+          <h3>Exits / Toilets (circles)</h3>
+          <code>&lt;circle class="exit" data-id="exit-1" data-name="Gate 1" cx="…" cy="…" r="…" /&gt;</code><br/>
+          <code>&lt;circle class="toilet" data-id="wc-1" data-label="WC 1" cx="…" cy="…" r="…" /&gt;</code>
+        </div>
+      </div>
+      <p><small>Coordinates can be any reasonable numbers; the importer normalizes to 100×62.5 space.</small></p>
+    </div>
+  </div>
+</body>
+</html>
+

@@ -36,14 +36,31 @@ const PersonFigure: React.FC<{ position: [number, number, number]; color: string
   );
 };
 
-const CrowdSimulation: React.FC = () => {
+const CrowdSimulation: React.FC<{ venueType?: string }> = ({ venueType = 'circular' }) => {
   const people = useMemo(() => {
     const colors = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', '#8b5cf6', '#ec4899'];
     return Array.from({ length: 25 }, (_, i) => {
-      const angle = (i / 25) * Math.PI * 2;
-      const radius = 2 + Math.random() * 2;
-      const x = Math.cos(angle) * radius + (Math.random() - 0.5) * 0.5;
-      const z = Math.sin(angle) * radius + (Math.random() - 0.5) * 0.5;
+      let x: number, z: number;
+      
+      if (venueType === 'circular') {
+        // Circular venue - people arranged in circular pattern
+        const angle = (i / 25) * Math.PI * 2;
+        const radius = 2 + Math.random() * 2;
+        x = Math.cos(angle) * radius + (Math.random() - 0.5) * 0.5;
+        z = Math.sin(angle) * radius + (Math.random() - 0.5) * 0.5;
+      } else if (venueType === 'rectangle') {
+        // Rectangular venue - people arranged in grid pattern
+        const gridSize = Math.ceil(Math.sqrt(25));
+        const row = Math.floor(i / gridSize);
+        const col = i % gridSize;
+        const spacing = 0.8;
+        x = (col - gridSize / 2) * spacing + (Math.random() - 0.5) * 0.3;
+        z = (row - gridSize / 2) * spacing + (Math.random() - 0.5) * 0.3;
+      } else {
+        // Custom venue - random distribution within a larger area
+        x = (Math.random() - 0.5) * 6;
+        z = (Math.random() - 0.5) * 6;
+      }
       
       return {
         id: i,
@@ -51,7 +68,7 @@ const CrowdSimulation: React.FC = () => {
         color: colors[i % colors.length],
       };
     });
-  }, []);
+  }, [venueType]);
 
   return (
     <group>
@@ -137,6 +154,7 @@ interface Scene3DWithModelsProps {
   carouselInterval?: number;
   showCrowd?: boolean;
   showInfoBanner?: boolean;
+  venueType?: string;
 }
 
 const Scene3DWithModels: React.FC<Scene3DWithModelsProps> = ({
@@ -145,7 +163,8 @@ const Scene3DWithModels: React.FC<Scene3DWithModelsProps> = ({
   showCarousel = true,
   carouselInterval = 5000,
   showCrowd = true,
-  showInfoBanner = true
+  showInfoBanner = true,
+  venueType = 'circular'
 }) => {
   const [currentModelIndex, setCurrentModelIndex] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(false);

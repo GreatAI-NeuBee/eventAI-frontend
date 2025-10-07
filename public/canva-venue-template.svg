@@ -1,0 +1,49 @@
+<svg viewBox="0 0 1000 625" xmlns="http://www.w3.org/2000/svg">
+  <!-- Stadium outline -->
+  <rect x="50" y="50" width="900" height="525" fill="none" stroke="#333" stroke-width="2"/>
+  
+  <!-- Sample zones (polygons) -->
+  <polygon points="100,100 300,100 300,200 100,200" fill="#e3f2fd" stroke="#1976d2" stroke-width="1"/>
+  <polygon points="350,100 550,100 550,200 350,200" fill="#e8f5e8" stroke="#388e3c" stroke-width="1"/>
+  <polygon points="600,100 800,100 800,200 600,200" fill="#fff3e0" stroke="#f57c00" stroke-width="1"/>
+  
+  <polygon points="100,250 300,250 300,350 100,350" fill="#fce4ec" stroke="#c2185b" stroke-width="1"/>
+  <polygon points="350,250 550,250 550,350 350,350" fill="#f3e5f5" stroke="#7b1fa2" stroke-width="1"/>
+  <polygon points="600,250 800,250 800,350 600,350" fill="#e0f2f1" stroke="#00695c" stroke-width="1"/>
+  
+  <polygon points="100,400 300,400 300,500 100,500" fill="#fff8e1" stroke="#f9a825" stroke-width="1"/>
+  <polygon points="350,400 550,400 550,500 350,500" fill="#e8eaf6" stroke="#3f51b5" stroke-width="1"/>
+  <polygon points="600,400 800,400 800,500 600,500" fill="#f1f8e9" stroke="#689f38" stroke-width="1"/>
+  
+  <!-- Sample exits (circles) -->
+  <circle cx="150" cy="50" r="15" fill="#ff5722" stroke="#d32f2f" stroke-width="1"/>
+  <circle cx="500" cy="50" r="15" fill="#ff5722" stroke="#d32f2f" stroke-width="1"/>
+  <circle cx="850" cy="50" r="15" fill="#ff5722" stroke="#d32f2f" stroke-width="1"/>
+  
+  <circle cx="50" cy="200" r="15" fill="#ff5722" stroke="#d32f2f" stroke-width="1"/>
+  <circle cx="950" cy="200" r="15" fill="#ff5722" stroke="#d32f2f" stroke-width="1"/>
+  
+  <circle cx="150" cy="575" r="15" fill="#ff5722" stroke="#d32f2f" stroke-width="1"/>
+  <circle cx="500" cy="575" r="15" fill="#ff5722" stroke="#d32f2f" stroke-width="1"/>
+  <circle cx="850" cy="575" r="15" fill="#ff5722" stroke="#d32f2f" stroke-width="1"/>
+  
+  <!-- Sample toilets (circles) -->
+  <circle cx="200" cy="150" r="12" fill="#4caf50" stroke="#2e7d32" stroke-width="1"/>
+  <circle cx="400" cy="150" r="12" fill="#4caf50" stroke="#2e7d32" stroke-width="1"/>
+  <circle cx="700" cy="150" r="12" fill="#4caf50" stroke="#2e7d32" stroke-width="1"/>
+  
+  <circle cx="200" cy="300" r="12" fill="#4caf50" stroke="#2e7d32" stroke-width="1"/>
+  <circle cx="400" cy="300" r="12" fill="#4caf50" stroke="#2e7d32" stroke-width="1"/>
+  <circle cx="700" cy="300" r="12" fill="#4caf50" stroke="#2e7d32" stroke-width="1"/>
+  
+  <circle cx="200" cy="450" r="12" fill="#4caf50" stroke="#2e7d32" stroke-width="1"/>
+  <circle cx="400" cy="450" r="12" fill="#4caf50" stroke="#2e7d32" stroke-width="1"/>
+  <circle cx="700" cy="450" r="12" fill="#4caf50" stroke="#2e7d32" stroke-width="1"/>
+  
+  <!-- Labels -->
+  <text x="500" y="30" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" fill="#333">Venue Layout Template</text>
+  <text x="20" y="320" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#666" transform="rotate(-90 20 320)">Zones (polygons)</text>
+  <text x="20" y="100" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#666" transform="rotate(-90 20 100)">Exits (red circles)</text>
+  <text x="20" y="200" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#666" transform="rotate(-90 20 200)">Toilets (green circles)</text>
+</svg>
+

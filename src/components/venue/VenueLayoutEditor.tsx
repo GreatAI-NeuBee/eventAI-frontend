@@ -28,6 +28,7 @@ export interface VenueLayoutEditorData {
     context: string;
     analyses: ComprehendAnalysis[];
   };
+  uploadedSvg?: string;
 }
 
 interface GateConfig {
@@ -49,6 +50,9 @@ const VenueLayoutEditor: React.FC<VenueLayoutEditorProps> = ({
     context: string;
     analyses: ComprehendAnalysis[];
   }>({ links: [], context: '', analyses: [] });
+  const [uploadedSvg, setUploadedSvg] = useState<string>('');
+  const [localLayout, setLocalLayout] = useState<StadiumMapJSON>(venueLayout);
+  const [layoutType, setLayoutType] = useState<string>(venueLayout.layoutType || 'circular');
   const [showUpdateNotification, setShowUpdateNotification] = useState<{
     show: boolean;
     gateName: string;
@@ -71,6 +75,13 @@ const VenueLayoutEditor: React.FC<VenueLayoutEditorProps> = ({
     }
   }, [venueLayout]);
 
+  // Initialize layout type from prop only once
+  useEffect(() => {
+    if (venueLayout.layoutType) {
+      setLayoutType(venueLayout.layoutType);
+    }
+  }, []); // Only run once on mount
+
   const updateGateConfig = (exitId: string, field: keyof GateConfig, value: string | number) => {
     setGateConfig(prev => ({
       ...prev,
@@ -85,9 +96,10 @@ const VenueLayoutEditor: React.FC<VenueLayoutEditorProps> = ({
   const handleSave = async () => {
     if (onSave) {
       const updatedData: VenueLayoutEditorData = {
-        venueLayout,
+        venueLayout: { ...localLayout, layoutType },
         gateConfig,
-        attachments
+        attachments,
+        uploadedSvg
       };
       onSave(updatedData);
       setHasChanges(false);
@@ -134,6 +146,153 @@ const VenueLayoutEditor: React.FC<VenueLayoutEditorProps> = ({
       };
     });
     setHasChanges(true);
+  };
+
+  const handleSvgUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!/\.svg$/i.test(file.name)) {
+      alert('Please select an SVG file (.svg)');
+      return;
+    }
+
+    try {
+      const text = await file.text();
+      setUploadedSvg(text);
+      setHasChanges(true);
+
+      // Parse SVG
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(text, 'image/svg+xml');
+
+      const svgEl = doc.querySelector('svg');
+      if (!svgEl) throw new Error('Invalid SVG (no <svg> root)');
+
+      const vb = (svgEl.getAttribute('viewBox') || '').trim();
+      const vbNums = vb.split(/[\s,]+/).map(Number);
+      if (vbNums.length !== 4 || vbNums.some(v => !Number.isFinite(v))) {
+        throw new Error('SVG must have a valid viewBox="minX minY width height"');
+      }
+      const [minX, minY, width, height] = vbNums;
+
+      const norm = (x: number, y: number): [number, number] => {
+        const nx = ((x - minX) / width) * 100;
+        const ny = ((y - minY) / height) * 62.5;
+        return [
+          Math.max(0, Math.min(100, nx)),
+          Math.max(0, Math.min(62.5, ny))
+        ];
+      };
+
+      // Helper: parse points from "x,y x,y" or "x y x y"
+      const parsePoints = (pointsAttr: string): [number, number][] => {
+        const s = (pointsAttr || '').trim();
+        if (!s) return [];
+        let nums: number[] = [];
+        if (s.includes(',')) {
+          // "x,y x,y ..."
+          s.split(/\s+/).forEach(pair => {
+            const [x, y] = pair.split(',').map(Number);
+            if (Number.isFinite(x) && Number.isFinite(y)) {
+              nums.push(x, y);
+            }
+          });
+        } else {
+          // "x y x y ..."
+          s.split(/\s+/).forEach(t => {
+            const n = Number(t);
+            if (Number.isFinite(n)) nums.push(n);
+          });
+        }
+        const out: [number, number][] = [];
+        for (let i = 0; i + 1 < nums.length; i += 2) {
+          out.push([nums[i], nums[i + 1]]);
+        }
+        return out;
+      };
+
+      // ----- ZONES: polygon / polyline with class="zone" or data-type="zone" -----
+      const zones: StadiumMapJSON['zones'] = [];
+      const polys = Array.from(svgEl.querySelectorAll('polygon, polyline'));
+      polys.forEach((el, idx) => {
+        const cls = (el.getAttribute('class') || '').toLowerCase().split(/\s+/);
+        const isZone = cls.includes('zone') || el.getAttribute('data-type') === 'zone';
+        if (!isZone) return;
+
+        const id = el.getAttribute('data-id') || `z-${idx + 1}`;
+        const name = el.getAttribute('data-name') || `Zone ${idx + 1}`;
+        const layer = parseInt(el.getAttribute('data-layer') || '1', 10) || 1;
+
+        const rawPoints = parsePoints(el.getAttribute('points') || '');
+        if (rawPoints.length < 3) return;
+
+        const normalized = rawPoints.map(([x, y]) => norm(x, y));
+        // If it was a polyline and first != last, optionally close it
+        const isPolyline = el.tagName.toLowerCase() === 'polyline';
+        if (isPolyline) {
+          const [fx, fy] = normalized[0];
+          const [lx, ly] = normalized[normalized.length - 1];
+          const closeEnough = Math.hypot(fx - lx, fy - ly) < 0.01;
+          if (!closeEnough) normalized.push([fx, fy]);
+        }
+
+        if (normalized.length >= 3) {
+          zones.push({ id, name, layer, points: normalized });
+        }
+      });
+
+      // ----- EXITS / TOILETS: circle -----
+      const exitsList: NonNullable<StadiumMapJSON['exitsList']> = [];
+      const toiletsList: NonNullable<StadiumMapJSON['toiletsList']> = [];
+
+      Array.from(svgEl.querySelectorAll('circle')).forEach((c, idx) => {
+        const cls = (c.getAttribute('class') || '').toLowerCase().split(/\s+/);
+        const cx = Number(c.getAttribute('cx'));
+        const cy = Number(c.getAttribute('cy'));
+        if (!Number.isFinite(cx) || !Number.isFinite(cy)) return;
+        const position = norm(cx, cy);
+
+        if (cls.includes('exit') || c.getAttribute('data-type') === 'exit') {
+          const id = c.getAttribute('data-id') || `exit-${idx + 1}`;
+          const name = c.getAttribute('data-name') || `Exit ${idx + 1}`;
+          const capAttr = c.getAttribute('data-capacity');
+          const capacity = capAttr ? Number(capAttr) : undefined;
+          exitsList.push({ id, name, position, capacity });
+        } else if (cls.includes('toilet') || c.getAttribute('data-type') === 'toilet') {
+          const id = c.getAttribute('data-id') || `wc-${idx + 1}`;
+          const label = c.getAttribute('data-label') || `WC ${idx + 1}`;
+          const fixturesAttr = c.getAttribute('data-fixtures');
+          const fixtures = fixturesAttr ? Number(fixturesAttr) : undefined;
+          toiletsList.push({ id, position, label, fixtures });
+        }
+      });
+
+      // Build plan & update local state so your counts and visualization update
+      const layersMax = zones.reduce((m, z) => Math.max(m, z.layer || 1), 1) || 1;
+
+      const plan: StadiumMapJSON = {
+        sections: Math.max(1, zones.length),
+        layers: layersMax,
+        exits: exitsList.length,
+        layoutType: 'custom', // Set to custom when importing from SVG
+        zones,
+        exitsList,
+        toiletsList
+      };
+
+      const updatedLayout = { ...plan, layoutType: 'custom' };
+      setLocalLayout(updatedLayout);
+      setLayoutType('custom'); // Update layout type to custom when importing SVG
+
+      console.log(`Parsed SVG -> zones: ${zones.length}, exits: ${exitsList.length}, toilets: ${toiletsList.length}`);
+    } catch (err: any) {
+      console.error('SVG upload parse failed:', err);
+      alert(`Import failed: ${err?.message || String(err)}`);
+    } finally {
+      // allow reselect of same file
+      event.target.value = '';
+    }
   };
 
   const validatePhoneNumber = (phone: string): boolean => {
@@ -202,22 +361,91 @@ const VenueLayoutEditor: React.FC<VenueLayoutEditorProps> = ({
         {/* Venue Overview */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6 p-4 bg-gray-50 rounded-lg">
           <div className="text-center">
-            <div className="text-2xl font-bold text-blue-600">{venueLayout.sections}</div>
+            <div className="text-2xl font-bold text-blue-600">{localLayout.sections}</div>
             <div className="text-sm text-gray-600">Sections</div>
           </div>
           <div className="text-center">
-            <div className="text-2xl font-bold text-green-600">{venueLayout.layers}</div>
+            <div className="text-2xl font-bold text-green-600">{localLayout.layers}</div>
             <div className="text-sm text-gray-600">Layers</div>
           </div>
           <div className="text-center">
-            <div className="text-2xl font-bold text-orange-600">{venueLayout.exits}</div>
+            <div className="text-2xl font-bold text-orange-600">{localLayout.exits}</div>
             <div className="text-sm text-gray-600">Exits/Gates</div>
           </div>
           <div className="text-center">
             <div className="text-2xl font-bold text-purple-600">
-              {venueLayout.toiletsList?.length || 0}
+              {localLayout.toiletsList?.length || 0}
             </div>
             <div className="text-sm text-gray-600">Facilities</div>
+          </div>
+        </div>
+
+        {/* Layout Type Selection */}
+        <div className="mb-6">
+          <h4 className="text-md font-medium text-gray-900 mb-3">Layout Type</h4>
+          <div className="border rounded-lg p-4 bg-white">
+            <div className="flex items-center gap-4">
+              <label className="text-sm font-medium text-gray-700">Select Layout Type:</label>
+              <select 
+                value={layoutType} 
+                onChange={(e) => {
+                  setLayoutType(e.target.value);
+                  setHasChanges(true);
+                }}
+                className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+              >
+                <option value="circular">Circular</option>
+                <option value="rect">Rectangular</option>
+                <option value="custom">Custom</option>
+              </select>
+            </div>
+            <div className="mt-3 text-sm text-gray-600">
+              <strong>Selected:</strong> {layoutType === 'rect' ? 'Rectangular' : layoutType.charAt(0).toUpperCase() + layoutType.slice(1)}
+            </div>
+          </div>
+        </div>
+
+        {/* SVG Upload Section */}
+        <div className="mb-6">
+          <h4 className="text-md font-medium text-gray-900 mb-3">Upload Custom Layout</h4>
+          <div className="border rounded-lg p-4 bg-white">
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Upload SVG Layout File
+              </label>
+              <input
+                type="file"
+                accept=".svg"
+                onChange={handleSvgUpload}
+                className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Upload an SVG file to display as your custom layout
+              </p>
+            </div>
+            
+            {/* Debug Info */}
+            <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs">
+              <strong>Debug Info:</strong> uploadedSvg length: {uploadedSvg.length} | 
+              State: {uploadedSvg ? 'Has SVG' : 'No SVG'} |
+              Preview: {uploadedSvg.substring(0, 50)}...
+            </div>
+
+            {/* SVG Display */}
+            {uploadedSvg && (
+              <div className="mt-4">
+                <div className="flex items-center justify-between mb-2">
+                  <h5 className="text-sm font-medium text-gray-900">Custom Layout Preview</h5>
+                  <span className="text-xs text-green-600 font-medium">✓ Successfully loaded</span>
+                </div>
+                <div className="w-full h-64 bg-gray-50 rounded-lg overflow-hidden border">
+                  <div 
+                    className="h-full w-full"
+                    dangerouslySetInnerHTML={{ __html: uploadedSvg }}
+                  />
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -225,20 +453,23 @@ const VenueLayoutEditor: React.FC<VenueLayoutEditorProps> = ({
         <div className="mb-6">
           <h4 className="text-md font-medium text-gray-900 mb-3">Layout Visualization</h4>
           <div className="border rounded-lg p-4 bg-white">
-            <VenueLayoutVisualization venueLayout={venueLayout} />
+            <VenueLayoutVisualization 
+              venueLayout={localLayout} 
+              uploadedFiles={attachments}
+            />
           </div>
         </div>
       </Card>
 
       {/* Gate Configuration */}
-      {venueLayout.exitsList && venueLayout.exitsList.length > 0 && (
+      {localLayout.exitsList && localLayout.exitsList.length > 0 && (
         <Card className="p-6">
           <h4 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
             <Users className="h-5 w-5" />
-            Gate Configuration ({venueLayout.exitsList.length} gates)
+            Gate Configuration ({localLayout.exitsList.length} gates)
           </h4>
           <div className="space-y-4">
-            {venueLayout.exitsList.map((exit, index) => {
+            {localLayout.exitsList.map((exit, index) => {
               const config = gateConfig[exit.id] || { capacity: 800, picPhoneNumber: '', picName: '' };
               const isPhoneValid = !config.picPhoneNumber || validatePhoneNumber(config.picPhoneNumber);
               
@@ -369,7 +600,7 @@ const VenueLayoutEditor: React.FC<VenueLayoutEditorProps> = ({
               <div>
                 <span className="font-medium text-blue-800">Configured Gates:</span>
                 <span className="ml-2 text-blue-700">
-                  {Object.values(gateConfig).filter(config => config.picPhoneNumber).length} / {venueLayout.exitsList.length}
+                  {Object.values(gateConfig).filter(config => config.picPhoneNumber).length} / {localLayout.exitsList.length}
                 </span>
               </div>
               <div>
@@ -584,7 +815,10 @@ const VenueLayoutEditor: React.FC<VenueLayoutEditorProps> = ({
 };
 
 // Simple venue layout visualization component
-const VenueLayoutVisualization: React.FC<{ venueLayout: StadiumMapJSON }> = ({ venueLayout }) => {
+const VenueLayoutVisualization: React.FC<{ 
+  venueLayout: StadiumMapJSON;
+  uploadedFiles?: { links: string[]; analyses: ComprehendAnalysis[] };
+}> = ({ venueLayout, uploadedFiles }) => {
   const vbW = 100;
   const vbH = 62.5;
 
@@ -655,6 +889,110 @@ const VenueLayoutVisualization: React.FC<{ venueLayout: StadiumMapJSON }> = ({ v
             🚻
           </text>
         ))}
+
+        {/* Render uploaded files as overlays (for custom layouts) */}
+        {uploadedFiles && uploadedFiles.links.length > 0 && (
+          <g>
+            {/* File icons positioned around the layout */}
+            {uploadedFiles.links.map((link, index) => {
+              const fileName = link.split('/').pop() || 'File';
+              const analysis = uploadedFiles.analyses[index];
+              
+              // Position files in a grid pattern around the layout
+              const cols = Math.ceil(Math.sqrt(uploadedFiles.links.length));
+              const row = Math.floor(index / cols);
+              const col = index % cols;
+              const x = 10 + (col * 20); // Start from left side
+              const y = 10 + (row * 15); // Start from top
+              
+              return (
+                <g key={link}>
+                  {/* File icon background */}
+                  <rect
+                    x={x - 2}
+                    y={y - 2}
+                    width="16"
+                    height="12"
+                    fill="rgba(59, 130, 246, 0.1)"
+                    stroke="#3b82f6"
+                    strokeWidth="0.5"
+                    rx="2"
+                  />
+                  {/* File icon */}
+                  <text
+                    x={x + 6}
+                    y={y + 4}
+                    textAnchor="middle"
+                    dominantBaseline="middle"
+                    fontSize="2"
+                    fill="#3b82f6"
+                  >
+                    📄
+                  </text>
+                  {/* File name */}
+                  <text
+                    x={x + 6}
+                    y={y + 8}
+                    textAnchor="middle"
+                    dominantBaseline="middle"
+                    fontSize="1"
+                    fill="#1e40af"
+                    fontWeight="bold"
+                  >
+                    {fileName.length > 8 ? fileName.substring(0, 8) + '...' : fileName}
+                  </text>
+                  
+                  {/* Analysis indicator if available */}
+                  {analysis && (
+                    <circle
+                      cx={x + 14}
+                      cy={y - 1}
+                      r="2"
+                      fill="#10b981"
+                      stroke="white"
+                      strokeWidth="0.5"
+                    />
+                  )}
+                </g>
+              );
+            })}
+            
+            {/* Legend for uploaded files */}
+            <g>
+              <rect
+                x="5"
+                y="5"
+                width="90"
+                height="15"
+                fill="rgba(255, 255, 255, 0.9)"
+                stroke="#e5e7eb"
+                strokeWidth="0.5"
+                rx="3"
+              />
+              <text
+                x="50"
+                y="8"
+                textAnchor="middle"
+                dominantBaseline="middle"
+                fontSize="1.2"
+                fill="#374151"
+                fontWeight="bold"
+              >
+                📁 Uploaded Files ({uploadedFiles.links.length})
+              </text>
+              <text
+                x="50"
+                y="12"
+                textAnchor="middle"
+                dominantBaseline="middle"
+                fontSize="1"
+                fill="#6b7280"
+              >
+                {uploadedFiles.analyses.length > 0 ? `${uploadedFiles.analyses.length} analyzed` : 'Click to view files'}
+              </text>
+            </g>
+          </g>
+        )}
       </svg>
     </div>
   );

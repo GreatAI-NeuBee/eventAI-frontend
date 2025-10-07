@@ -8,11 +8,14 @@ import {
   MousePointer2,
   Plus,
   Minus,
+  Upload,
 } from "lucide-react";
 // If you already have helpers, keep these imports.
 // (Not required by this component to function.)
 // import { addToilet } from "../../utils/toiletutils";
 import type { Toilet } from "../../utils/toiletutils";
+// Import SVG parsing functionality (web-compatible)
+import { XMLParser } from 'fast-xml-parser';
 
 /* =========================
    Types
@@ -40,9 +43,10 @@ type EditorExit = {
 export type StadiumMapJSON = {
   sections: number;
   layers: number;
-  exits: number;
+  exits?: number;
+  layoutType?: string;
   zones: { id: string; name: string; layer: number; points: PctPoint[] }[];
-  exitsList: { id: string; name: string; position: PctPoint; capacity?: number }[];
+  exitsList?: { id: string; name: string; position: PctPoint; capacity?: number }[];
   toiletsList?: { id: string; position: PctPoint; label?: string; fixtures?: number }[];
 };
 
@@ -343,26 +347,27 @@ const StadiumMapEditor: React.FC<{
     return {
       sections: effectiveZones.length,
       layers: maxLayer,
-      exits: effectiveExits.length,
+      exits: effectiveExits.length > 0 ? effectiveExits.length : undefined,
+      layoutType: layout, // Set layoutType based on selected layout mode
       zones: effectiveZones.map(({ id, name, layer, points }) => ({
         id,
         name,
         layer,
         points,
       })),
-      exitsList: effectiveExits.map((e) => ({
+      exitsList: effectiveExits.length > 0 ? effectiveExits.map((e) => ({
         id: e.id,
         name: e.name,
         position: e.position,
         capacity: e.capacity ?? EXIT_DEFAULT_CAP,
-      })),
+      })) : undefined,
       // ✅ Export toilets for the CURRENT layout
-      toiletsList: toilets.map((t) => ({
+      toiletsList: toilets.length > 0 ? toilets.map((t) => ({
         id: t.id,
         position: t.position,
         label: t.label,
         fixtures: t.fixtures,
-      })),
+      })) : undefined,
     };
   }, [effectiveZones, effectiveExits, layers, layout, toilets]);
 
@@ -533,6 +538,281 @@ const StadiumMapEditor: React.FC<{
     // keep toilets — they are per-layout and should persist by design
   };
 
+  const handleSvgUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const svgContent = await file.text();
+      
+      // Parse SVG content
+      const parser = new XMLParser({
+        ignoreAttributes: false,
+        attributeNamePrefix: "",
+        preserveOrder: false,
+        parseAttributeValue: true,
+        parseTagValue: true,
+        trimValues: true
+      });
+      
+      const parsed = parser.parse(svgContent);
+      const svg = parsed.svg;
+      
+      if (!svg) {
+        throw new Error('Invalid SVG file');
+      }
+      
+      // Debug: Log the parsed structure to understand the format
+      console.log('Parsed SVG structure:', JSON.stringify(svg, null, 2));
+      console.log('SVG keys:', Object.keys(svg));
+      console.log('Has polygon:', !!svg.polygon);
+      console.log('Has circle:', !!svg.circle);
+      console.log('Has g:', !!svg.g);
+      
+      // Extract viewBox - try multiple methods
+      let viewBox = svg['@_']?.viewBox;
+      if (!viewBox) {
+        // Try direct string parsing as fallback
+        const viewBoxMatch = svgContent.match(/viewBox\s*=\s*["']([^"']+)["']/);
+        if (!viewBoxMatch) {
+          throw new Error('SVG must have a viewBox attribute');
+        }
+        viewBox = viewBoxMatch[1];
+      }
+      
+      const [minX, minY, width, height] = viewBox.split(/\s+/).map(Number);
+      if (!isFinite(minX) || !isFinite(minY) || !isFinite(width) || !isFinite(height)) {
+        throw new Error('Invalid viewBox values');
+      }
+      
+      // Normalize coordinates to [0..100] × [0..62.5]
+      const normalizePoint = (x: number, y: number): PctPoint => {
+        const normX = ((x - minX) / width) * 100;
+        const normY = ((y - minY) / height) * 62.5;
+        return [
+          Math.max(0, Math.min(100, normX)),
+          Math.max(0, Math.min(62.5, normY))
+        ];
+      };
+      
+      // Parse zones (polygons) - improved parsing logic
+      const importedZones: EditorZone[] = [];
+      const parseZones = (node: any) => {
+        console.log('parseZones called with node:', node);
+        // Handle direct polygon elements
+        if (node.polygon) {
+          console.log('Found polygon elements:', node.polygon);
+          console.log('Polygon count:', Array.isArray(node.polygon) ? node.polygon.length : 1);
+          const polygons = Array.isArray(node.polygon) ? node.polygon : [node.polygon];
+          polygons.forEach((polygon: any) => {
+            console.log('Polygon attrs:', polygon);
+            console.log('Polygon class:', polygon.class);
+            console.log('Polygon data-type:', polygon['data-type']);
+            // Check if this is a zone polygon (multiple ways to identify)
+            const isZone = polygon && (
+              polygon.class === 'zone' || 
+              polygon['data-type'] === 'zone' ||
+              polygon['data-id']?.startsWith('z-') ||
+              polygon['data-name']?.includes('Zone') ||
+              polygon['data-name']?.includes('Section')
+            );
+            
+            console.log('Is zone?', isZone, 'ID:', polygon['data-id'], 'Name:', polygon['data-name']);
+            
+            if (isZone) {
+              const id = polygon['data-id'];
+              const name = polygon['data-name'];
+              const layer = parseInt(polygon['data-layer'] || '1', 10);
+              const points = polygon.points;
+              
+              console.log('Processing zone:', { id, name, layer, points });
+              
+              if (id && name && points) {
+                // Parse coordinates - handle both "x,y x,y" and "x y x y" formats
+                let coords: number[] = [];
+                const pointsStr = points.trim();
+                console.log('Raw points string:', pointsStr);
+                
+                if (pointsStr.includes(',')) {
+                  // Format: "100,50 500,50 500,200 100,200"
+                  const pairs = pointsStr.split(/\s+/);
+                  console.log('Coordinate pairs:', pairs);
+                  pairs.forEach((pair: string) => {
+                    const [x, y] = pair.split(',').map(Number);
+                    if (Number.isFinite(x) && Number.isFinite(y)) {
+                      coords.push(x, y);
+                    }
+                  });
+                } else {
+                  // Format: "100 50 500 50 500 200 100 200"
+                  const nums = pointsStr.split(/\s+/).map(Number);
+                  coords = nums.filter(Number.isFinite);
+                }
+                
+                console.log('Parsed coordinates:', coords);
+                
+                if (coords.length >= 6) { // At least 3 points (6 numbers)
+                  const normalizedPoints: PctPoint[] = [];
+                  for (let i = 0; i < coords.length; i += 2) {
+                    const x = coords[i];
+                    const y = coords[i + 1];
+                    console.log(`Point ${i/2}: x=${x}, y=${y}`);
+                    if (Number.isFinite(x) && Number.isFinite(y)) {
+                      const normalized = normalizePoint(x, y);
+                      console.log(`Normalized point ${i/2}:`, normalized);
+                      normalizedPoints.push(normalized);
+                    }
+                  }
+                  console.log('All normalized points:', normalizedPoints);
+                  if (normalizedPoints.length >= 3) {
+                    const zone = {
+                      id,
+                      name,
+                      layer,
+                      points: normalizedPoints
+                    };
+                    importedZones.push(zone);
+                    console.log('✅ Added zone to importedZones:', zone);
+                    console.log('Current importedZones length:', importedZones.length);
+                  } else {
+                    console.log('❌ Not enough valid points for zone:', normalizedPoints.length);
+                  }
+                } else {
+                  console.log('❌ Not enough coordinates for zone:', coords.length, 'expected at least 6');
+                }
+              } else {
+                console.log('❌ Missing required zone data:', { id, name, points });
+              }
+            }
+          });
+        }
+        
+        // Recursively parse children
+        if (node.g) {
+          const gArray = Array.isArray(node.g) ? node.g : [node.g];
+          gArray.forEach(parseZones);
+        }
+        
+        // Also check for direct polygon children
+        Object.keys(node).forEach(key => {
+          if (key !== '@_' && typeof node[key] === 'object' && node[key] !== null) {
+            parseZones(node[key]);
+          }
+        });
+      };
+      
+      parseZones(svg);
+      console.log('Found zones:', importedZones.length, importedZones);
+      
+      // Parse exits (circles) - improved parsing logic
+      const importedExits: EditorExit[] = [];
+      const parseExits = (node: any) => {
+        // Handle direct circle elements
+        if (node.circle) {
+          const circles = Array.isArray(node.circle) ? node.circle : [node.circle];
+          circles.forEach((circle: any) => {
+            if (circle && (circle.class === 'exit' || circle['data-type'] === 'exit')) {
+              const id = circle['data-id'];
+              const name = circle['data-name'];
+              const cx = parseFloat(circle.cx);
+              const cy = parseFloat(circle.cy);
+              const capacity = circle['data-capacity'] ? parseInt(circle['data-capacity'], 10) : undefined;
+              
+              if (id && name && isFinite(cx) && isFinite(cy)) {
+                const position = normalizePoint(cx, cy);
+                importedExits.push({
+                  id,
+                  name,
+                  position,
+                  capacity
+                });
+              }
+            }
+          });
+        }
+        
+        // Recursively parse children
+        if (node.g) {
+          const gArray = Array.isArray(node.g) ? node.g : [node.g];
+          gArray.forEach(parseExits);
+        }
+        
+        // Also check for direct circle children
+        Object.keys(node).forEach(key => {
+          if (key !== '@_' && typeof node[key] === 'object' && node[key] !== null) {
+            parseExits(node[key]);
+          }
+        });
+      };
+      
+      parseExits(svg);
+      console.log('Found exits:', importedExits.length, importedExits);
+      
+      // Parse toilets (circles) - improved parsing logic
+      const importedToilets: Toilet[] = [];
+      const parseToilets = (node: any) => {
+        // Handle direct circle elements
+        if (node.circle) {
+          const circles = Array.isArray(node.circle) ? node.circle : [node.circle];
+          circles.forEach((circle: any) => {
+            if (circle && (circle.class === 'toilet' || circle['data-type'] === 'toilet')) {
+              const id = circle['data-id'];
+              const cx = parseFloat(circle.cx);
+              const cy = parseFloat(circle.cy);
+              const label = circle['data-label'];
+              const fixtures = circle['data-fixtures'] ? parseInt(circle['data-fixtures'], 10) : undefined;
+              
+              if (id && isFinite(cx) && isFinite(cy)) {
+                const position = normalizePoint(cx, cy);
+                importedToilets.push({
+                  id,
+                  position,
+                  label: label || `Toilet ${id}`,
+                  fixtures: fixtures || 1
+                });
+              }
+            }
+          });
+        }
+        
+        // Recursively parse children
+        if (node.g) {
+          const gArray = Array.isArray(node.g) ? node.g : [node.g];
+          gArray.forEach(parseToilets);
+        }
+        
+        // Also check for direct circle children
+        Object.keys(node).forEach(key => {
+          if (key !== '@_' && typeof node[key] === 'object' && node[key] !== null) {
+            parseToilets(node[key]);
+          }
+        });
+      };
+      
+      parseToilets(svg);
+      console.log('Found toilets:', importedToilets.length, importedToilets);
+      
+      // Update editor state
+      setZones(importedZones);
+      setExits(importedExits);
+      setToiletsForLayout(layout, () => importedToilets);
+      
+      // Switch to custom layout mode to show imported zones
+      setLayout("custom");
+      setTool("idle");
+      
+      // Show success message
+      alert(`Successfully imported layout with ${importedZones.length} zones, ${importedExits.length} exits, and ${importedToilets.length} toilets!`);
+      
+    } catch (error) {
+      console.error('SVG import failed:', error);
+      alert(`Import failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+    
+    // Reset file input
+    event.target.value = '';
+  };
+
   React.useEffect(() => {
     setSectionsPerLayer((prev) => {
       const next = [...prev];
@@ -592,6 +872,32 @@ const StadiumMapEditor: React.FC<{
                   <option value="rect">Rectangular</option>
                   <option value="custom">Custom</option>
                 </select>
+              </div>
+
+              {/* SVG Upload Section */}
+              <div className="flex flex-col gap-2">
+                <label className="text-sm font-medium text-gray-700">
+                  Import Layout
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="file"
+                    id="svg-upload"
+                    accept=".svg,image/svg+xml"
+                    onChange={handleSvgUpload}
+                    className="hidden"
+                  />
+                  <label
+                    htmlFor="svg-upload"
+                    className="flex items-center gap-2 px-3 py-2 text-sm bg-blue-50 text-blue-700 border border-blue-200 rounded-md hover:bg-blue-100 cursor-pointer transition-colors"
+                  >
+                    <Upload className="h-4 w-4" />
+                    Upload SVG Layout
+                  </label>
+                  <span className="text-xs text-gray-500">
+                    Import zones, exits, and toilets from SVG
+                  </span>
+                </div>
               </div>
 
               {layout === "circular" && (

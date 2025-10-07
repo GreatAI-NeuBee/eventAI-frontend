@@ -8,6 +8,7 @@ type StadiumMapJSON = {
   sections: number;
   layers: number;
   exits?: number;
+  layoutType?: string;
   zones: { id: string; name: string; layer: number; points: PctPoint[] }[];
   exitsList?: { id: string; name: string; position: PctPoint; capacity?: number }[];
   toiletsList?: { id: string; position: PctPoint; label?: string; fixtures?: number }[];
@@ -930,21 +931,24 @@ const StadiumPlanSVG: React.FC<{
     `;
   };
 
+  // Check if layout is circular to apply circular restrictions
+  const isCircularLayout = plan.layoutType === "circular";
+
   return (
     <div className="relative w-full aspect-[16/10] rounded-xl overflow-hidden border border-gray-300 bg-white">
       <svg viewBox={`0 0 ${VB_W} ${VB_H}`} preserveAspectRatio="xMidYMid meet" className="h-full w-full">
         <defs>
-          <clipPath id="stadiumClip"><circle cx={cx} cy={cy} r={R} /></clipPath>
+          {isCircularLayout && <clipPath id="stadiumClip"><circle cx={cx} cy={cy} r={R} /></clipPath>}
           <pattern id="exitHatch" width="4" height="4" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
             <rect width="2" height="4" fill="rgba(244,63,94,0.12)" />
           </pattern>
         </defs>
 
-        <circle cx={cx} cy={cy} r={R} fill="#ffffff" stroke="#e5e7eb" strokeWidth={0.8} />
+        {isCircularLayout && <circle cx={cx} cy={cy} r={R} fill="#ffffff" stroke="#e5e7eb" strokeWidth={0.8} />}
 
-        <g clipPath="url(#stadiumClip)">
-          {/* rings */}
-          {Array.from({ length: RINGS }, (_, li) => {
+        <g clipPath={isCircularLayout ? "url(#stadiumClip)" : undefined}>
+          {/* rings - only for circular layout */}
+          {isCircularLayout && Array.from({ length: RINGS }, (_, li) => {
             const rIn = rVoid + li * (ringThick + GAP);
             const rOut = rIn + ringThick;
             return (
@@ -955,8 +959,8 @@ const StadiumPlanSVG: React.FC<{
             );
           })}
 
-          {/* Section dividers */}
-          {sectionAngles.map((angle, i) => {
+          {/* Section dividers - only for circular layout */}
+          {isCircularLayout && sectionAngles.map((angle, i) => {
             const rad = (angle * Math.PI) / 180;
             const x1 = cx + (rVoid - 0.5) * Math.cos(rad);
             const y1 = cy + (rVoid - 0.5) * Math.sin(rad);
@@ -969,8 +973,8 @@ const StadiumPlanSVG: React.FC<{
             );
           })}
 
-          {/* Section hover targets */}
-          {sectionAngles.map((angle, i) => {
+          {/* Section hover targets - only for circular layout */}
+          {isCircularLayout && sectionAngles.map((angle, i) => {
             const a0 = angle;
             const a1 = angle + sectionStep;
             const pct = sectionAgg[i] ?? 0;

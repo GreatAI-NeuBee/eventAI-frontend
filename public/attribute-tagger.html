@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>SVG Attribute Tagger</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  :root { color-scheme: light dark; }
+  body{font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;margin:0;background:#0b1220;color:#e7ecf3}
+  .wrap{max-width:1100px;margin:0 auto;padding:20px}
+  h1{font-size:24px;margin:0 0 12px}
+  .grid{display:grid;gap:16px;grid-template-columns:2fr 1fr}
+  @media (max-width:900px){.grid{grid-template-columns:1fr}}
+  .panel{background:#111827;border:1px solid #1f2a3a;border-radius:12px;padding:14px}
+  label{display:block;margin-top:8px;font-weight:600}
+  input,select{width:100%;padding:8px;border-radius:8px;border:1px solid #334155;background:#0e1726;color:#e7ecf3}
+  button{margin-top:12px;padding:10px 12px;border-radius:10px;border:1px solid #374151;background:#7c5cff;color:white;font-weight:700;cursor:pointer}
+  .btn-ghost{background:transparent}
+  svg{width:100%;height:70vh;background:#0e1726;border-radius:10px;border:1px dashed #334155}
+  .hint{color:#aab3c2}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>SVG Attribute Tagger</h1>
+  <div class="grid">
+    <div class="panel">
+      <input type="file" id="file" accept=".svg,image/svg+xml" />
+      <p class="hint">Drop a Canva-exported SVG. Click polygons or circles to select.</p>
+      <div id="stage"></div>
+    </div>
+    <div class="panel">
+      <h3>Selected Element</h3>
+      <div id="none">Nothing selected. Click a polygon or circle.</div>
+      <div id="form" style="display:none">
+        <label>Kind</label>
+        <select id="kind">
+          <option value="none">None</option>
+          <option value="zone">Zone (polygon)</option>
+          <option value="exit">Exit (circle)</option>
+          <option value="toilet">Toilet (circle)</option>
+        </select>
+        <div id="zoneFields" style="display:none">
+          <label>data-id</label><input id="zid" placeholder="z-101"/>
+          <label>data-name</label><input id="zname" placeholder="North A"/>
+          <label>data-layer</label><input id="zlayer" type="number" min="1" max="20" value="1"/>
+        </div>
+        <div id="exitFields" style="display:none">
+          <label>data-id</label><input id="eid" placeholder="exit-1"/>
+          <label>data-name</label><input id="ename" placeholder="Gate 1"/>
+          <label>data-capacity</label><input id="ecap" type="number" min="0" placeholder="1000"/>
+        </div>
+        <div id="toiletFields" style="display:none">
+          <label>data-id</label><input id="tid" placeholder="wc-1"/>
+          <label>data-label</label><input id="tlabel" placeholder="WC North"/>
+          <label>data-fixtures</label><input id="tfix" type="number" min="0" placeholder="8"/>
+        </div>
+        <button id="apply">Apply</button>
+        <button id="download" class="btn-ghost">Download Tagged SVG</button>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+let svgEl=null, selected=null;
+const file=document.getElementById('file');
+const stage=document.getElementById('stage');
+const form=document.getElementById('form');
+const none=document.getElementById('none');
+
+const kind=document.getElementById('kind');
+const zoneFields=document.getElementById('zoneFields');
+const exitFields=document.getElementById('exitFields');
+const toiletFields=document.getElementById('toiletFields');
+
+const zid=document.getElementById('zid');
+const zname=document.getElementById('zname');
+const zlayer=document.getElementById('zlayer');
+
+const eid=document.getElementById('eid');
+const ename=document.getElementById('ename');
+const ecap=document.getElementById('ecap');
+
+const tid=document.getElementById('tid');
+const tlabel=document.getElementById('tlabel');
+const tfix=document.getElementById('tfix');
+
+function showFields(){
+  zoneFields.style.display=(kind.value==='zone')?'':'none';
+  exitFields.style.display=(kind.value==='exit')?'':'none';
+  toiletFields.style.display=(kind.value==='toilet')?'':'none';
+}
+
+file.addEventListener('change', async e=>{
+  const f=e.target.files?.[0]; if(!f) return;
+  const text=await f.text();
+  stage.innerHTML=text; // render
+  svgEl=stage.querySelector('svg');
+
+  stage.querySelectorAll('polygon,circle').forEach(el=>{
+    el.style.cursor='pointer';
+    el.addEventListener('click', ev=>{
+      ev.stopPropagation();
+      selected=el; none.style.display='none'; form.style.display='';
+      const cls=(selected.getAttribute('class')||'').split(/\s+/);
+      if (cls.includes('zone')) kind.value='zone';
+      else if (cls.includes('exit')) kind.value='exit';
+      else if (cls.includes('toilet')) kind.value='toilet';
+      else kind.value='none';
+      fillFields();
+      showFields();
+    });
+  });
+
+  svgEl?.addEventListener('click', ()=>{
+    selected=null; form.style.display='none'; none.style.display='';
+  });
+});
+
+function fillFields(){
+  if(!selected) return;
+  zid.value=selected.getAttribute('data-id')||'';
+  zname.value=selected.getAttribute('data-name')||'';
+  zlayer.value=selected.getAttribute('data-layer')||'1';
+
+  eid.value=selected.getAttribute('data-id')||'';
+  ename.value=selected.getAttribute('data-name')||'';
+  ecap.value=selected.getAttribute('data-capacity')||'';
+
+  tid.value=selected.getAttribute('data-id')||'';
+  tlabel.value=selected.getAttribute('data-label')||'';
+  tfix.value=selected.getAttribute('data-fixtures')||'';
+}
+
+kind.addEventListener('change', showFields);
+
+document.getElementById('apply').addEventListener('click', ()=>{
+  if(!selected) return;
+  const keep=(selected.getAttribute('class')||'').split(/\s+/).filter(c=>!['zone','exit','toilet'].includes(c));
+  if (kind.value!=='none') keep.push(kind.value);
+  selected.setAttribute('class', keep.join(' ').trim());
+
+  if (kind.value==='zone'){
+    selected.setAttribute('data-id', zid.value);
+    selected.setAttribute('data-name', zname.value);
+    selected.setAttribute('data-layer', zlayer.value||'1');
+  } else {
+    selected.removeAttribute('data-name');
+    selected.removeAttribute('data-layer');
+  }
+
+  if (kind.value==='exit'){
+    selected.setAttribute('data-id', eid.value);
+    selected.setAttribute('data-name', ename.value);
+    if (ecap.value) selected.setAttribute('data-capacity', ecap.value); else selected.removeAttribute('data-capacity');
+  } else {
+    selected.removeAttribute('data-capacity');
+  }
+
+  if (kind.value==='toilet'){
+    selected.setAttribute('data-id', tid.value);
+    if (tlabel.value) selected.setAttribute('data-label', tlabel.value); else selected.removeAttribute('data-label');
+    if (tfix.value) selected.setAttribute('data-fixtures', tfix.value); else selected.removeAttribute('data-fixtures');
+  } else {
+    selected.removeAttribute('data-label');
+    selected.removeAttribute('data-fixtures');
+  }
+
+  alert('Attributes applied.');
+});
+
+document.getElementById('download').addEventListener('click', ()=>{
+  if(!svgEl) return;
+  const xml='<?xml version="1.0" encoding="UTF-8"?>\n'+svgEl.outerHTML.replace(/></g,'>\n<')+'\n';
+  const blob=new Blob([xml],{type:'image/svg+xml;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a'); a.href=url; a.download='venue-layout-tagged.svg'; a.click();
+  URL.revokeObjectURL(url);
+});
+</script>
+</body>
+</html>
+

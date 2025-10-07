@@ -11,8 +11,10 @@ import { eventAPI } from '../api/apiClient';
 import StadiumMapEditor from "../components/maps/StadiumMapEditor";
 import type { StadiumMapJSON } from '../components/maps/StadiumMapEditor';
 import { useAuth } from '../contexts/AuthContext';
+// ⛔️ Removed: import { DesignInCanvaCTA } from '../components/DesignInCanvaCTA';
 
 const NewEvent: React.FC = () => {
+  // SVG upload functionality moved to VenueLayoutEditor
   const navigate = useNavigate();
   const { addEvent, setCurrentEvent, setLoading, setError, isLoading } = useEventStore();
   const { user, backendUser, backendUserLoading } = useAuth();
@@ -27,6 +29,7 @@ const NewEvent: React.FC = () => {
   });
 
   const [venueLayoutJson, setVenueLayoutJson] = useState<StadiumMapJSON | null>(null);
+  const [uploadStatus, setUploadStatus] = useState<string>('');
 
   const [venueLocation, setVenueLocation] = useState<{
     lat: number;
@@ -41,28 +44,19 @@ const NewEvent: React.FC = () => {
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
-    
-    // Clear error when user starts typing
-    if (errors[name]) {
-      setErrors(prev => ({ ...prev, [name]: '' }));
-    }
+    if (errors[name]) setErrors(prev => ({ ...prev, [name]: '' }));
   };
 
   const handleVenueLayoutChange = (venueLayoutData: StadiumMapJSON) => {
     setVenueLayoutJson(venueLayoutData);
-    
-    // Clear error when layout is updated
-    if (errors.venueLayout) {
-      setErrors(prev => ({ ...prev, venueLayout: '' }));
-    }
+    if (errors.venueLayout) setErrors(prev => ({ ...prev, venueLayout: '' }));
   };
+
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
 
-    if (!formData.name.trim()) {
-      newErrors.name = 'Event name is required';
-    }
+    if (!formData.name.trim()) newErrors.name = 'Event name is required';
 
     if (!formData.eventDate) {
       newErrors.eventDate = 'Event date is required';
@@ -70,48 +64,21 @@ const NewEvent: React.FC = () => {
       const eventDate = new Date(formData.eventDate);
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      
-      if (eventDate < today) {
-        newErrors.eventDate = 'Event date cannot be in the past';
-      }
+      if (eventDate < today) newErrors.eventDate = 'Event date cannot be in the past';
     }
 
-    if (!formData.startTime) {
-      newErrors.startTime = 'Start time is required';
+    if (!formData.startTime) newErrors.startTime = 'Start time is required';
+    if (!formData.endTime) newErrors.endTime = 'End time is required';
+    if (formData.startTime && formData.endTime) {
+      const [sh, sm] = formData.startTime.split(':').map(Number);
+      const [eh, em] = formData.endTime.split(':').map(Number);
+      if (eh * 60 + em <= sh * 60 + sm) newErrors.endTime = 'End time must be after start time';
     }
 
-    if (!formData.endTime) {
-      newErrors.endTime = 'End time is required';
-    } else if (formData.startTime && formData.endTime) {
-      // Compare times within the same day
-      const [startHour, startMin] = formData.startTime.split(':').map(Number);
-      const [endHour, endMin] = formData.endTime.split(':').map(Number);
-      
-      const startMinutes = startHour * 60 + startMin;
-      const endMinutes = endHour * 60 + endMin;
-      
-      if (endMinutes <= startMinutes) {
-        newErrors.endTime = 'End time must be after start time';
-      }
-    }
-
-    if (!formData.venue.trim()) {
-      newErrors.venue = 'Venue is required';
-    }
-
-    // Venue layout validation (optional but if provided should have at least 1 section)
-    if (venueLayoutJson && venueLayoutJson.sections === 0) {
-      newErrors.venueLayout = 'Venue layout must have at least one section';
-    }
-
-    if (!venueLocation) {
-      newErrors.venueLocation = 'Please select a venue location on the map';
-    }
-
-    // Check if user is logged in
-    if (!user?.email) {
-      newErrors.userEmail = 'You must be logged in to create an event';
-    }
+    if (!formData.venue.trim()) newErrors.venue = 'Venue is required';
+    if (venueLayoutJson && venueLayoutJson.sections === 0) newErrors.venueLayout = 'Venue layout must have at least one section';
+    if (!venueLocation) newErrors.venueLocation = 'Please select a venue location on the map';
+    if (!user?.email) newErrors.userEmail = 'You must be logged in to create an event';
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -119,17 +86,12 @@ const NewEvent: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!validateForm()) {
-      return;
-    }
+    if (!validateForm()) return;
 
-    // Check if backend user is ready
     if (backendUserLoading) {
       setError('Account setup in progress. Please wait a moment and try again.');
       return;
     }
-
     if (!backendUser) {
       setError('Account setup incomplete. Please refresh the page and try again.');
       return;
@@ -139,57 +101,35 @@ const NewEvent: React.FC = () => {
     setError(null);
 
     try {
-      // Create JSON payload for API submission (using server-expected field names)
-      // Combine date and time fields into datetime format for API
       const dateOfEventStart = `${formData.eventDate}T${formData.startTime}:00Z`;
       const dateOfEventEnd = `${formData.eventDate}T${formData.endTime}:00Z`;
       
       const submitData: any = {
         name: formData.name,
-        dateOfEventStart: dateOfEventStart,
-        dateOfEventEnd: dateOfEventEnd,
+        dateOfEventStart,
+        dateOfEventEnd,
         venue: formData.venue,
         description: formData.description,
+        userEmail: user?.email,
+        venueLocation: venueLocation || undefined,
+        venueLayout: venueLayoutJson || undefined,
       };
-      
-      // Add logged-in user email
-      if (user?.email) {
-        submitData.userEmail = user.email;
-      }
-      
-      if (venueLocation) {
-        submitData.venueLocation = venueLocation;
-      }
-      
-      // Include venue layout JSON if available
-      if (venueLayoutJson) {
-        submitData.venueLayout = venueLayoutJson;
-        console.log('📍 Including venue layout with', venueLayoutJson.sections, 'sections,', venueLayoutJson.exits, 'exits, and', venueLayoutJson.toiletsList?.length || 0, 'toilets');
-      } else {
-        console.log('📍 No venue layout configured for this event');
-      }
 
-      // Debug: Log the JSON data being submitted
       console.log('🚀 Submitting event data to API...');
       console.log('📝 JSON payload:', submitData);
       
       const response = await eventAPI.createEvent(submitData);
-      console.log('✅ Event created successfully:', response.data);
-      
-      // Transform backend response to frontend EventData format
       const backendEvent = response.data.data || response.data;
-      
-      // Map backend status to frontend status
+
       let status: 'draft' | 'processing' | 'completed' | 'error' | 'active' = 'active';
       if (backendEvent.status) {
-        const normalizedStatus = backendEvent.status.toLowerCase();
-        if (normalizedStatus === 'created') {
-          status = 'active';
-        } else if (['draft', 'processing', 'completed', 'error', 'active'].includes(normalizedStatus)) {
-          status = normalizedStatus as typeof status;
+        const normalized = String(backendEvent.status).toLowerCase();
+        if (normalized === 'created') status = 'active';
+        else if (['draft', 'processing', 'completed', 'error', 'active'].includes(normalized)) {
+          status = normalized as typeof status;
         }
       }
-      
+
       const newEvent = {
         id: backendEvent.eventId || backendEvent.id,
         name: backendEvent.name || formData.name,
@@ -204,19 +144,15 @@ const NewEvent: React.FC = () => {
         createdAt: backendEvent.createdAt || new Date().toISOString(),
       };
 
-      // Add event to store
       addEvent(newEvent);
       setCurrentEvent(newEvent);
-
-      // Navigate to dashboard
       navigate(`/event/${newEvent.id}`);
     } catch (error: any) {
       console.error('❌ Error creating event:', error);
       console.error('Error response:', error.response?.data);
       console.error('Error status:', error.response?.status);
-      
+
       let errorMessage = 'Failed to create event';
-      
       if (error.response?.status === 404) {
         errorMessage = 'API endpoint not found. Please check if the server is running at http://localhost:3000';
       } else if (error.response?.status >= 500) {
@@ -226,7 +162,6 @@ const NewEvent: React.FC = () => {
       } else if (error.message) {
         errorMessage = error.message;
       }
-      
       setError(errorMessage);
     } finally {
       setLoading(false);
@@ -279,10 +214,7 @@ const NewEvent: React.FC = () => {
                     value={formData.startTime}
                     onChange={(value) => {
                       setFormData(prev => ({ ...prev, startTime: value }));
-                      // Clear error when user selects a time
-                      if (errors.startTime) {
-                        setErrors(prev => ({ ...prev, startTime: '' }));
-                      }
+                      if (errors.startTime) setErrors(prev => ({ ...prev, startTime: '' }));
                     }}
                     placeholder="Select start time"
                     error={!!(errors.startTime || errors.endTime)}
@@ -297,10 +229,7 @@ const NewEvent: React.FC = () => {
                     value={formData.endTime}
                     onChange={(value) => {
                       setFormData(prev => ({ ...prev, endTime: value }));
-                      // Clear error when user selects a time
-                      if (errors.endTime) {
-                        setErrors(prev => ({ ...prev, endTime: '' }));
-                      }
+                      if (errors.endTime) setErrors(prev => ({ ...prev, endTime: '' }));
                     }}
                     placeholder="Select end time"
                     error={!!(errors.startTime || errors.endTime)}
@@ -324,18 +253,12 @@ const NewEvent: React.FC = () => {
                 value={formData.venue}
                 onValueChange={(value) => {
                   setFormData(prev => ({ ...prev, venue: value }));
-                  // Clear error when user starts typing
-                  if (errors.venue) {
-                    setErrors(prev => ({ ...prev, venue: '' }));
-                  }
+                  if (errors.venue) setErrors(prev => ({ ...prev, venue: '' }));
                 }}
                 onVenueSelected={(location) => {
                   setVenueLocation(location);
                   setFormData(prev => ({ ...prev, venue: location.name || location.address || '' }));
-                  // Clear venue location error if exists
-                  if (errors.venueLocation) {
-                    setErrors(prev => ({ ...prev, venueLocation: '' }));
-                  }
+                  if (errors.venueLocation) setErrors(prev => ({ ...prev, venueLocation: '' }));
                 }}
               />
               {errors.venue && (
@@ -359,8 +282,7 @@ const NewEvent: React.FC = () => {
           </div>
         </Card>
 
-       
-        {/* User Authentication Error */}
+        {/* Venue Layout Builder */}
         <Card>
           <div className="flex items-center justify-between mb-4">
             <div>
@@ -386,8 +308,10 @@ const NewEvent: React.FC = () => {
               )}
             </div>
           </div>
-          <StadiumMapEditor 
-            initialLayers={2} 
+
+
+          <StadiumMapEditor
+            initialLayers={2}
             onChange={handleVenueLayoutChange}
           />
         </Card>
@@ -411,55 +335,7 @@ const NewEvent: React.FC = () => {
           </Button>
           
           <div className="flex space-x-4">
-            {/* <Button
-              type="button"
-              variant="outline"
-              onClick={async (e) => {
-                e.preventDefault();
-                // Navigate to dashboard to run forecast
-                if (validateForm()) {
-                  setLoading(true);
-                  setError(null);
 
-                  try {
-                    // Create FormData for file upload
-                    const submitData = new FormData();
-                    submitData.append('name', formData.name);
-                    submitData.append('capacity', formData.capacity);
-                    submitData.append('date', formData.date);
-                    submitData.append('venue', formData.venue);
-                    submitData.append('description', formData.description);
-                    
-                    if (files.ticketingData) {
-                      submitData.append('ticketingData', files.ticketingData);
-                    }
-                    
-                    if (files.venueLayout) {
-                      submitData.append('venueLayout', files.venueLayout);
-                    }
-
-                    const response = await eventAPI.createEvent(submitData);
-                    const newEvent = response.data;
-
-                    // Add event to store
-                    addEvent(newEvent);
-                    setCurrentEvent(newEvent);
-
-                    // Navigate to dashboard
-                    navigate(`/event/${newEvent.id}`);
-                  } catch (error: any) {
-                    console.error('Error creating event:', error);
-                    setError(error.response?.data?.message || 'Failed to create event');
-                  } finally {
-                    setLoading(false);
-                  }
-                }
-              }}
-              disabled={isLoading}
-            >
-              Create Event & Run Forecast
-            </Button> */}
-            
             <Button
               type="submit"
               loading={isLoading}
