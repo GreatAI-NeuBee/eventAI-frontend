@@ -22,14 +22,18 @@ interface LiveTrafficForecastProps {
 }
 
 const LiveTrafficForecast: React.FC<LiveTrafficForecastProps> = ({
+<<<<<<< HEAD
   venueLocation,
   selectedStation,
   eventDate,
   eventTimeRange
+=======
+  selectedStation
+>>>>>>> f4742c83ccc323228b61ec4d9cb93f973680938e
 }) => {
   const [realTimeData, setRealTimeData] = useState<any>(null);
-  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
-  const [autoRefresh, setAutoRefresh] = useState(true);
+  const [, setLastUpdated] = useState<Date>(new Date());
+  const [autoRefresh] = useState(true);
   
   // Fetch real-time traffic data using Google Maps API
   const fetchRealTimeTrafficData = useCallback(async () => {

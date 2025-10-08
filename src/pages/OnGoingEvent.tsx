@@ -1,10 +1,35 @@
 import React, { useMemo, useState, useEffect } from "react";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { Activity, AlertTriangle, CheckCircle2, Map, DoorOpen, RefreshCw } from "lucide-react";
+import { Activity, AlertTriangle, CheckCircle2, Map, DoorOpen, RefreshCw, TrendingUp, Calendar, ChevronDown, ChevronUp } from "lucide-react";
 import Card from "../components/common/Card";
 import Button from "../components/common/Button";
 import Spinner from "../components/common/Spinner";
 import { useEventStore } from "../store/eventStore";
+import { eventAPI } from "../api/apiClient";
+import { Line } from 'react-chartjs-2';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+  Filler
+} from 'chart.js';
+
+// Register ChartJS components
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+  Filler
+);
 
 /* ========= Types from the map editor ========= */
 type PctPoint = [number, number];
@@ -279,10 +304,56 @@ const OngoingEvent: React.FC = () => {
   const [searchParams] = useSearchParams();
   const [refreshCounter, setRefreshCounter] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [eventDetails, setEventDetails] = useState<any>(null);
+  const [isLoadingEvent, setIsLoadingEvent] = useState(true);
+  const [predictResult, setPredictResult] = useState<any>(null);
+  const [forecastResult, setForecastResult] = useState<any>(null);
+  const [expandedGates, setExpandedGates] = useState<Set<string>>(new Set());
 
   // Resolve eventId (fallback)
   const eventId =
     paramId ?? searchParams.get("eventId") ?? location.state?.eventId ?? currentEvent?.id ?? "demo";
+
+  // Fetch event details including predict_result
+  useEffect(() => {
+    const fetchEventDetails = async () => {
+      if (!eventId || eventId === "demo") {
+        setIsLoadingEvent(false);
+        return;
+      }
+
+      setIsLoadingEvent(true);
+      try {
+        const response = await eventAPI.getEvent(eventId);
+        console.log('📥 OnGoingEvent - Full API Response:', response);
+        console.log('📥 OnGoingEvent - Response.data:', response.data);
+        
+        // Handle nested response structure similar to Dashboard
+        const event = response.data.data || response.data;
+        console.log('📥 OnGoingEvent - Extracted event:', event);
+        
+        setEventDetails(event);
+        
+        // Extract predict_result and forecast_result with multiple fallback paths
+        const predictData = event.predict_result || event.predictResult || null;
+        const forecastData = event.forecast_result || event.forecastResult || null;
+        
+        console.log('📊 OnGoingEvent - Predict Result:', predictData);
+        console.log('📊 OnGoingEvent - Forecast Result:', forecastData);
+        console.log('🔍 Is Predict Result null?', predictData === null);
+        console.log('🔍 Is Forecast Result null?', forecastData === null);
+        
+        setPredictResult(predictData);
+        setForecastResult(forecastData);
+      } catch (error) {
+        console.error('Error fetching event details:', error);
+      } finally {
+        setIsLoadingEvent(false);
+      }
+    };
+
+    fetchEventDetails();
+  }, [eventId]);
 
   // Pull plan JSON from your event (string or object). Falls back to embedded sample.
   const plan: StadiumMapJSON = useMemo(() => {
@@ -302,9 +373,24 @@ const OngoingEvent: React.FC = () => {
 
   // Build zones for SVG from the plan (merge live congestion by id if available)
   const zones: FloorZonePolygon[] = useMemo(() => {
+    // Prioritize predict_result zones if available (live event data)
+    const predictZones = predictResult?.zones || predictResult?.hotspots || [];
+    if (predictZones.length > 0) {
+      return predictZones.map((z: any, index: number) => ({
+        id: z.id || `zone-${index}`,
+        name: z.name || `Zone ${index + 1}`,
+        layer: z.layer || 1,
+        section: z.section || index + 1,
+        points: z.points || [],
+        congestion: z.congestion || z.density || 0,
+      }));
+    }
+
+    // Fallback to simulationResult
     const apiZones = (simulationResult as any)?.zones as FloorZonePolygon[] | undefined;
     if (apiZones?.length) return apiZones;
 
+    // Fallback to plan zones with mock data
     if (plan?.zones?.length) {
       const liveById: Record<string, number> = {};
       (simulationResult as any)?.zones?.forEach?.((z: any) => (liveById[z.id] = z.congestion));
@@ -337,23 +423,45 @@ const OngoingEvent: React.FC = () => {
       });
     }
     return [];
-  }, [plan, simulationResult, refreshCounter]);
+  }, [plan, simulationResult, predictResult, refreshCounter]);
 
-  // Auto-refresh every 10 seconds
+  // Auto-refresh every 5 minutes (as per documentation)
   useEffect(() => {
     const interval = setInterval(() => {
       setRefreshCounter(prev => prev + 1);
-    }, 10000);
+      // Refetch event details to get latest predict_result
+      if (eventId && eventId !== "demo") {
+        eventAPI.getEvent(eventId).then((response) => {
+          const event = response.data.data || response.data;
+          setEventDetails(event);
+          setPredictResult(event.predict_result || event.predictResult || null);
+          setForecastResult(event.forecast_result || event.forecastResult || null);
+        }).catch((error) => {
+          console.error('Error auto-refreshing event data:', error);
+        });
+      }
+    }, 5 * 60 * 1000); // 5 minutes
 
     return () => clearInterval(interval);
-  }, []);
+  }, [eventId]);
 
   // Manual refresh function
   const handleManualRefresh = async () => {
     setIsRefreshing(true);
-    await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
+    try {
+      if (eventId && eventId !== "demo") {
+        const response = await eventAPI.getEvent(eventId);
+        const event = response.data.data || response.data;
+        setEventDetails(event);
+        setPredictResult(event.predict_result || event.predictResult || null);
+        setForecastResult(event.forecast_result || event.forecastResult || null);
+      }
     setRefreshCounter(prev => prev + 1);
+    } catch (error) {
+      console.error('Error manually refreshing event data:', error);
+    } finally {
     setIsRefreshing(false);
+    }
   };
 
   const avgCongestion = useMemo(
@@ -365,10 +473,380 @@ const OngoingEvent: React.FC = () => {
     [zones]
   );
 
-  const activeEvent: any = currentEvent ?? { name: "Event", capacity: 0, date: new Date().toISOString(), venue: "" };
-  const eventDate = activeEvent?.date ? new Date(activeEvent.date) : null;
+  const activeEvent: any = eventDetails || currentEvent || { name: "Event", capacity: 0, date: new Date().toISOString(), venue: "" };
 
-  if (isLoading && !simulationResult && !plan) {
+  // Prepare comparison chart data for EACH GATE (adapted to new backend structure)
+  const gateComparisonCharts = useMemo(() => {
+    if (!forecastResult || !predictResult) {
+      console.log('⚠️ Cannot create comparison charts - missing data:', { 
+        hasForecast: !!forecastResult, 
+        hasPredict: !!predictResult 
+      });
+      return null;
+    }
+
+    console.log('🔍 Full Predict Result:', predictResult);
+    console.log('🔍 Full Forecast Result:', forecastResult);
+
+    const charts: any = {};
+    
+    // NEW STRUCTURE: predictions array with single snapshot per gate
+    if (!predictResult.predictions || !Array.isArray(predictResult.predictions)) {
+      console.warn('⚠️ No predictions array found in predict_result');
+      return null;
+    }
+
+    console.log('📊 Processing', predictResult.predictions.length, 'gate predictions');
+
+    // Process each gate prediction
+    predictResult.predictions.forEach((prediction: any, index: number) => {
+      const gateId = prediction.gate_id; // e.g., "gate_1", "gate_2"
+      const gateNumber = gateId.replace('gate_', ''); // "1", "2", "3"
+      const gateName = `Gate ${gateNumber}`;
+      const zone = prediction.zone || prediction.metadata?.zone || `Zone ${String.fromCharCode(65 + index)}`;
+
+      console.log(`📊 Processing ${gateName} (${zone})`);
+
+      // Get forecast time frames for this gate
+      let forecastTimeFrames: any[] = [];
+      if (forecastResult.forecast) {
+        forecastTimeFrames = 
+          forecastResult.forecast[gateNumber]?.timeFrames ||
+          forecastResult.forecast[gateNumber.toUpperCase()]?.timeFrames ||
+          forecastResult.forecast[gateId]?.timeFrames ||
+          forecastResult.forecast[gateName]?.timeFrames ||
+          [];
+      }
+
+      console.log(`📊 ${gateName} - Forecast frames:`, forecastTimeFrames.length);
+
+      if (forecastTimeFrames.length === 0) {
+        console.warn(`⚠️ No forecast data for ${gateName}`);
+        return;
+      }
+
+      // Create data array with forecast + current live point
+      const allTimeFrames: any[] = [];
+
+      // Add all forecast data points (ensure non-negative values)
+      // Convert UTC to Malaysia/Kuala Lumpur timezone (UTC+8)
+      // Ensure timestamp has 'Z' suffix for UTC, or add it if missing
+      forecastTimeFrames.forEach((f: any) => {
+        const forecastValue = f.predicted ?? f.congestion ?? f.density ?? 0;
+        const utcTimestamp = f.timestamp.endsWith('Z') ? f.timestamp : `${f.timestamp}Z`;
+        allTimeFrames.push({
+          timestamp: new Date(utcTimestamp).toLocaleTimeString('en-MY', { 
+            hour: '2-digit', 
+            minute: '2-digit',
+            timeZone: 'Asia/Kuala_Lumpur'
+          }),
+          rawTimestamp: utcTimestamp,
+          forecasted: Math.max(0, forecastValue), // Ensure non-negative
+          actual: null,
+        });
+      });
+
+      // Add current live prediction as a single point (ensure non-negative)
+      // Convert UTC to Malaysia/Kuala Lumpur timezone (UTC+8)
+      // Ensure timestamp has 'Z' suffix for UTC, or add it if missing
+      const currentCount = Math.max(0, prediction.current_people_count ?? 0);
+      const utcTimestamp = prediction.timestamp.endsWith('Z') ? prediction.timestamp : `${prediction.timestamp}Z`;
+      allTimeFrames.push({
+        timestamp: new Date(utcTimestamp).toLocaleTimeString('en-MY', { 
+          hour: '2-digit', 
+          minute: '2-digit',
+          timeZone: 'Asia/Kuala_Lumpur'
+        }),
+        rawTimestamp: utcTimestamp,
+        forecasted: null,
+        actual: currentCount,
+      });
+
+      // Sort by timestamp
+      allTimeFrames.sort((a, b) => {
+        const timeA = new Date(a.rawTimestamp).getTime();
+        const timeB = new Date(b.rawTimestamp).getTime();
+        return timeA - timeB;
+      });
+
+      const capacity = prediction.total_capacity || prediction.metadata?.total_capacity || 100;
+
+      charts[gateName] = {
+        capacity: capacity,
+        zone: zone,
+        gateId: gateId,
+        currentData: prediction, // Store full prediction data for incidents
+        labels: allTimeFrames.map((d: any) => d.timestamp),
+        datasets: [
+          {
+            label: 'Forecasted',
+            data: allTimeFrames.map((d: any) => d.forecasted),
+            borderColor: 'rgb(66, 133, 244)',
+            backgroundColor: 'rgba(66, 133, 244, 0.1)',
+            borderWidth: 2,
+            tension: 0.4,
+            fill: true,
+            pointRadius: 3,
+            pointHoverRadius: 5,
+            borderDash: [],
+          },
+          {
+            label: 'Live (Real-time)',
+            data: allTimeFrames.map((d: any) => d.actual),
+            borderColor: 'rgb(234, 67, 53)',
+            backgroundColor: 'rgba(234, 67, 53, 0.1)',
+            borderWidth: 2,
+            tension: 0.4,
+            fill: true,
+            pointRadius: 4,
+            pointHoverRadius: 6,
+            spanGaps: true,
+            borderDash: [],
+          },
+        ],
+      };
+
+      console.log(`✅ ${gateName} chart created with ${allTimeFrames.length} data points`);
+    });
+
+    console.log('📊 Total charts created:', Object.keys(charts).length);
+    return Object.keys(charts).length > 0 ? charts : null;
+  }, [forecastResult, predictResult]);
+
+  // 🚨 Incident Analysis: Extract and organize incidents by gate (adapted to new structure)
+  const incidentAnalysis = useMemo(() => {
+    if (!predictResult || !predictResult.predictions) return null;
+
+    const gateData: any = {};
+
+    // Process each gate prediction (new structure)
+    predictResult.predictions.forEach((prediction: any, index: number) => {
+      const gateId = prediction.gate_id;
+      const gateNumber = gateId.replace('gate_', '');
+      const gateName = `Gate ${gateNumber}`;
+      const zone = prediction.zone || prediction.metadata?.zone || `Zone ${String.fromCharCode(65 + index)}`;
+
+      // Initialize gate data
+      gateData[gateName] = {
+        capacity: prediction.total_capacity || prediction.metadata?.total_capacity || 100,
+        zone: zone,
+        timeFrames: []
+      };
+
+      // Current snapshot (convert UTC to Malaysia/Kuala Lumpur timezone)
+      // Ensure timestamp has 'Z' suffix for UTC, or add it if missing
+      const currentUtcTimestamp = prediction.timestamp.endsWith('Z') ? prediction.timestamp : `${prediction.timestamp}Z`;
+      const currentTimestamp = new Date(currentUtcTimestamp).toLocaleString('en-MY', {
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        timeZone: 'Asia/Kuala_Lumpur'
+      });
+
+      // Filter current incidents (skip low probability)
+      const currentIncidents = prediction.forecast_next_5_min?.possible_incidents?.filter((incident: any) => 
+        incident.incident_id !== 0 && 
+        incident.incident_name !== "No incidents" && 
+        incident.probability > 0.05
+      ) || [];
+
+      // Add current timeframe (ensure non-negative counts)
+      gateData[gateName].timeFrames.push({
+        timestamp: currentTimestamp,
+        rawTimestamp: currentUtcTimestamp,
+        riskLevel: prediction.risk_level,
+        riskScore: prediction.risk_score,
+        congestionLevel: prediction.predicted_congestion_level,
+        actualCount: Math.max(0, prediction.current_people_count ?? 0),
+        incidents: currentIncidents.sort((a: any, b: any) => b.probability - a.probability),
+        hasIncidents: currentIncidents.length > 0
+      });
+
+      // Add forecast next 5 min as a future timeframe if available
+      if (prediction.forecast_next_5_min) {
+        const nextIncidents = prediction.forecast_next_5_min.possible_incidents?.filter((incident: any) => 
+          incident.incident_id !== 0 && 
+          incident.incident_name !== "No incidents" && 
+          incident.probability > 0.05
+        ) || [];
+
+        // Calculate next timestamp (5 minutes from now, convert to Malaysia/Kuala Lumpur timezone)
+        // Use the UTC timestamp to ensure correct calculation
+        const nextTime = new Date(new Date(currentUtcTimestamp).getTime() + 5 * 60 * 1000);
+        const nextTimestamp = nextTime.toLocaleString('en-MY', {
+          month: 'short',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          timeZone: 'Asia/Kuala_Lumpur'
+        });
+
+        gateData[gateName].timeFrames.push({
+          timestamp: `${nextTimestamp} (forecast)`,
+          rawTimestamp: nextTime.toISOString(),
+          riskLevel: prediction.forecast_next_5_min.risk_level,
+          riskScore: prediction.forecast_next_5_min.risk_score,
+          congestionLevel: prediction.forecast_next_5_min.predicted_congestion_level,
+          actualCount: Math.max(0, prediction.forecast_next_5_min.predicted_people_count ?? 0),
+          incidents: nextIncidents.sort((a: any, b: any) => b.probability - a.probability),
+          hasIncidents: nextIncidents.length > 0
+        });
+      }
+
+      // Sort time frames by timestamp (newest first)
+      gateData[gateName].timeFrames.sort((a: any, b: any) => 
+        new Date(b.rawTimestamp).getTime() - new Date(a.rawTimestamp).getTime()
+      );
+    });
+
+    // Calculate totals by risk level
+    let totalHigh = 0;
+    let totalMedium = 0;
+    let totalLow = 0;
+
+    Object.values(gateData).forEach((gate: any) => {
+      gate.timeFrames.forEach((frame: any) => {
+        if (frame.riskLevel === 'High') totalHigh += frame.incidents.length;
+        else if (frame.riskLevel === 'Medium') totalMedium += frame.incidents.length;
+        else if (frame.riskLevel === 'Low') totalLow += frame.incidents.length;
+      });
+    });
+
+    return {
+      byGate: gateData,
+      gates: Object.keys(gateData).sort(),
+      totals: {
+        high: totalHigh,
+        medium: totalMedium,
+        low: totalLow,
+        all: totalHigh + totalMedium + totalLow
+      }
+    };
+  }, [predictResult]);
+
+  // 📊 Deviation Metrics for each gate (adapted to new structure)
+  const gateDeviationMetrics = useMemo(() => {
+    if (!gateComparisonCharts || !predictResult) return null;
+
+    const metrics: any = {};
+
+    Object.entries(gateComparisonCharts).forEach(([gateName, chartData]: [string, any]) => {
+      const datasets = chartData.datasets;
+      if (!datasets || datasets.length < 2) return;
+
+      const forecastData = datasets[0].data;
+      const actualData = datasets[1].data;
+      const currentData = chartData.currentData;
+
+      let totalDeviation = 0;
+      let validPoints = 0;
+
+      forecastData.forEach((forecast: any, index: number) => {
+        const actual = actualData[index];
+        if (forecast !== null && actual !== null && forecast !== 0) {
+          const deviation = ((actual - forecast) / forecast) * 100;
+          totalDeviation += Math.abs(deviation);
+          validPoints++;
+        }
+      });
+
+      if (validPoints > 0) {
+        const avgDeviation = totalDeviation / validPoints;
+        const accuracy = Math.max(0, 100 - avgDeviation);
+
+        metrics[gateName] = {
+          avgDeviation: avgDeviation.toFixed(1),
+          accuracy: accuracy.toFixed(1),
+          validPoints,
+          currentRisk: currentData?.risk_level || 'Unknown',
+          currentCount: currentData?.current_people_count || 0,
+          trend: currentData?.trend_analysis?.current_trend || 'stable',
+          trendStrength: currentData?.trend_analysis?.trend_strength || 'moderate',
+        };
+      }
+    });
+
+    return Object.keys(metrics).length > 0 ? metrics : null;
+  }, [gateComparisonCharts, predictResult]);
+
+  const chartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: {
+      mode: 'index' as const,
+      intersect: false,
+    },
+    plugins: {
+      legend: {
+        position: 'top' as const,
+        labels: {
+          usePointStyle: true,
+          padding: 15,
+        },
+      },
+      title: {
+        display: true,
+        text: 'Forecast vs Live Prediction Comparison',
+        font: {
+          size: 16,
+          weight: 'bold' as const,
+        },
+        padding: {
+          bottom: 20,
+        },
+      },
+      tooltip: {
+        callbacks: {
+          label: function(context: any) {
+            const value = context.parsed.y;
+            return value !== null ? `${context.dataset.label}: ${Math.round(value)} people` : '';
+          },
+          afterLabel: function(context: any) {
+            if (context.datasetIndex === 0 && context.parsed.y !== null) {
+              const actualDataset = context.chart.data.datasets[1];
+              const actualValue = actualDataset.data[context.dataIndex];
+              if (actualValue !== null && actualValue !== undefined) {
+                const deviation = actualValue as number - context.parsed.y;
+                const deviationPercent = (deviation / context.parsed.y * 100);
+                return `Difference: ${deviation >= 0 ? '+' : ''}${Math.round(deviation)} people (${deviationPercent >= 0 ? '+' : ''}${deviationPercent.toFixed(1)}%)`;
+              }
+            }
+            return '';
+          }
+        }
+      }
+    },
+    scales: {
+      y: {
+        beginAtZero: true,
+        title: {
+          display: true,
+          text: 'Crowd Density (people)',
+        },
+        grid: {
+          color: 'rgba(0, 0, 0, 0.05)',
+        },
+      },
+      x: {
+        title: {
+          display: true,
+          text: 'Time (5-minute intervals)',
+        },
+        ticks: {
+          maxRotation: 45,
+          minRotation: 45,
+          autoSkip: true,
+          maxTicksLimit: 20, // Show max 20 labels to avoid overcrowding
+        },
+        grid: {
+          display: false,
+        },
+      },
+    },
+  };
+
+  if (isLoadingEvent || (isLoading && !simulationResult && !plan)) {
     return (
       <div className="max-w-7xl mx-auto p-6">
         <div className="text-center py-12">
@@ -401,6 +879,63 @@ const OngoingEvent: React.FC = () => {
   const headerSections = plan?.zones?.length ?? 0;
   const headerToilets = plan?.toiletsList?.length ?? 0;
 
+  // Check if predict_result is null (live model not available)
+  if (!predictResult && !isLoadingEvent) {
+    return (
+      <div className="max-w-7xl mx-auto p-6">
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">{activeEvent?.name || "On-going Event"}</h1>
+            <p className="mt-2 text-gray-600">Live Event Monitoring</p>
+          </div>
+          <Button
+            onClick={() => navigate('/dashboard')}
+            variant="outline"
+          >
+            Back to Dashboard
+          </Button>
+        </div>
+
+        <Card className="bg-gradient-to-br from-amber-50 to-amber-100 border-amber-200">
+          <div className="text-center py-12">
+            <Calendar className="h-16 w-16 text-amber-600 mx-auto mb-4" />
+            <h2 className="text-2xl font-semibold text-gray-900 mb-3">
+              Live Model Only Available on Event Day
+            </h2>
+            <p className="text-gray-700 mb-6 max-w-2xl mx-auto">
+              The live prediction model will be activated on the day of the event. 
+              Real-time crowd density predictions and monitoring will be available once the event begins.
+            </p>
+            <div className="flex items-center justify-center gap-8 text-sm text-gray-600">
+              <div className="flex flex-col items-center">
+                <span className="font-medium text-gray-900">Event Date</span>
+                <span>{activeEvent?.dateStart ? new Date(activeEvent.dateStart).toLocaleDateString() : "—"}</span>
+              </div>
+              <div className="flex flex-col items-center">
+                <span className="font-medium text-gray-900">Event Time</span>
+                <span>{activeEvent?.dateStart ? new Date(activeEvent.dateStart).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "—"}</span>
+              </div>
+              <div className="flex flex-col items-center">
+                <span className="font-medium text-gray-900">Venue</span>
+                <span>{activeEvent?.venue || activeEvent?.venueLocation?.name || "—"}</span>
+              </div>
+            </div>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
+  // Debug: Log state before rendering
+  console.log('🎯 OnGoingEvent Render State:', {
+    hasPredictResult: !!predictResult,
+    hasForecastResult: !!forecastResult,
+    hasGateComparisonCharts: !!gateComparisonCharts,
+    gateChartsCount: gateComparisonCharts ? Object.keys(gateComparisonCharts).length : 0,
+    isLoadingEvent,
+    eventId
+  });
+
   return (
     <div className="max-w-7xl mx-auto p-6 space-y-8">
       {/* Header */}
@@ -409,7 +944,7 @@ const OngoingEvent: React.FC = () => {
           <h1 className="text-3xl font-bold text-gray-900">{activeEvent?.name || "On-going Event"}</h1>
           <p className="mt-2 text-gray-600 flex items-center gap-2">
             <Activity className="h-4 w-4 text-green-600" /> Live congestion monitoring
-            <span className="text-xs text-gray-500">• Auto-refresh every 10s</span>
+            <span className="text-xs text-gray-500">• Auto-refresh every 5 min</span>
           </p>
         </div>
         <div className="flex items-center gap-4">
@@ -429,6 +964,358 @@ const OngoingEvent: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Comparison Charts by Gate */}
+      {gateComparisonCharts && Object.keys(gateComparisonCharts).length > 0 && (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <TrendingUp className="h-5 w-5 text-blue-600" />
+              <h2 className="text-2xl font-semibold text-gray-900">Forecast vs Live Prediction by Gate</h2>
+            </div>
+            <div className="flex items-center gap-2 text-sm">
+              <span className="flex items-center gap-1">
+                <span className="w-3 h-3 rounded-full bg-blue-500"></span>
+                <span className="text-gray-600">Forecast</span>
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="w-3 h-3 rounded-full bg-red-500"></span>
+                <span className="text-gray-600">Live</span>
+              </span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {Object.entries(gateComparisonCharts).map(([gateName, chartData]: [string, any]) => {
+              const metrics = gateDeviationMetrics?.[gateName];
+              const currentData = chartData.currentData;
+              
+              // Risk level badge color
+              const riskColor = 
+                currentData?.risk_level === 'High' ? 'bg-red-500' :
+                currentData?.risk_level === 'Medium' ? 'bg-yellow-500' :
+                'bg-green-500';
+              
+              return (
+                <Card key={gateName} className="bg-gradient-to-b from-white to-blue-50">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                      <DoorOpen className="h-5 w-5 text-gray-700" />
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-lg font-bold text-gray-900">{gateName}</h3>
+                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium text-white ${riskColor}`}>
+                            {currentData?.risk_level || 'Unknown'}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-gray-600 mt-1">
+                          <span>{chartData.zone}</span>
+                          <span>•</span>
+                          <span>Capacity: {chartData.capacity}</span>
+                          <span>•</span>
+                          <span>Current: {Math.max(0, currentData?.current_people_count ?? 0)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="h-64">
+                    <Line 
+                      data={{
+                        labels: chartData.labels,
+                        datasets: chartData.datasets
+                      }} 
+                      options={{
+                        ...chartOptions,
+                        plugins: {
+                          ...chartOptions.plugins,
+                          title: {
+                            display: false,
+                          },
+                        },
+                      }} 
+                    />
+                  </div>
+                  
+                  {/* Deviation Metrics & Live Status for this gate */}
+                  {metrics && (
+                    <div className="mt-4 space-y-2">
+                      <div className="p-3 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-xs font-semibold text-gray-900 mb-1">Accuracy Analysis</p>
+                            <p className="text-xs text-gray-600">
+                              Based on {metrics.validPoints} comparison points
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-4">
+                            <div className="text-center">
+                              <p className="text-lg font-bold text-green-600">{metrics.accuracy}%</p>
+                              <p className="text-xs text-gray-600">Accuracy</p>
+                            </div>
+                            <div className="text-center">
+                              <p className="text-lg font-bold text-blue-600">±{metrics.avgDeviation}%</p>
+                              <p className="text-xs text-gray-600">Deviation</p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Live Trend Indicator */}
+                      <div className="flex items-center justify-between p-2 bg-gray-50 rounded border border-gray-200 text-xs">
+                        <span className="text-gray-600">Trend:</span>
+                        <span className={`font-medium ${
+                          metrics.trend === 'rising' ? 'text-red-600' :
+                          metrics.trend === 'falling' ? 'text-green-600' :
+                          'text-gray-700'
+                        }`}>
+                          {metrics.trend === 'rising' ? '📈' : metrics.trend === 'falling' ? '📉' : '➡️'} 
+                          {' '}{metrics.trend} ({metrics.trendStrength})
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </Card>
+              );
+            })}
+          </div>
+
+          <div className="p-3 bg-blue-50 rounded-lg">
+            <p className="text-sm text-gray-700">
+              <span className="font-semibold">💡 Insight:</span> Each chart compares forecasted crowd density 
+              predictions (blue) with real-time live predictions (red) for individual gates. Significant deviations may indicate unexpected crowd 
+              patterns or changes in event conditions at specific entry points.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Incident Predictions - Organized by Gate */}
+      {incidentAnalysis && incidentAnalysis.totals.all > 0 && (
+        <Card className="bg-gradient-to-b from-white to-amber-50">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-600" />
+              <h2 className="text-xl font-semibold text-gray-900">Predicted Incident Analysis by Gate</h2>
+            </div>
+            <div className="flex items-center gap-4 text-sm">
+              <div className="flex items-center gap-1">
+                <span className="w-3 h-3 rounded-full bg-red-500"></span>
+                <span className="text-gray-600">{incidentAnalysis.totals.high} High Risk</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="w-3 h-3 rounded-full bg-yellow-500"></span>
+                <span className="text-gray-600">{incidentAnalysis.totals.medium} Medium</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="w-3 h-3 rounded-full bg-green-500"></span>
+                <span className="text-gray-600">{incidentAnalysis.totals.low} Low</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Gates Tabs/Sections */}
+          {incidentAnalysis.gates.map((gateName: string) => {
+            const gateInfo = incidentAnalysis.byGate[gateName];
+            // Show all gates, even if no time frames
+            if (!gateInfo) return null;
+            
+            const isExpanded = expandedGates.has(gateName);
+            const toggleGate = () => {
+              const newExpanded = new Set(expandedGates);
+              if (isExpanded) {
+                newExpanded.delete(gateName);
+              } else {
+                newExpanded.add(gateName);
+              }
+              setExpandedGates(newExpanded);
+            };
+
+            // Get risk summary for this gate
+            const riskSummary = {
+              high: gateInfo.timeFrames?.filter((f: any) => f.riskLevel === 'High' && f.hasIncidents).length || 0,
+              medium: gateInfo.timeFrames?.filter((f: any) => f.riskLevel === 'Medium' && f.hasIncidents).length || 0,
+              low: gateInfo.timeFrames?.filter((f: any) => f.riskLevel === 'Low' && f.hasIncidents).length || 0,
+            };
+
+            // Get latest time frame for preview
+            const latestFrame = gateInfo.timeFrames?.[0];
+            const hasAnyIncidents = gateInfo.timeFrames?.some((f: any) => f.hasIncidents) || false;
+
+            return (
+              <div key={gateName} className="mb-4 last:mb-0">
+                {/* Gate Header - Clickable */}
+                <button
+                  onClick={toggleGate}
+                  className="w-full flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 rounded-lg border-2 border-gray-200 transition-colors"
+                >
+                  <div className="flex items-center gap-4">
+                    <DoorOpen className="h-5 w-5 text-gray-700" />
+                    <div className="text-left">
+                      <h3 className="text-lg font-bold text-gray-900">{gateName}</h3>
+                      <div className="flex items-center gap-4 mt-1">
+                        <span className="text-sm text-gray-600">
+                          Capacity: {gateInfo.capacity} people
+                        </span>
+                        <span className="text-sm text-gray-600">•</span>
+                        <span className="text-sm text-gray-600">
+                          {gateInfo.timeFrames?.length || 0} time periods
+                        </span>
+                        {hasAnyIncidents ? (
+                          riskSummary.high > 0 && (
+                            <>
+                              <span className="text-sm text-gray-600">•</span>
+                              <span className="text-sm font-medium text-red-600">
+                                {riskSummary.high} High Risk
+                              </span>
+                            </>
+                          )
+                        ) : (
+                          <>
+                            <span className="text-sm text-gray-600">•</span>
+                            <span className="text-sm font-medium text-green-600">
+                              No incidents
+                            </span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    {!isExpanded && latestFrame && (
+                      <div className="text-right mr-4">
+                        <p className="text-xs text-gray-500">Latest</p>
+                        <p className="text-sm font-medium text-gray-900">{latestFrame.timestamp}</p>
+                        <p className={`text-xs font-semibold ${
+                          latestFrame.riskLevel === 'High' ? 'text-red-600' :
+                          latestFrame.riskLevel === 'Medium' ? 'text-yellow-600' :
+                          'text-green-600'
+                        }`}>
+                          {latestFrame.riskLevel} Risk • {Math.max(0, latestFrame.actualCount ?? 0)}/{gateInfo.capacity} people
+                        </p>
+                      </div>
+                    )}
+                    {isExpanded ? (
+                      <ChevronUp className="h-5 w-5 text-gray-600" />
+                    ) : (
+                      <ChevronDown className="h-5 w-5 text-gray-600" />
+                    )}
+                  </div>
+                </button>
+
+                {/* Timeline of incidents for this gate - Collapsible */}
+                {isExpanded && (
+                  <div className="mt-4 space-y-4 pl-4">
+                  {(() => {
+                    // Filter out Low Risk frames with no incidents
+                    const displayFrames = gateInfo.timeFrames?.filter((frame: any) => {
+                      // Skip Low Risk frames with no incidents
+                      if (frame.riskLevel === 'Low' && !frame.hasIncidents) {
+                        return false;
+                      }
+                      return true;
+                    }) || [];
+
+                    if (displayFrames.length === 0) {
+                      return (
+                        <div className="p-4 bg-green-50 border border-green-200 rounded-lg text-center">
+                          <CheckCircle2 className="h-8 w-8 text-green-600 mx-auto mb-2" />
+                          <p className="text-sm font-medium text-green-900">No significant incidents for this gate</p>
+                          <p className="text-xs text-green-700 mt-1">All periods showing low risk with no incidents</p>
+                        </div>
+                      );
+                    }
+
+                    return displayFrames.map((frame: any, frameIdx: number) => {
+                    // Determine frame color based on risk level
+                    const frameColor = 
+                      frame.riskLevel === 'High' ? 'red' :
+                      frame.riskLevel === 'Medium' ? 'yellow' : 'green';
+                    
+                    const bgClass = 
+                      frameColor === 'red' ? 'bg-red-50 border-red-200' :
+                      frameColor === 'yellow' ? 'bg-yellow-50 border-yellow-200' :
+                      'bg-green-50 border-green-200';
+
+                    return (
+                      <div key={frameIdx} className={`p-4 rounded-lg border ${bgClass}`}>
+                        {/* Time Frame Header */}
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-3">
+                            <span className="text-sm font-semibold text-gray-900">
+                              🕐 {frame.timestamp}
+                            </span>
+                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                              frameColor === 'red' ? 'bg-red-200 text-red-800' :
+                              frameColor === 'yellow' ? 'bg-yellow-200 text-yellow-800' :
+                              'bg-green-200 text-green-800'
+                            }`}>
+                              {frame.riskLevel} Risk
+                            </span>
+                          </div>
+                          <div className="text-sm text-gray-700">
+                            <span className="font-medium">Crowd:</span> {Math.max(0, frame.actualCount ?? 0)}/{gateInfo.capacity} 
+                            <span className={`ml-2 font-semibold ${
+                              frame.congestionLevel === 'High' ? 'text-red-600' :
+                              frame.congestionLevel === 'Medium' ? 'text-yellow-600' :
+                              'text-green-600'
+                            }`}>
+                              ({frame.congestionLevel})
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Incidents List */}
+                        {frame.incidents && frame.incidents.length > 0 ? (
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                            {frame.incidents.map((incident: any, incidentIdx: number) => (
+                            <div 
+                              key={incidentIdx} 
+                              className={`p-2 rounded border ${
+                                frameColor === 'red' ? 'bg-white border-red-300' :
+                                frameColor === 'yellow' ? 'bg-white border-yellow-300' :
+                                'bg-white border-green-300'
+                              }`}
+                            >
+                              <div className="flex items-start justify-between gap-2">
+                                <p className="text-xs font-medium text-gray-900 flex-1">
+                                  {incident.incident_name}
+                                </p>
+                                <span className={`px-1.5 py-0.5 rounded text-xs font-bold whitespace-nowrap ${
+                                  incident.probability >= 0.8 ? 'bg-red-600 text-white' :
+                                  incident.probability >= 0.5 ? 'bg-orange-500 text-white' :
+                                  incident.probability >= 0.3 ? 'bg-yellow-400 text-gray-900' :
+                                  'bg-gray-300 text-gray-700'
+                                }`}>
+                                  {(incident.probability * 100).toFixed(0)}%
+                                </span>
+                              </div>
+                            </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="p-3 bg-green-50 border border-green-200 rounded text-center">
+                            <p className="text-xs font-medium text-green-900">✓ No incidents predicted for this time period</p>
+                          </div>
+                        )}
+                      </div>
+                    );
+                    });
+                  })()}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+
+          <div className="mt-6 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+            <p className="text-sm text-gray-700">
+              <span className="font-semibold">⚠️ Note:</span> These are AI-predicted potential incidents based on crowd density patterns and historical data. 
+              Probabilities above 50% require immediate attention and proactive measures.
+            </p>
+          </div>
+        </Card>
+      )}
 
       {/* Summary */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -453,9 +1340,13 @@ const OngoingEvent: React.FC = () => {
         <Card padding="sm" className="bg-gradient-to-br from-emerald-50 to-emerald-100">
           <div className="text-center">
             <div className="text-2xl font-bold text-blue-600">
-              {(eventDate ?? new Date()).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+              {new Date().toLocaleTimeString('en-MY', { 
+                hour: "2-digit", 
+                minute: "2-digit",
+                timeZone: 'Asia/Kuala_Lumpur'
+              })}
             </div>
-            <div className="text-sm text-gray-600">Local Time</div>
+            <div className="text-sm text-gray-600">Malaysia Time (MYT)</div>
           </div>
         </Card>
       </div>
@@ -514,8 +1405,18 @@ const OngoingEvent: React.FC = () => {
                   {activeEvent?.venue || activeEvent?.venueLocation?.name || "—"}
                 </span>
               </div>
-              <div className="flex justify-between"><span className="text-gray-600">Start:</span> <span className="font-medium">{activeEvent?.dateStart ? new Date(activeEvent.dateStart).toLocaleString() : "—"}</span></div>
-              <div className="flex justify-between"><span className="text-gray-600">End:</span> <span className="font-medium">{activeEvent?.dateEnd ? new Date(activeEvent.dateEnd).toLocaleString() : "—"}</span></div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Start:</span> 
+                <span className="font-medium">
+                  {activeEvent?.dateStart ? new Date(activeEvent.dateStart).toLocaleString('en-MY', { timeZone: 'Asia/Kuala_Lumpur' }) : "—"}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">End:</span> 
+                <span className="font-medium">
+                  {activeEvent?.dateEnd ? new Date(activeEvent.dateEnd).toLocaleString('en-MY', { timeZone: 'Asia/Kuala_Lumpur' }) : "—"}
+                </span>
+              </div>
             </div>
           </Card>
 

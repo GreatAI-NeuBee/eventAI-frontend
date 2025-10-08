@@ -9,7 +9,11 @@ import NewEvent from './pages/NewEvent';
 import EventDetails from './pages/EventDetails';
 import OnGoingEvent from './pages/OnGoingEvent';
 import User from './pages/User';
+<<<<<<< HEAD
 import WeatherTest from './pages/WeatherTest';
+=======
+import QRCodeAttachments from './pages/QRCodeAttachments';
+>>>>>>> f4742c83ccc323228b61ec4d9cb93f973680938e
 
 // Import API testing utilities (available in browser console)
 import './utils/apiTest';
@@ -20,8 +24,9 @@ function App() {
       <GoogleMapsProvider>
         <Router>
           <Routes>
-          {/* Landing page (no layout) */}
+          {/* Public pages (no authentication required) */}
           <Route path="/" element={<Landing />} />
+          <Route path="/qrCodeAttachments" element={<QRCodeAttachments />} />
           
           {/* Protected Dashboard routes (with layout) */}
           <Route path="/dashboard" element={

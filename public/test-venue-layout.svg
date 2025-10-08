@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg viewBox="0 0 600 400" xmlns="http://www.w3.org/2000/svg">
+  <!-- Test Venue Layout for Import -->
+  
+  <!-- Zone 1: Main Hall -->
+  <polygon 
+    class="zone" 
+    data-id="z-1" 
+    data-name="Main Hall" 
+    data-layer="1" 
+    points="100,50 500,50 500,200 100,200"
+    fill="#ff6b6b"
+    stroke="#333"
+    stroke-width="2"
+  />
+  
+  <!-- Zone 2: VIP Area -->
+  <polygon 
+    class="zone" 
+    data-id="z-2" 
+    data-name="VIP Area" 
+    data-layer="2" 
+    points="200,100 400,100 400,150 200,150"
+    fill="#4ecdc4"
+    stroke="#333"
+    stroke-width="2"
+  />
+  
+  <!-- Exit 1: Main Entrance -->
+  <circle 
+    class="exit" 
+    data-id="exit-1" 
+    data-name="Main Entrance" 
+    data-capacity="200"
+    cx="300" 
+    cy="20" 
+    r="15"
+    fill="#22c55e"
+    stroke="#16a34a"
+    stroke-width="3"
+  />
+  
+  <!-- Exit 2: Emergency Exit -->
+  <circle 
+    class="exit" 
+    data-id="exit-2" 
+    data-name="Emergency Exit" 
+    data-capacity="100"
+    cx="50" 
+    cy="200" 
+    r="12"
+    fill="#22c55e"
+    stroke="#16a34a"
+    stroke-width="3"
+  />
+  
+  <!-- Toilet 1: Men's -->
+  <circle 
+    class="toilet" 
+    data-id="wc-1" 
+    data-label="Men's WC" 
+    data-fixtures="4"
+    cx="450" 
+    cy="100" 
+    r="8"
+    fill="#3b82f6"
+    stroke="#2563eb"
+    stroke-width="2"
+  />
+  
+  <!-- Toilet 2: Women's -->
+  <circle 
+    class="toilet" 
+    data-id="wc-2" 
+    data-label="Women's WC" 
+    data-fixtures="6"
+    cx="450" 
+    cy="150" 
+    r="8"
+    fill="#3b82f6"
+    stroke="#2563eb"
+    stroke-width="2"
+  />
+  
+  <!-- Labels -->
+  <text x="300" y="40" text-anchor="middle" font-family="Arial" font-size="12" fill="#16a34a" font-weight="bold">Main Entrance</text>
+  <text x="300" y="120" text-anchor="middle" font-family="Arial" font-size="14" fill="#333" font-weight="bold">Main Hall</text>
+  <text x="300" y="130" text-anchor="middle" font-family="Arial" font-size="12" fill="#333">VIP Area</text>
+</svg>

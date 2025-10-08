@@ -1,0 +1,1735 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>PNG to SVG Converter</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root { color-scheme: light dark; }
+    body{font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;margin:0;background:#0b1220;color:#e7ecf3}
+    .wrap{max-width:1000px;margin:0 auto;padding:32px}
+    .card{background:#111827;border:1px solid #1f2a3a;border-radius:14px;padding:20px;margin:20px 0}
+    .btn{display:inline-block;background:#7c5cff;color:white;text-decoration:none;padding:12px 16px;border-radius:10px;font-weight:700;cursor:pointer;border:none}
+    .btn:hover{opacity:.9}
+    .btn-secondary{background:#374151;color:#e7ecf3}
+    .btn-secondary:hover{background:#4b5563}
+    .grid{display:grid;gap:16px;grid-template-columns:1fr 1fr}
+    @media (max-width:720px){.grid{grid-template-columns:1fr}}
+    .preview{background:#0e1726;border:1px solid #1e293b;border-radius:12px;overflow:auto;padding:12px;min-height:200px}
+    .muted{color:#9aa6b2;font-size:12px}
+    .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:12px 0}
+    label{display:block;margin:12px 0 6px;color:#b8c0cc}
+    input[type="file"], input[type="number"], input[type="text"]{padding:8px;border-radius:8px;border:1px solid #334155;background:#0e1726;color:#e7ecf3}
+    .instructions{background:#1e293b;border:1px solid #334155;border-radius:8px;padding:12px;margin:12px 0}
+    .step{background:#0f172a;border-left:3px solid #7c5cff;padding:8px 12px;margin:8px 0}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>PNG to SVG Converter</h1>
+    <p class="muted">Convert your Canva PNG export to SVG with circles and rectangles. Perfect for simple venue layouts.</p>
+
+    <div class="instructions">
+      <h3 style="margin-top:0">How to use:</h3>
+      <div class="step">1. Upload your PNG from Canva</div>
+      <div class="step">2. Auto-detection will find circles and rectangles automatically</div>
+      <div class="step">3. Move and edit the detected shapes as needed</div>
+      <div class="step">4. Add more shapes manually if required</div>
+      <div class="step">5. Download the final SVG and continue to the Attribute Tagger</div>
+    </div>
+
+    <div class="card">
+      <h3 style="margin-top:0">Step 1: Upload PNG</h3>
+      <input type="file" id="pngFile" accept="image/png,image/jpeg" />
+      <p class="muted">🤖 Auto-detection: The tool will automatically detect circles and rectangles in your PNG!</p>
+      <div class="row">
+        <label>Canvas Width: <input type="number" id="canvasWidth" value="1000" min="100" max="5000" /></label>
+        <label>Canvas Height: <input type="number" id="canvasHeight" value="625" min="100" max="5000" /></label>
+      </div>
+      <button id="convertBtn" class="btn" disabled>Convert to SVG</button>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <h3 style="margin-top:0">Step 2: Add Shapes</h3>
+        <div class="row">
+          <button id="addCircle" class="btn btn-secondary">Add Circle</button>
+          <button id="addRect" class="btn btn-secondary">Add Rectangle</button>
+          <button id="detectShapes" class="btn btn-secondary">Re-detect Shapes</button>
+          <button id="fineTuneBtn" class="btn btn-secondary" style="display:none">Fine-tune Placement</button>
+          <button id="resetBtn" class="btn btn-secondary" style="display:none">Reset to Original</button>
+          <button id="forceCircleBtn" class="btn btn-secondary" style="display:none">Force Circle Detection</button>
+          <button id="colorDetectionBtn" class="btn btn-secondary" style="display:none">Color Detection Only</button>
+          <button id="forceRectBtn" class="btn btn-secondary" style="display:none">Force Rectangle Detection</button>
+          <button id="clearShapes" class="btn btn-secondary">Clear All</button>
+        </div>
+        <p class="muted">💡 Tip: Click and drag shapes to move them around. Selected shapes show a purple border.</p>
+        
+        <div class="card" style="background:#0e1726; border:1px solid #1e293b;">
+          <h4 style="margin-top:0; color:#e7ecf3">Hybrid Detection System</h4>
+          <p style="color:#9aa6b2; font-size:12px; margin:8px 0;">Circles detected by color, rectangles by shape:</p>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; font-size:11px;">
+            <div style="display:flex; align-items:center; gap:6px;">
+              <div style="width:12px; height:12px; background:#ff0000; border-radius:50%;"></div>
+              <span style="color:#e7ecf3;">Red Circles = Exits</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:6px;">
+              <div style="width:12px; height:12px; background:#00ff00; border-radius:50%;"></div>
+              <span style="color:#e7ecf3;">Green Circles = Zones</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:6px;">
+              <div style="width:12px; height:12px; background:#0000ff; border-radius:50%;"></div>
+              <span style="color:#e7ecf3;">Blue Circles = Toilets</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:6px;">
+              <div style="width:12px; height:12px; background:#ffff00; border-radius:50%;"></div>
+              <span style="color:#e7ecf3;">Yellow Circles = Other</span>
+            </div>
+          </div>
+          <p style="color:#9aa6b2; font-size:11px; margin:8px 0 0;"><strong>Circles:</strong> Use colored circles (any color). <strong>Rectangles:</strong> Use any shape (detected by form).</p>
+        </div>
+        
+        <div id="debugInfo" style="display:none; background:#0e1726; border:1px solid #1e293b; border-radius:8px; padding:12px; margin:12px 0; font-size:12px; color:#9aa6b2;">
+          <div><strong>Debug Info:</strong></div>
+          <div id="scaleInfo"></div>
+          <div id="shapeInfo"></div>
+          <div style="margin-top:8px;">
+            <button id="adjustCoordsBtn" class="btn btn-secondary" style="font-size:11px; padding:4px 8px;">Adjust Coordinates</button>
+          </div>
+        </div>
+        
+        <div id="shapeControls" style="display:none">
+          <h4>Selected Shape:</h4>
+          <div id="shapeForm">
+            <label>Type: <select id="shapeType">
+              <option value="zone">Zone (polygon)</option>
+              <option value="exit">Exit (circle)</option>
+              <option value="toilet">Toilet (circle)</option>
+            </select></label>
+            <label>ID: <input type="text" id="shapeId" placeholder="z-101" /></label>
+            <label>Name: <input type="text" id="shapeName" placeholder="North A" /></label>
+            <label>Layer: <input type="number" id="shapeLayer" value="1" min="1" max="20" /></label>
+            <div class="row">
+              <button id="applyShape" class="btn">Apply to Shape</button>
+              <button id="deleteShape" class="btn btn-secondary">Delete Shape</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3 style="margin-top:0">Preview & Download</h3>
+        <div id="preview" class="preview"></div>
+        <div class="row">
+          <button id="downloadSvg" class="btn" disabled>Download SVG</button>
+          <a href="/attribute-tagger.html" class="btn btn-secondary">Continue to Attribute Tagger</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const $ = s => document.querySelector(s);
+    let pngDataUrl = '';
+    let svgContent = '';
+    let selectedShape = null;
+    let shapes = [];
+    let isDragging = false;
+    let dragShape = null;
+    let dragOffset = { x: 0, y: 0 };
+    
+    // Global resize state
+    let resizeShape = null;
+    let resizeDirection = null;
+    let isResizing = false;
+
+    const pngFile = $('#pngFile');
+    const convertBtn = $('#convertBtn');
+    const preview = $('#preview');
+    const downloadBtn = $('#downloadSvg');
+    const shapeControls = $('#shapeControls');
+    const shapeForm = $('#shapeForm');
+
+    // File upload handler
+    pngFile.addEventListener('change', async (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      
+      if (!file.type.startsWith('image/')) {
+        alert('Please select an image file');
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        pngDataUrl = e.target.result;
+        convertBtn.disabled = false;
+        
+        // Show loading indicator
+        preview.innerHTML = `<div style="text-align:center;padding:40px;color:#9aa6b2">
+          <div style="font-size:18px;margin-bottom:10px">🔍</div>
+          <div>Analyzing image for shapes...</div>
+        </div>`;
+        
+        // Auto-detect shapes from the PNG
+        await detectShapesFromPNG(pngDataUrl);
+        
+        // Convert to SVG first to enable shape rendering
+        const width = parseInt($('#canvasWidth').value) || 1000;
+        const height = parseInt($('#canvasHeight').value) || 625;
+        
+        svgContent = `<?xml version="1.0" encoding="UTF-8"?>
+<svg viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">
+  <image href="${pngDataUrl}" width="${width}" height="${height}" />
+</svg>`;
+        
+        // Now update preview with shapes
+        updatePreview();
+      };
+      reader.readAsDataURL(file);
+    });
+
+    // Auto-detect shapes from PNG using canvas analysis
+    async function detectShapesFromPNG(dataUrl) {
+      return new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          canvas.width = img.width;
+          canvas.height = img.height;
+          
+          ctx.drawImage(img, 0, 0);
+          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          
+          // Detect shapes using edge detection and contour analysis
+          const detectedShapes = analyzeImageForShapes(imageData, canvas.width, canvas.height);
+          
+          // Get SVG canvas dimensions
+          const svgWidth = parseInt($('#canvasWidth').value) || 1000;
+          const svgHeight = parseInt($('#canvasHeight').value) || 1000;
+          
+          // Scale coordinates from PNG to SVG canvas
+          const scaleX = svgWidth / canvas.width;
+          const scaleY = svgHeight / canvas.height;
+          
+          // Apply scaling to detected shapes
+          const scaledShapes = detectedShapes.map(shape => {
+            if (shape.type === 'circle') {
+              return {
+                ...shape,
+                cx: shape.cx * scaleX,
+                cy: shape.cy * scaleY,
+                r: shape.r * Math.min(scaleX, scaleY), // Use smaller scale to maintain aspect ratio
+                originalBounds: {
+                  ...shape.originalBounds,
+                  x: shape.originalBounds.x * scaleX,
+                  y: shape.originalBounds.y * scaleY,
+                  width: shape.originalBounds.width * scaleX,
+                  height: shape.originalBounds.height * scaleY
+                }
+              };
+            } else if (shape.type === 'rect') {
+              return {
+                ...shape,
+                x: shape.x * scaleX,
+                y: shape.y * scaleY,
+                width: shape.width * scaleX,
+                height: shape.height * scaleY,
+                originalBounds: {
+                  ...shape.originalBounds,
+                  x: shape.originalBounds.x * scaleX,
+                  y: shape.originalBounds.y * scaleY,
+                  width: shape.originalBounds.width * scaleX,
+                  height: shape.originalBounds.height * scaleY
+                }
+              };
+            }
+            return shape;
+          });
+          
+          // Add detected shapes to the shapes array
+          shapes = scaledShapes;
+          
+          console.log('Detected shapes:', scaledShapes);
+          console.log('Scale factors:', { scaleX, scaleY, pngSize: { width: canvas.width, height: canvas.height }, svgSize: { width: svgWidth, height: svgHeight } });
+          
+          // Show debug info
+          $('#debugInfo').style.display = 'block';
+          $('#scaleInfo').innerHTML = `
+            PNG: ${canvas.width}×${canvas.height} → SVG: ${svgWidth}×${svgHeight}<br>
+            Scale: ${scaleX.toFixed(2)}× (X) ${scaleY.toFixed(2)}× (Y)
+          `;
+          $('#shapeInfo').innerHTML = `Detected ${scaledShapes.length} shapes`;
+          
+          // Update preview with detected shapes
+          updatePreview();
+          
+          // Download button will be enabled by updateDownloadButton() in updatePreview()
+          
+          if (detectedShapes.length > 0) {
+            alert(`Auto-detected ${detectedShapes.length} shapes! You can now move and edit them.`);
+          } else {
+            alert('No shapes detected automatically. You can add shapes manually.');
+          }
+          
+          resolve();
+        };
+        img.src = dataUrl;
+      });
+    }
+
+    // Analyze image data to detect circles and rectangles
+    function analyzeImageForShapes(imageData, width, height) {
+      const detectedShapes = [];
+      const data = imageData.data;
+      
+      // Try color-based detection for circles first
+      console.log('Starting color-based circle detection...');
+      const colorCircles = detectCirclesByColor(data, width, height);
+      console.log(`Color circle detection found ${colorCircles.length} circles`);
+      
+      // Try shape-based detection for rectangles
+      console.log('Starting shape-based rectangle detection...');
+      const shapeRectangles = detectRectanglesByShape(data, width, height);
+      console.log(`Shape rectangle detection found ${shapeRectangles.length} rectangles`);
+      
+      // If no shapes found, try fallback detection
+      if (colorCircles.length === 0 && shapeRectangles.length === 0) {
+        console.log('No shapes found with hybrid detection, trying fallback...');
+        const fallbackShapes = detectShapesByColor(data, width, height);
+        console.log(`Fallback detection found ${fallbackShapes.length} shapes`);
+        return fallbackShapes.slice(0, 50); // Limit to 50 shapes
+      }
+      
+      // Combine results: circles from color + rectangles from shape
+      const combinedShapes = [...colorCircles, ...shapeRectangles];
+      console.log(`Combined detection: ${colorCircles.length} circles + ${shapeRectangles.length} rectangles = ${combinedShapes.length} total`);
+      
+      // Limit to 50 shapes maximum
+      const limitedShapes = combinedShapes.slice(0, 50);
+      console.log(`Limited to ${limitedShapes.length} shapes (max 50)`);
+      return limitedShapes;
+      
+    }
+
+    // Color-based shape detection with specific color mapping
+    function detectShapesByColor(data, width, height) {
+      const detectedShapes = [];
+      const visited = new Array(width * height).fill(false);
+      
+      // Define color ranges for different shape types
+      const colorRanges = [
+        { 
+          name: 'red', 
+          r: [200, 255], g: [0, 100], b: [0, 100], 
+          shapeType: 'exit',
+          fill: '#ff0000',
+          stroke: '#cc0000'
+        },
+        { 
+          name: 'green', 
+          r: [0, 100], g: [200, 255], b: [0, 100], 
+          shapeType: 'zone',
+          fill: '#00ff00',
+          stroke: '#00cc00'
+        },
+        { 
+          name: 'blue', 
+          r: [0, 100], g: [0, 100], b: [200, 255], 
+          shapeType: 'toilet',
+          fill: '#0000ff',
+          stroke: '#0000cc'
+        },
+        { 
+          name: 'yellow', 
+          r: [200, 255], g: [200, 255], b: [0, 100], 
+          shapeType: 'other',
+          fill: '#ffff00',
+          stroke: '#cccc00'
+        }
+      ];
+      
+      console.log('Starting color-based detection...');
+      
+      // Look for distinct colored regions
+      for (let y = 0; y < height; y += 10) { // Sample every 10 pixels for better detection
+        for (let x = 0; x < width; x += 10) {
+          const idx = y * width + x;
+          if (visited[idx]) continue;
+          
+          const pixelIdx = idx * 4;
+          const r = data[pixelIdx];
+          const g = data[pixelIdx + 1];
+          const b = data[pixelIdx + 2];
+          
+          // Skip very dark pixels (likely background)
+          if (r + g + b < 150) continue;
+          
+          // Check if pixel matches any color range
+          for (const colorRange of colorRanges) {
+            if (r >= colorRange.r[0] && r <= colorRange.r[1] &&
+                g >= colorRange.g[0] && g <= colorRange.g[1] &&
+                b >= colorRange.b[0] && b <= colorRange.b[1]) {
+              
+              console.log(`Found ${colorRange.name} pixel at (${x}, ${y})`);
+              
+              // Find connected region
+              const region = floodFill(data, visited, x, y, width, height, r, g, b);
+              if (region.length > 100) { // Minimum region size
+                const bounds = getContourBounds(region);
+                const aspectRatio = bounds.width / bounds.height;
+                
+                console.log(`Detected ${colorRange.shapeType}: at (${bounds.x}, ${bounds.y}) size ${bounds.width}x${bounds.height}`);
+                
+                // Use improved shape classification
+                const area = getContourArea(region);
+                const perimeter = region.length;
+                const circularity = (4 * Math.PI * area) / (perimeter * perimeter);
+                
+                console.log(`Shape analysis: circularity=${circularity.toFixed(3)}, aspectRatio=${aspectRatio.toFixed(3)}, area=${area}, bounds=${bounds.width}x${bounds.height}`);
+                
+                // More lenient classification criteria
+                const isVeryCircular = circularity > 0.7; // Higher threshold for circles
+                const isSquareish = Math.abs(aspectRatio - 1) < 0.3; // Square-like aspect ratio
+                const isRectangular = circularity < 0.5 || Math.abs(aspectRatio - 1) > 0.5; // Clearly rectangular
+                
+                console.log(`Classification: isVeryCircular=${isVeryCircular}, isSquareish=${isSquareish}, isRectangular=${isRectangular}`);
+                
+                if (isVeryCircular && isSquareish) {
+                  // Definitely a circle
+                  const centerX = bounds.x + bounds.width / 2;
+                  const centerY = bounds.y + bounds.height / 2;
+                  const radius = Math.min(bounds.width, bounds.height) / 2;
+                  
+                  detectedShapes.push({
+                    id: `color-${colorRange.name}-${detectedShapes.length}`,
+                    type: 'circle',
+                    cx: centerX,
+                    cy: centerY,
+                    r: radius,
+                    fill: colorRange.fill,
+                    stroke: colorRange.stroke,
+                    strokeWidth: 2,
+                    name: `${colorRange.shapeType.charAt(0).toUpperCase() + colorRange.shapeType.slice(1)} ${detectedShapes.length + 1}`,
+                    layer: 1,
+                    shapeType: colorRange.shapeType,
+                    isDetected: true,
+                    originalBounds: bounds
+                  });
+                  console.log(`→ Classified as CIRCLE`);
+                } else {
+                  // Default to rectangle for ambiguous shapes
+                  detectedShapes.push({
+                    id: `color-${colorRange.name}-${detectedShapes.length}`,
+                    type: 'rect',
+                    x: bounds.x,
+                    y: bounds.y,
+                    width: bounds.width,
+                    height: bounds.height,
+                    fill: colorRange.fill,
+                    stroke: colorRange.stroke,
+                    strokeWidth: 2,
+                    name: `${colorRange.shapeType.charAt(0).toUpperCase() + colorRange.shapeType.slice(1)} ${detectedShapes.length + 1}`,
+                    layer: 1,
+                    shapeType: colorRange.shapeType,
+                    isDetected: true,
+                    originalBounds: bounds
+                  });
+                  console.log(`→ Classified as RECTANGLE`);
+                }
+              }
+              break;
+            }
+          }
+        }
+      }
+      
+      console.log(`Color-based detection found ${detectedShapes.length} shapes`);
+      
+      // Limit color detection to 50 shapes maximum
+      const limitedShapes = detectedShapes.slice(0, 50);
+      console.log(`Limited color detection to ${limitedShapes.length} shapes (max 50)`);
+      return limitedShapes;
+    }
+
+    // Simple flood fill algorithm
+    function floodFill(data, visited, startX, startY, width, height, targetR, targetG, targetB) {
+      const region = [];
+      const stack = [{x: startX, y: startY}];
+      const tolerance = 30; // Color tolerance
+      
+      while (stack.length > 0) {
+        const {x, y} = stack.pop();
+        const idx = (y * width + x) * 4;
+        
+        if (x < 0 || x >= width || y < 0 || y >= height || visited[y * width + x]) continue;
+        
+        const r = data[idx];
+        const g = data[idx + 1];
+        const b = data[idx + 2];
+        
+        // Check if color is similar
+        if (Math.abs(r - targetR) > tolerance || 
+            Math.abs(g - targetG) > tolerance || 
+            Math.abs(b - targetB) > tolerance) continue;
+        
+        visited[y * width + x] = true;
+        region.push({x, y});
+        
+        // Add 4-connected neighbors
+        stack.push({x: x + 1, y});
+        stack.push({x: x - 1, y});
+        stack.push({x, y: y + 1});
+        stack.push({x, y: y - 1});
+      }
+      
+      return region;
+    }
+
+    // Simple edge detection using Sobel operator
+    function findEdges(data, width, height) {
+      const edges = new Uint8Array(width * height);
+      
+      for (let y = 1; y < height - 1; y++) {
+        for (let x = 1; x < width - 1; x++) {
+          const idx = (y * width + x) * 4;
+          const gray = (data[idx] + data[idx + 1] + data[idx + 2]) / 3;
+          
+          // Simple edge detection
+          const gx = Math.abs(
+            (data[((y-1) * width + (x-1)) * 4] + 2 * data[((y-1) * width + x) * 4] + data[((y-1) * width + (x+1)) * 4]) / 3 -
+            (data[((y+1) * width + (x-1)) * 4] + 2 * data[((y+1) * width + x) * 4] + data[((y+1) * width + (x+1)) * 4]) / 3
+          );
+          
+          const gy = Math.abs(
+            (data[((y-1) * width + (x-1)) * 4] + 2 * data[(y * width + (x-1)) * 4] + data[((y+1) * width + (x-1)) * 4]) / 3 -
+            (data[((y-1) * width + (x+1)) * 4] + 2 * data[(y * width + (x+1)) * 4] + data[((y+1) * width + (x+1)) * 4]) / 3
+          );
+          
+          const magnitude = Math.sqrt(gx * gx + gy * gy);
+          edges[y * width + x] = magnitude > 20 ? 255 : 0; // Lower threshold for better detection
+        }
+      }
+      
+      return edges;
+    }
+
+    // Find contours in edge data
+    function findContours(edges, width, height) {
+      const visited = new Array(width * height).fill(false);
+      const contours = [];
+      
+      for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+          const idx = y * width + x;
+          if (edges[idx] > 0 && !visited[idx]) {
+            const contour = traceContour(edges, visited, x, y, width, height);
+            if (contour.length > 5) {
+              contours.push(contour);
+            }
+          }
+        }
+      }
+      
+      return contours;
+    }
+
+    // Trace a single contour
+    function traceContour(edges, visited, startX, startY, width, height) {
+      const contour = [];
+      const stack = [{x: startX, y: startY}];
+      
+      while (stack.length > 0) {
+        const {x, y} = stack.pop();
+        const idx = y * width + x;
+        
+        if (x < 0 || x >= width || y < 0 || y >= height || visited[idx] || edges[idx] === 0) {
+          continue;
+        }
+        
+        visited[idx] = true;
+        contour.push({x, y});
+        
+        // Add 8-connected neighbors
+        for (let dy = -1; dy <= 1; dy++) {
+          for (let dx = -1; dx <= 1; dx++) {
+            if (dx === 0 && dy === 0) continue;
+            stack.push({x: x + dx, y: y + dy});
+          }
+        }
+      }
+      
+      return contour;
+    }
+
+    // Get bounding box of contour
+    function getContourBounds(contour) {
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      
+      contour.forEach(point => {
+        minX = Math.min(minX, point.x);
+        minY = Math.min(minY, point.y);
+        maxX = Math.max(maxX, point.x);
+        maxY = Math.max(maxY, point.y);
+      });
+      
+      return {
+        x: minX,
+        y: minY,
+        width: maxX - minX,
+        height: maxY - minY
+      };
+    }
+
+    // Calculate contour area
+    function getContourArea(contour) {
+      let area = 0;
+      for (let i = 0; i < contour.length; i++) {
+        const j = (i + 1) % contour.length;
+        area += contour[i].x * contour[j].y;
+        area -= contour[j].x * contour[i].y;
+      }
+      return Math.abs(area) / 2;
+    }
+
+    // Classify shape based on improved contour analysis
+    function classifyShape(contour, bounds, area) {
+      const aspectRatio = bounds.width / bounds.height;
+      
+      // Calculate perimeter from contour length
+      const perimeter = contour.length;
+      
+      // Circularity formula: 4π * area / perimeter²
+      // For a perfect circle, this equals 1
+      const circularity = (4 * Math.PI * area) / (perimeter * perimeter);
+      
+      // More sophisticated classification
+      const isVerySquare = Math.abs(aspectRatio - 1) < 0.15; // Very square aspect ratio
+      const isSomewhatSquare = Math.abs(aspectRatio - 1) < 0.3; // Somewhat square
+      const isVeryRound = circularity > 0.8; // Very circular
+      const isSomewhatRound = circularity > 0.6; // Somewhat circular
+      const isRectangular = circularity < 0.4 || Math.abs(aspectRatio - 1) > 0.5; // Clearly rectangular
+      
+      console.log(`Shape analysis: circularity=${circularity.toFixed(3)}, aspectRatio=${aspectRatio.toFixed(3)}, area=${area}, perimeter=${perimeter}`);
+      console.log(`Classification factors: isVerySquare=${isVerySquare}, isSomewhatSquare=${isSomewhatSquare}, isVeryRound=${isVeryRound}, isSomewhatRound=${isSomewhatRound}, isRectangular=${isRectangular}`);
+      
+      // More conservative circle classification
+      if (isVeryRound && isVerySquare) {
+        console.log(`→ Classifying as CIRCLE (very round + very square)`);
+        return 'circle';
+      } else if (isVeryRound && isSomewhatSquare) {
+        console.log(`→ Classifying as CIRCLE (very round + somewhat square)`);
+        return 'circle';
+      } else if (isSomewhatRound && isVerySquare) {
+        console.log(`→ Classifying as CIRCLE (somewhat round + very square)`);
+        return 'circle';
+      } else if (isRectangular) {
+        console.log(`→ Classifying as RECTANGLE (clearly rectangular)`);
+        return 'rectangle';
+      } else {
+        // Default to rectangle for ambiguous shapes
+        console.log(`→ Classifying as RECTANGLE (default for ambiguous)`);
+        return 'rectangle';
+      }
+    }
+
+    // Direct circle detection using Hough-like approach (more selective)
+    function detectCirclesDirectly(data, width, height) {
+      const circles = [];
+      const minRadius = 15; // Increased minimum radius
+      const maxRadius = Math.min(width, height) / 6; // Reduced maximum radius
+      
+      // Only sample every 20 pixels to reduce false positives
+      for (let y = minRadius; y < height - minRadius; y += 20) {
+        for (let x = minRadius; x < width - minRadius; x += 20) {
+          const idx = (y * width + x) * 4;
+          const r = data[idx];
+          const g = data[idx + 1];
+          const b = data[idx + 2];
+          
+          // Skip if pixel is too dark (likely background)
+          if (r + g + b < 150) continue;
+          
+          // Only check for circles if the pixel matches our target colors
+          const isTargetColor = (
+            (r >= 200 && g <= 100 && b <= 100) || // Red
+            (r <= 100 && g >= 200 && b <= 100) || // Green
+            (r <= 100 && g <= 100 && b >= 200) || // Blue
+            (r >= 200 && g >= 200 && b <= 100)    // Yellow
+          );
+          
+          if (!isTargetColor) continue;
+          
+          // Try different radii with larger steps
+          for (let radius = minRadius; radius < maxRadius; radius += 5) {
+            if (isValidCircle(data, width, height, x, y, radius)) {
+              const confidence = calculateCircleConfidence(data, width, height, x, y, radius);
+              // Only add circles with high confidence
+              if (confidence > 0.8) {
+                circles.push({
+                  x: x,
+                  y: y,
+                  radius: radius,
+                  confidence: confidence
+                });
+              }
+            }
+          }
+        }
+      }
+      
+      // Remove overlapping circles and limit to reasonable number
+      const filtered = filterOverlappingCircles(circles);
+      return filtered.slice(0, 50); // Limit to maximum 50 circles
+    }
+
+    // Check if a circle is valid at given position and radius (more strict)
+    function isValidCircle(data, width, height, centerX, centerY, radius) {
+      const samplePoints = 24; // Sample more points for better accuracy
+      let validPoints = 0;
+      let colorConsistency = 0;
+      const centerIdx = (centerY * width + centerX) * 4;
+      const centerR = data[centerIdx];
+      const centerG = data[centerIdx + 1];
+      const centerB = data[centerIdx + 2];
+      
+      for (let i = 0; i < samplePoints; i++) {
+        const angle = (i / samplePoints) * 2 * Math.PI;
+        const x = Math.round(centerX + radius * Math.cos(angle));
+        const y = Math.round(centerY + radius * Math.sin(angle));
+        
+        if (x >= 0 && x < width && y >= 0 && y < height) {
+          const idx = (y * width + x) * 4;
+          const r = data[idx];
+          const g = data[idx + 1];
+          const b = data[idx + 2];
+          
+          // Check if this point is part of a shape (not background)
+          if (r + g + b > 150) {
+            validPoints++;
+            
+            // Check color consistency with center
+            const colorDiff = Math.abs(r - centerR) + Math.abs(g - centerG) + Math.abs(b - centerB);
+            if (colorDiff < 50) { // Similar color to center
+              colorConsistency++;
+            }
+          }
+        }
+      }
+      
+      // At least 80% of points should be valid AND 70% should have consistent color
+      return validPoints >= samplePoints * 0.8 && colorConsistency >= samplePoints * 0.7;
+    }
+
+    // Calculate confidence for a detected circle (more strict)
+    function calculateCircleConfidence(data, width, height, centerX, centerY, radius) {
+      let confidence = 0;
+      let colorConsistency = 0;
+      const samplePoints = 32;
+      const centerIdx = (centerY * width + centerX) * 4;
+      const centerR = data[centerIdx];
+      const centerG = data[centerIdx + 1];
+      const centerB = data[centerIdx + 2];
+      
+      for (let i = 0; i < samplePoints; i++) {
+        const angle = (i / samplePoints) * 2 * Math.PI;
+        const x = Math.round(centerX + radius * Math.cos(angle));
+        const y = Math.round(centerY + radius * Math.sin(angle));
+        
+        if (x >= 0 && x < width && y >= 0 && y < height) {
+          const idx = (y * width + x) * 4;
+          const r = data[idx];
+          const g = data[idx + 1];
+          const b = data[idx + 2];
+          
+          if (r + g + b > 150) {
+            confidence += 1;
+            
+            // Check color consistency
+            const colorDiff = Math.abs(r - centerR) + Math.abs(g - centerG) + Math.abs(b - centerB);
+            if (colorDiff < 50) {
+              colorConsistency += 1;
+            }
+          }
+        }
+      }
+      
+      // Combine shape confidence with color consistency
+      const shapeConfidence = confidence / samplePoints;
+      const colorConfidence = colorConsistency / samplePoints;
+      return (shapeConfidence + colorConfidence) / 2;
+    }
+
+    // Remove overlapping circles, keeping the ones with highest confidence
+    function filterOverlappingCircles(circles) {
+      const filtered = [];
+      
+      circles.sort((a, b) => b.confidence - a.confidence);
+      
+      for (const circle of circles) {
+        let isOverlapping = false;
+        
+        for (const existing of filtered) {
+          const distance = Math.sqrt(
+            Math.pow(circle.x - existing.x, 2) + Math.pow(circle.y - existing.y, 2)
+          );
+          
+          if (distance < Math.max(circle.radius, existing.radius) * 0.8) {
+            isOverlapping = true;
+            break;
+          }
+        }
+        
+        if (!isOverlapping) {
+          filtered.push(circle);
+        }
+      }
+      
+      return filtered;
+    }
+
+    // Color-based circle detection (circles only)
+    function detectCirclesByColor(data, width, height) {
+      const circles = [];
+      const visited = new Array(width * height).fill(false);
+      
+      // Define color ranges for circles only
+      const colorRanges = [
+        { name: 'red', r: [200, 255], g: [0, 100], b: [0, 100], color: '#ff0000', shapeType: 'exit' },
+        { name: 'green', r: [0, 100], g: [200, 255], b: [0, 100], color: '#00ff00', shapeType: 'zone' },
+        { name: 'blue', r: [0, 100], g: [0, 100], b: [200, 255], color: '#0000ff', shapeType: 'toilet' },
+        { name: 'yellow', r: [200, 255], g: [200, 255], b: [0, 100], color: '#ffff00', shapeType: 'other' }
+      ];
+      
+      console.log('Starting color-based circle detection...');
+      
+      // Look for colored regions that are circular
+      for (let y = 0; y < height; y += 10) {
+        for (let x = 0; x < width; x += 10) {
+          const idx = y * width + x;
+          if (visited[idx]) continue;
+          
+          const pixelIdx = idx * 4;
+          const r = data[pixelIdx];
+          const g = data[pixelIdx + 1];
+          const b = data[pixelIdx + 2];
+          
+          // Skip very dark pixels
+          if (r + g + b < 150) continue;
+          
+          // Check if pixel matches any color range
+          for (const colorRange of colorRanges) {
+            if (r >= colorRange.r[0] && r <= colorRange.r[1] &&
+                g >= colorRange.g[0] && g <= colorRange.g[1] &&
+                b >= colorRange.b[0] && b <= colorRange.b[1]) {
+              
+              // Find connected region
+              const region = floodFill(data, visited, x, y, width, height, r, g, b);
+              if (region.length > 100) { // Minimum region size
+                const bounds = getContourBounds(region);
+                const aspectRatio = bounds.width / bounds.height;
+                const area = getContourArea(region);
+                const perimeter = region.length;
+                const circularity = (4 * Math.PI * area) / (perimeter * perimeter);
+                
+                // More lenient circle classification
+                const isCircular = circularity > 0.5 && Math.abs(aspectRatio - 1) < 0.4;
+                
+                console.log(`Color region: circularity=${circularity.toFixed(3)}, aspectRatio=${aspectRatio.toFixed(3)}, isCircular=${isCircular}`);
+                
+                if (isCircular) {
+                  const centerX = bounds.x + bounds.width / 2;
+                  const centerY = bounds.y + bounds.height / 2;
+                  const radius = Math.min(bounds.width, bounds.height) / 2;
+                  
+                  circles.push({
+                    id: `color-circle-${circles.length}`,
+                    type: 'circle',
+                    cx: centerX,
+                    cy: centerY,
+                    r: radius,
+                    fill: colorRange.color,
+                    stroke: '#333',
+                    strokeWidth: 2,
+                    name: `${colorRange.shapeType.charAt(0).toUpperCase() + colorRange.shapeType.slice(1)} ${circles.length + 1}`,
+                    layer: 1,
+                    shapeType: colorRange.shapeType,
+                    isDetected: true,
+                    originalBounds: bounds
+                  });
+                  
+                  console.log(`→ Added color circle: ${colorRange.name} at (${centerX}, ${centerY}) radius ${radius}`);
+                } else {
+                  console.log(`→ Skipped color region (not circular enough)`);
+                }
+              }
+              break;
+            }
+          }
+        }
+      }
+      
+      console.log(`Color-based circle detection found ${circles.length} circles`);
+      return circles;
+    }
+
+    // Shape-based rectangle detection (rectangles only)
+    function detectRectanglesByShape(data, width, height) {
+      const rectangles = [];
+      
+      // Use edge detection to find rectangular shapes
+      const edges = findEdges(data, width, height);
+      const contours = findContours(edges, width, height);
+      
+      console.log(`Edge detection found ${contours.length} contours for rectangle detection`);
+      
+      // Analyze each contour for rectangular shapes
+      contours.forEach((contour, index) => {
+        if (contour.length < 20) return; // Skip very small contours
+        
+        const bounds = getContourBounds(contour);
+        const area = getContourArea(contour);
+        const aspectRatio = bounds.width / bounds.height;
+        const perimeter = contour.length;
+        const circularity = (4 * Math.PI * area) / (perimeter * perimeter);
+        
+        // More lenient rectangle classification
+        const isRectangular = circularity < 0.7 || Math.abs(aspectRatio - 1) > 0.2;
+        
+        console.log(`Contour ${index}: circularity=${circularity.toFixed(3)}, aspectRatio=${aspectRatio.toFixed(3)}, isRectangular=${isRectangular}`);
+        
+        if (isRectangular) {
+          rectangles.push({
+            id: `shape-rect-${index}`,
+            type: 'rect',
+            x: bounds.x,
+            y: bounds.y,
+            width: bounds.width,
+            height: bounds.height,
+            fill: '#4caf50',
+            stroke: '#2e7d32',
+            strokeWidth: 2,
+            name: `Zone ${rectangles.length + 1}`,
+            layer: 1,
+            shapeType: 'zone',
+            isDetected: true,
+            originalBounds: bounds
+          });
+          
+          console.log(`→ Added shape rectangle: ${bounds.width}x${bounds.height} at (${bounds.x}, ${bounds.y})`);
+        } else {
+          console.log(`→ Skipped contour ${index} (too circular)`);
+        }
+      });
+      
+      console.log(`Shape-based rectangle detection found ${rectangles.length} rectangles`);
+      return rectangles;
+    }
+
+    // Limit detection to maximum 50 shapes
+    function limitToFiftyShapes(shapes) {
+      if (shapes.length <= 50) {
+        return shapes;
+      }
+      
+      // Sort by area (largest first) and take first 50
+      const sortedShapes = shapes.sort((a, b) => {
+        const areaA = a.type === 'circle' ? Math.PI * a.r * a.r : a.width * a.height;
+        const areaB = b.type === 'circle' ? Math.PI * b.r * b.r : b.width * b.height;
+        return areaB - areaA; // Largest first
+      });
+      
+      const limited = sortedShapes.slice(0, 50);
+      console.log(`Limited to ${limited.length} shapes (max 50) - selected largest shapes`);
+      return limited;
+    }
+
+    // Direct rectangle detection using color-based approach
+    function detectRectanglesDirectly(data, width, height) {
+      const rectangles = [];
+      const visited = new Array(width * height).fill(false);
+      
+      // Define color ranges for different shape types
+      const colorRanges = [
+        { name: 'red', r: [200, 255], g: [0, 100], b: [0, 100], color: '#ff0000' },
+        { name: 'green', r: [0, 100], g: [200, 255], b: [0, 100], color: '#00ff00' },
+        { name: 'blue', r: [0, 100], g: [0, 100], b: [200, 255], color: '#0000ff' },
+        { name: 'yellow', r: [200, 255], g: [200, 255], b: [0, 100], color: '#ffff00' }
+      ];
+      
+      console.log('Starting direct rectangle detection...');
+      
+      // Look for colored regions
+      for (let y = 0; y < height; y += 5) {
+        for (let x = 0; x < width; x += 5) {
+          const idx = y * width + x;
+          if (visited[idx]) continue;
+          
+          const pixelIdx = idx * 4;
+          const r = data[pixelIdx];
+          const g = data[pixelIdx + 1];
+          const b = data[pixelIdx + 2];
+          
+          // Skip very dark pixels
+          if (r + g + b < 150) continue;
+          
+          // Check if pixel matches any color range
+          for (const colorRange of colorRanges) {
+            if (r >= colorRange.r[0] && r <= colorRange.r[1] &&
+                g >= colorRange.g[0] && g <= colorRange.g[1] &&
+                b >= colorRange.b[0] && b <= colorRange.b[1]) {
+              
+              // Find connected region
+              const region = floodFill(data, visited, x, y, width, height, r, g, b);
+              if (region.length > 200) { // Minimum region size for rectangles
+                const bounds = getContourBounds(region);
+                const aspectRatio = bounds.width / bounds.height;
+                
+                // Force classification as rectangle (relaxed criteria)
+                if (bounds.width > 20 && bounds.height > 20) { // Minimum size
+                  rectangles.push({
+                    x: bounds.x,
+                    y: bounds.y,
+                    width: bounds.width,
+                    height: bounds.height,
+                    color: colorRange.color,
+                    aspectRatio: aspectRatio
+                  });
+                  
+                  console.log(`Found rectangle: ${bounds.width}x${bounds.height} at (${bounds.x}, ${bounds.y})`);
+                }
+              }
+              break;
+            }
+          }
+        }
+      }
+      
+      console.log(`Direct rectangle detection found ${rectangles.length} rectangles`);
+      
+      // Limit to 50 rectangles maximum
+      const limitedRectangles = rectangles.slice(0, 50);
+      console.log(`Limited rectangle detection to ${limitedRectangles.length} rectangles (max 50)`);
+      return limitedRectangles;
+    }
+
+    // Convert PNG to SVG
+    convertBtn.addEventListener('click', () => {
+      const width = parseInt($('#canvasWidth').value) || 1000;
+      const height = parseInt($('#canvasHeight').value) || 625;
+      
+      svgContent = `<?xml version="1.0" encoding="UTF-8"?>
+<svg viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">
+  <image href="${pngDataUrl}" width="${width}" height="${height}" />
+</svg>`;
+      
+      preview.innerHTML = svgContent;
+      downloadBtn.disabled = false;
+    });
+
+    // Add circle
+    $('#addCircle').addEventListener('click', () => {
+      const circle = {
+        id: `circle-${Date.now()}`,
+        type: 'circle',
+        cx: 100,
+        cy: 100,
+        r: 20,
+        fill: '#ff5722',
+        stroke: '#d32f2f',
+        strokeWidth: 2
+      };
+      shapes.push(circle);
+      updatePreview();
+    });
+
+    // Add rectangle
+    $('#addRect').addEventListener('click', () => {
+      const rect = {
+        id: `rect-${Date.now()}`,
+        type: 'rect',
+        x: 50,
+        y: 50,
+        width: 100,
+        height: 60,
+        fill: '#4caf50',
+        stroke: '#2e7d32',
+        strokeWidth: 2
+      };
+      shapes.push(rect);
+      updatePreview();
+    });
+
+    // Clear all shapes
+    $('#clearShapes').addEventListener('click', () => {
+      shapes = [];
+      updatePreview();
+      updateDownloadButton(); // Update download button state
+    });
+
+    // Re-detect shapes
+    $('#detectShapes').addEventListener('click', async () => {
+      if (!pngDataUrl) {
+        alert('Please upload a PNG file first');
+        return;
+      }
+      
+      // Show loading indicator
+      preview.innerHTML = `<div style="text-align:center;padding:40px;color:#9aa6b2">
+        <div style="font-size:18px;margin-bottom:10px">🔍</div>
+        <div>Re-analyzing image for shapes...</div>
+      </div>`;
+      
+      // Clear existing shapes
+      shapes = [];
+      
+      // Re-run detection
+      await detectShapesFromPNG(pngDataUrl);
+      
+      // Update preview with detected shapes
+      updatePreview();
+      
+      // Show fine-tune, reset, force circle, color detection, and force rectangle buttons if shapes were detected
+      if (shapes.length > 0) {
+        $('#fineTuneBtn').style.display = 'inline-block';
+        $('#resetBtn').style.display = 'inline-block';
+        $('#forceCircleBtn').style.display = 'inline-block';
+        $('#colorDetectionBtn').style.display = 'inline-block';
+        $('#forceRectBtn').style.display = 'inline-block';
+      }
+    });
+
+    // Fine-tune placement
+    $('#fineTuneBtn').addEventListener('click', () => {
+      // Select all detected shapes for easy adjustment
+      const detectedShapes = shapes.filter(s => s.isDetected);
+      if (detectedShapes.length > 0) {
+        selectedShape = detectedShapes[0];
+        updateShapeForm();
+        updatePreview();
+        alert(`Fine-tuning mode: ${detectedShapes.length} detected shapes. Click and drag to adjust placement, or use resize handles.`);
+      }
+    });
+
+    // Reset to original positions
+    $('#resetBtn').addEventListener('click', () => {
+      const detectedShapes = shapes.filter(s => s.isDetected);
+      if (detectedShapes.length > 0) {
+        // Reset each detected shape to its original bounds
+        detectedShapes.forEach(shape => {
+          if (shape.originalBounds) {
+            if (shape.type === 'circle') {
+              shape.cx = shape.originalBounds.x + shape.originalBounds.width / 2;
+              shape.cy = shape.originalBounds.y + shape.originalBounds.height / 2;
+              shape.r = Math.min(shape.originalBounds.width, shape.originalBounds.height) / 2;
+            } else if (shape.type === 'rect') {
+              shape.x = shape.originalBounds.x;
+              shape.y = shape.originalBounds.y;
+              shape.width = shape.originalBounds.width;
+              shape.height = shape.originalBounds.height;
+            }
+          }
+        });
+        updatePreview();
+        alert('Shapes reset to original detected positions');
+      }
+    });
+
+    // Force circle detection
+    $('#forceCircleBtn').addEventListener('click', async () => {
+      if (!pngDataUrl) {
+        alert('Please upload a PNG first');
+        return;
+      }
+      
+      try {
+        // Create a new image to analyze
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          canvas.width = img.width;
+          canvas.height = img.height;
+          ctx.drawImage(img, 0, 0);
+          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          
+          // Force circle detection with more aggressive parameters
+          const circles = detectCirclesDirectly(imageData.data, canvas.width, canvas.height);
+          
+          // Get SVG canvas dimensions
+          const svgWidth = parseInt($('#canvasWidth').value) || 1000;
+          const svgHeight = parseInt($('#canvasHeight').value) || 1000;
+          const scaleX = svgWidth / canvas.width;
+          const scaleY = svgHeight / canvas.height;
+          
+          // Add detected circles to shapes
+          circles.forEach((circle, index) => {
+            shapes.push({
+              id: `forced-circle-${Date.now()}-${index}`,
+              type: 'circle',
+              cx: circle.x * scaleX,
+              cy: circle.y * scaleY,
+              r: circle.radius * Math.min(scaleX, scaleY),
+              fill: '#ff5722',
+              stroke: '#d32f2f',
+              strokeWidth: 2,
+              name: `Forced Circle ${index + 1}`,
+              layer: 1,
+              shapeType: 'exit',
+              isDetected: true,
+              originalBounds: {
+                x: (circle.x - circle.radius) * scaleX,
+                y: (circle.y - circle.radius) * scaleY,
+                width: circle.radius * 2 * scaleX,
+                height: circle.radius * 2 * scaleY
+              }
+            });
+          });
+          
+          updatePreview();
+          alert(`Force detection found ${circles.length} circles`);
+        };
+        img.src = pngDataUrl;
+      } catch (error) {
+        console.error('Force circle detection failed:', error);
+        alert('Force circle detection failed: ' + error.message);
+      }
+    });
+
+    // Color detection only
+    $('#colorDetectionBtn').addEventListener('click', async () => {
+      if (!pngDataUrl) {
+        alert('Please upload a PNG first');
+        return;
+      }
+      
+      try {
+        // Create a new image to analyze
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          canvas.width = img.width;
+          canvas.height = img.height;
+          ctx.drawImage(img, 0, 0);
+          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          
+          // Force color-based detection only
+          const colorShapes = detectShapesByColor(imageData.data, canvas.width, canvas.height);
+          
+          // Get SVG canvas dimensions
+          const svgWidth = parseInt($('#canvasWidth').value) || 1000;
+          const svgHeight = parseInt($('#canvasHeight').value) || 1000;
+          const scaleX = svgWidth / canvas.width;
+          const scaleY = svgHeight / canvas.height;
+          
+          // Scale the detected shapes
+          const scaledShapes = colorShapes.map(shape => {
+            if (shape.type === 'circle') {
+              return {
+                ...shape,
+                cx: shape.cx * scaleX,
+                cy: shape.cy * scaleY,
+                r: shape.r * Math.min(scaleX, scaleY),
+                originalBounds: {
+                  ...shape.originalBounds,
+                  x: shape.originalBounds.x * scaleX,
+                  y: shape.originalBounds.y * scaleY,
+                  width: shape.originalBounds.width * scaleX,
+                  height: shape.originalBounds.height * scaleY
+                }
+              };
+            } else if (shape.type === 'rect') {
+              return {
+                ...shape,
+                x: shape.x * scaleX,
+                y: shape.y * scaleY,
+                width: shape.width * scaleX,
+                height: shape.height * scaleY,
+                originalBounds: {
+                  ...shape.originalBounds,
+                  x: shape.originalBounds.x * scaleX,
+                  y: shape.originalBounds.y * scaleY,
+                  width: shape.originalBounds.width * scaleX,
+                  height: shape.originalBounds.height * scaleY
+                }
+              };
+            }
+            return shape;
+          });
+          
+          // Replace all shapes with color-detected shapes
+          shapes = scaledShapes;
+          updatePreview();
+          alert(`Color detection found ${scaledShapes.length} shapes`);
+        };
+        img.src = pngDataUrl;
+      } catch (error) {
+        console.error('Color detection failed:', error);
+        alert('Color detection failed: ' + error.message);
+      }
+    });
+
+    // Force rectangle detection
+    $('#forceRectBtn').addEventListener('click', async () => {
+      if (!pngDataUrl) {
+        alert('Please upload a PNG first');
+        return;
+      }
+      
+      try {
+        // Create a new image to analyze
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          canvas.width = img.width;
+          canvas.height = img.height;
+          ctx.drawImage(img, 0, 0);
+          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          
+          // Force rectangle detection with relaxed criteria
+          const rectShapes = detectRectanglesDirectly(imageData.data, canvas.width, canvas.height);
+          
+          // Get SVG canvas dimensions
+          const svgWidth = parseInt($('#canvasWidth').value) || 1000;
+          const svgHeight = parseInt($('#canvasHeight').value) || 1000;
+          const scaleX = svgWidth / canvas.width;
+          const scaleY = svgHeight / canvas.height;
+          
+          // Add detected rectangles to shapes
+          rectShapes.forEach((rect, index) => {
+            shapes.push({
+              id: `forced-rect-${Date.now()}-${index}`,
+              type: 'rect',
+              x: rect.x * scaleX,
+              y: rect.y * scaleY,
+              width: rect.width * scaleX,
+              height: rect.height * scaleY,
+              fill: rect.color,
+              stroke: '#333',
+              strokeWidth: 2,
+              name: `Forced Rectangle ${index + 1}`,
+              layer: 1,
+              shapeType: 'zone',
+              isDetected: true,
+              originalBounds: {
+                x: rect.x * scaleX,
+                y: rect.y * scaleY,
+                width: rect.width * scaleX,
+                height: rect.height * scaleY
+              }
+            });
+          });
+          
+          updatePreview();
+          alert(`Force rectangle detection found ${rectShapes.length} rectangles`);
+        };
+        img.src = pngDataUrl;
+      } catch (error) {
+        console.error('Force rectangle detection failed:', error);
+        alert('Force rectangle detection failed: ' + error.message);
+      }
+    });
+
+    // Adjust coordinates manually
+    $('#adjustCoordsBtn').addEventListener('click', () => {
+      const detectedShapes = shapes.filter(s => s.isDetected);
+      if (detectedShapes.length === 0) {
+        alert('No detected shapes to adjust');
+        return;
+      }
+      
+      const offsetX = parseFloat(prompt('X offset (pixels):', '0')) || 0;
+      const offsetY = parseFloat(prompt('Y offset (pixels):', '0')) || 0;
+      const scaleFactor = parseFloat(prompt('Scale factor (1.0 = no change):', '1.0')) || 1.0;
+      
+      detectedShapes.forEach(shape => {
+        if (shape.type === 'circle') {
+          shape.cx += offsetX;
+          shape.cy += offsetY;
+          shape.r *= scaleFactor;
+        } else if (shape.type === 'rect') {
+          shape.x += offsetX;
+          shape.y += offsetY;
+          shape.width *= scaleFactor;
+          shape.height *= scaleFactor;
+        }
+      });
+      
+      updatePreview();
+      alert(`Applied adjustments: +${offsetX}px X, +${offsetY}px Y, ×${scaleFactor} scale`);
+    });
+
+    // Check if download button should be enabled
+    function updateDownloadButton() {
+      downloadBtn.disabled = !(svgContent || shapes.length > 0);
+    }
+
+    // Update preview with shapes
+    function updatePreview() {
+      if (!svgContent && !pngDataUrl) return;
+      
+      // If no SVG content but we have PNG, create basic SVG
+      if (!svgContent && pngDataUrl) {
+        const width = parseInt($('#canvasWidth').value) || 1000;
+        const height = parseInt($('#canvasHeight').value) || 625;
+        svgContent = `<?xml version="1.0" encoding="UTF-8"?>
+<svg viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">
+  <image href="${pngDataUrl}" width="${width}" height="${height}" />
+</svg>`;
+      }
+      
+      if (!svgContent) return;
+      
+      let shapesSvg = '';
+      shapes.forEach(shape => {
+        const isSelected = selectedShape && selectedShape.id === shape.id;
+        const isDraggingShape = dragShape && dragShape.id === shape.id;
+        const strokeWidth = isSelected || isDraggingShape ? 4 : 2;
+        const strokeColor = isSelected ? '#7c5cff' : (isDraggingShape ? '#ff6b6b' : shape.stroke);
+        const opacity = isDraggingShape ? 0.7 : 1;
+        
+        if (shape.type === 'circle') {
+          shapesSvg += `<circle id="${shape.id}" cx="${shape.cx}" cy="${shape.cy}" r="${shape.r}" 
+            fill="${shape.fill}" stroke="${strokeColor}" stroke-width="${strokeWidth}" 
+            opacity="${opacity}" style="cursor:move" onmousedown="startDrag(event, '${shape.id}')" onclick="selectShape('${shape.id}')" />`;
+          
+          // Add resize handles for selected circles
+          if (isSelected) {
+            const handleSize = 6;
+            shapesSvg += `<circle cx="${shape.cx + shape.r}" cy="${shape.cy}" r="${handleSize}" 
+              fill="#7c5cff" stroke="white" stroke-width="2" style="cursor:ew-resize" 
+              onmousedown="startResize(event, '${shape.id}', 'right')" />`;
+            shapesSvg += `<circle cx="${shape.cx - shape.r}" cy="${shape.cy}" r="${handleSize}" 
+              fill="#7c5cff" stroke="white" stroke-width="2" style="cursor:ew-resize" 
+              onmousedown="startResize(event, '${shape.id}', 'left')" />`;
+            shapesSvg += `<circle cx="${shape.cx}" cy="${shape.cy + shape.r}" r="${handleSize}" 
+              fill="#7c5cff" stroke="white" stroke-width="2" style="cursor:ns-resize" 
+              onmousedown="startResize(event, '${shape.id}', 'bottom')" />`;
+            shapesSvg += `<circle cx="${shape.cx}" cy="${shape.cy - shape.r}" r="${handleSize}" 
+              fill="#7c5cff" stroke="white" stroke-width="2" style="cursor:ns-resize" 
+              onmousedown="startResize(event, '${shape.id}', 'top')" />`;
+          }
+        } else if (shape.type === 'rect') {
+          shapesSvg += `<rect id="${shape.id}" x="${shape.x}" y="${shape.y}" width="${shape.width}" height="${shape.height}" 
+            fill="${shape.fill}" stroke="${strokeColor}" stroke-width="${strokeWidth}" 
+            opacity="${opacity}" style="cursor:move" onmousedown="startDrag(event, '${shape.id}')" onclick="selectShape('${shape.id}')" />`;
+          
+          // Add resize handles for selected rectangles
+          if (isSelected) {
+            const handleSize = 6;
+            const x = shape.x;
+            const y = shape.y;
+            const w = shape.width;
+            const h = shape.height;
+            
+            // Corner handles
+            shapesSvg += `<circle cx="${x}" cy="${y}" r="${handleSize}" 
+              fill="#7c5cff" stroke="white" stroke-width="2" style="cursor:nw-resize" 
+              onmousedown="startResize(event, '${shape.id}', 'nw')" />`;
+            shapesSvg += `<circle cx="${x + w}" cy="${y}" r="${handleSize}" 
+              fill="#7c5cff" stroke="white" stroke-width="2" style="cursor:ne-resize" 
+              onmousedown="startResize(event, '${shape.id}', 'ne')" />`;
+            shapesSvg += `<circle cx="${x}" cy="${y + h}" r="${handleSize}" 
+              fill="#7c5cff" stroke="white" stroke-width="2" style="cursor:sw-resize" 
+              onmousedown="startResize(event, '${shape.id}', 'sw')" />`;
+            shapesSvg += `<circle cx="${x + w}" cy="${y + h}" r="${handleSize}" 
+              fill="#7c5cff" stroke="white" stroke-width="2" style="cursor:se-resize" 
+              onmousedown="startResize(event, '${shape.id}', 'se')" />`;
+            
+            // Edge handles
+            shapesSvg += `<circle cx="${x + w/2}" cy="${y}" r="${handleSize}" 
+              fill="#7c5cff" stroke="white" stroke-width="2" style="cursor:ns-resize" 
+              onmousedown="startResize(event, '${shape.id}', 'n')" />`;
+            shapesSvg += `<circle cx="${x + w/2}" cy="${y + h}" r="${handleSize}" 
+              fill="#7c5cff" stroke="white" stroke-width="2" style="cursor:ns-resize" 
+              onmousedown="startResize(event, '${shape.id}', 's')" />`;
+            shapesSvg += `<circle cx="${x}" cy="${y + h/2}" r="${handleSize}" 
+              fill="#7c5cff" stroke="white" stroke-width="2" style="cursor:ew-resize" 
+              onmousedown="startResize(event, '${shape.id}', 'w')" />`;
+            shapesSvg += `<circle cx="${x + w}" cy="${y + h/2}" r="${handleSize}" 
+              fill="#7c5cff" stroke="white" stroke-width="2" style="cursor:ew-resize" 
+              onmousedown="startResize(event, '${shape.id}', 'e')" />`;
+          }
+        }
+      });
+
+      const updatedSvg = svgContent.replace('</svg>', shapesSvg + '</svg>');
+      preview.innerHTML = updatedSvg;
+      
+      // Update download button state
+      updateDownloadButton();
+    }
+
+    // Select shape for editing
+    window.selectShape = (shapeId) => {
+      selectedShape = shapes.find(s => s.id === shapeId);
+      if (selectedShape) {
+        shapeControls.style.display = 'block';
+        $('#shapeId').value = selectedShape.id;
+        $('#shapeName').value = selectedShape.name || '';
+        $('#shapeLayer').value = selectedShape.layer || 1;
+        $('#shapeType').value = selectedShape.shapeType || 'zone';
+      }
+    };
+
+    // Apply shape properties
+    $('#applyShape').addEventListener('click', () => {
+      if (!selectedShape) return;
+      
+      selectedShape.id = $('#shapeId').value || selectedShape.id;
+      selectedShape.name = $('#shapeName').value;
+      selectedShape.layer = parseInt($('#shapeLayer').value) || 1;
+      selectedShape.shapeType = $('#shapeType').value;
+      
+      // Add class and data attributes
+      selectedShape.class = selectedShape.shapeType;
+      if (selectedShape.shapeType === 'zone') {
+        selectedShape['data-id'] = selectedShape.id;
+        selectedShape['data-name'] = selectedShape.name;
+        selectedShape['data-layer'] = selectedShape.layer;
+      } else if (selectedShape.shapeType === 'exit') {
+        selectedShape['data-id'] = selectedShape.id;
+        selectedShape['data-name'] = selectedShape.name;
+      } else if (selectedShape.shapeType === 'toilet') {
+        selectedShape['data-id'] = selectedShape.id;
+        selectedShape['data-label'] = selectedShape.name;
+      }
+      
+      updatePreview();
+      alert('Shape properties applied!');
+    });
+
+    // Delete selected shape
+    $('#deleteShape').addEventListener('click', () => {
+      if (!selectedShape) return;
+      
+      if (confirm('Are you sure you want to delete this shape?')) {
+        const index = shapes.findIndex(s => s.id === selectedShape.id);
+        if (index > -1) {
+          shapes.splice(index, 1);
+          selectedShape = null;
+          shapeControls.style.display = 'none';
+          updatePreview();
+        }
+      }
+    });
+
+    // Download SVG
+    downloadBtn.addEventListener('click', () => {
+      if (!svgContent && shapes.length === 0) {
+        alert('Please upload a PNG file or add some shapes first');
+        return;
+      }
+      
+      let finalSvg = svgContent;
+      let shapesSvg = '';
+      
+      // If no SVG content but we have shapes, create a basic SVG
+      if (!finalSvg && shapes.length > 0) {
+        const width = parseInt($('#canvasWidth').value) || 1000;
+        const height = parseInt($('#canvasHeight').value) || 625;
+        finalSvg = `<?xml version="1.0" encoding="UTF-8"?>
+<svg viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">
+  <rect width="${width}" height="${height}" fill="white" />
+</svg>`;
+      }
+      
+      shapes.forEach(shape => {
+        let attrs = '';
+        if (shape.class) attrs += ` class="${shape.class}"`;
+        if (shape['data-id']) attrs += ` data-id="${shape['data-id']}"`;
+        if (shape['data-name']) attrs += ` data-name="${shape['data-name']}"`;
+        if (shape['data-layer']) attrs += ` data-layer="${shape['data-layer']}"`;
+        if (shape['data-label']) attrs += ` data-label="${shape['data-label']}"`;
+        
+        if (shape.type === 'circle') {
+          shapesSvg += `<circle cx="${shape.cx}" cy="${shape.cy}" r="${shape.r}" 
+            fill="${shape.fill}" stroke="${shape.stroke}" stroke-width="${shape.strokeWidth}"${attrs} />`;
+        } else if (shape.type === 'rect') {
+          shapesSvg += `<rect x="${shape.x}" y="${shape.y}" width="${shape.width}" height="${shape.height}" 
+            fill="${shape.fill}" stroke="${shape.stroke}" stroke-width="${shape.strokeWidth}"${attrs} />`;
+        }
+      });
+
+      finalSvg = finalSvg.replace('</svg>', shapesSvg + '</svg>');
+      
+      const blob = new Blob([finalSvg], { type: 'image/svg+xml' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'venue-layout-converted.svg';
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+
+    // Drag functionality
+    window.startDrag = (event, shapeId) => {
+      event.preventDefault();
+      event.stopPropagation();
+      
+      dragShape = shapes.find(s => s.id === shapeId);
+      if (!dragShape) return;
+      
+      isDragging = true;
+      selectedShape = dragShape;
+      
+      // Calculate offset from mouse to shape center
+      const rect = preview.getBoundingClientRect();
+      const mouseX = event.clientX - rect.left;
+      const mouseY = event.clientY - rect.top;
+      
+      if (dragShape.type === 'circle') {
+        dragOffset.x = mouseX - dragShape.cx;
+        dragOffset.y = mouseY - dragShape.cy;
+      } else if (dragShape.type === 'rect') {
+        dragOffset.x = mouseX - (dragShape.x + dragShape.width / 2);
+        dragOffset.y = mouseY - (dragShape.y + dragShape.height / 2);
+      }
+      
+      // Update form with selected shape
+      shapeControls.style.display = 'block';
+      $('#shapeId').value = dragShape.id;
+      $('#shapeName').value = dragShape.name || '';
+      $('#shapeLayer').value = dragShape.layer || 1;
+      $('#shapeType').value = dragShape.shapeType || 'zone';
+      
+      document.addEventListener('mousemove', handleDrag);
+      document.addEventListener('mouseup', stopDrag);
+    };
+
+    function handleDrag(event) {
+      if (!isDragging || !dragShape) return;
+      
+      const rect = preview.getBoundingClientRect();
+      const mouseX = event.clientX - rect.left;
+      const mouseY = event.clientY - rect.top;
+      
+      if (dragShape.type === 'circle') {
+        dragShape.cx = mouseX - dragOffset.x;
+        dragShape.cy = mouseY - dragOffset.y;
+      } else if (dragShape.type === 'rect') {
+        dragShape.x = mouseX - dragOffset.x - dragShape.width / 2;
+        dragShape.y = mouseY - dragOffset.y - dragShape.height / 2;
+      }
+      
+      updatePreview();
+    }
+
+    function stopDrag() {
+      isDragging = false;
+      dragShape = null;
+      document.removeEventListener('mousemove', handleDrag);
+      document.removeEventListener('mouseup', stopDrag);
+    }
+
+    // Resize functionality
+    window.startResize = (event, shapeId, direction) => {
+      event.stopPropagation();
+      event.preventDefault();
+      
+      const shape = shapes.find(s => s.id === shapeId);
+      if (!shape) return;
+      
+      resizeShape = shape;
+      resizeDirection = direction;
+      isResizing = true;
+      
+      const rect = preview.getBoundingClientRect();
+      const startX = event.clientX - rect.left;
+      const startY = event.clientY - rect.top;
+      
+      dragOffset = { x: startX, y: startY };
+      
+      document.addEventListener('mousemove', handleResize);
+      document.addEventListener('mouseup', stopResize);
+    };
+
+    function handleResize(event) {
+      if (!isResizing || !resizeShape) return;
+      
+      const rect = preview.getBoundingClientRect();
+      const currentX = event.clientX - rect.left;
+      const currentY = event.clientY - rect.top;
+      
+      const deltaX = currentX - dragOffset.x;
+      const deltaY = currentY - dragOffset.y;
+      
+      if (resizeShape.type === 'circle') {
+        const shape = shapes.find(s => s.id === resizeShape.id);
+        if (shape) {
+          if (resizeDirection === 'right') {
+            shape.r = Math.max(5, shape.r + deltaX);
+          } else if (resizeDirection === 'left') {
+            shape.r = Math.max(5, shape.r - deltaX);
+          } else if (resizeDirection === 'bottom') {
+            shape.r = Math.max(5, shape.r + deltaY);
+          } else if (resizeDirection === 'top') {
+            shape.r = Math.max(5, shape.r - deltaY);
+          }
+        }
+      } else if (resizeShape.type === 'rect') {
+        const shape = shapes.find(s => s.id === resizeShape.id);
+        if (shape) {
+          const minSize = 10;
+          
+          if (resizeDirection === 'se') {
+            shape.width = Math.max(minSize, shape.width + deltaX);
+            shape.height = Math.max(minSize, shape.height + deltaY);
+          } else if (resizeDirection === 'sw') {
+            shape.x = shape.x + deltaX;
+            shape.width = Math.max(minSize, shape.width - deltaX);
+            shape.height = Math.max(minSize, shape.height + deltaY);
+          } else if (resizeDirection === 'ne') {
+            shape.y = shape.y + deltaY;
+            shape.width = Math.max(minSize, shape.width + deltaX);
+            shape.height = Math.max(minSize, shape.height - deltaY);
+          } else if (resizeDirection === 'nw') {
+            shape.x = shape.x + deltaX;
+            shape.y = shape.y + deltaY;
+            shape.width = Math.max(minSize, shape.width - deltaX);
+            shape.height = Math.max(minSize, shape.height - deltaY);
+          } else if (resizeDirection === 'e') {
+            shape.width = Math.max(minSize, shape.width + deltaX);
+          } else if (resizeDirection === 'w') {
+            shape.x = shape.x + deltaX;
+            shape.width = Math.max(minSize, shape.width - deltaX);
+          } else if (resizeDirection === 's') {
+            shape.height = Math.max(minSize, shape.height + deltaY);
+          } else if (resizeDirection === 'n') {
+            shape.y = shape.y + deltaY;
+            shape.height = Math.max(minSize, shape.height - deltaY);
+          }
+        }
+      }
+      
+      dragOffset = { x: currentX, y: currentY };
+      updatePreview();
+    }
+
+    function stopResize() {
+      isResizing = false;
+      resizeShape = null;
+      resizeDirection = null;
+      document.removeEventListener('mousemove', handleResize);
+      document.removeEventListener('mouseup', stopResize);
+    }
+
+    // Prevent default drag behavior on the preview container
+    preview.addEventListener('mousedown', (e) => {
+      if (e.target.tagName === 'svg' || e.target.tagName === 'image') {
+        e.preventDefault();
+      }
+    });
+
+    // Keyboard support
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Delete' && selectedShape) {
+        $('#deleteShape').click();
+      }
+    });
+  </script>
+</body>
+</html>

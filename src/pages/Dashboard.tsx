@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AlertTriangle, Calendar, MapPin, Eye, Trash2, Search, ShieldAlert, ArrowRight, Clock } from 'lucide-react';
+import { AlertTriangle, Calendar, MapPin, Eye, Trash2, Search, ShieldAlert, ArrowRight, Clock, ChevronLeft, ChevronRight } from 'lucide-react';
 import Card from '../components/common/Card';
 import Button from '../components/common/Button';
 import Spinner from '../components/common/Spinner';
@@ -21,6 +21,10 @@ const Dashboard: React.FC = () => {
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [eventToDelete, setEventToDelete] = useState<EventData | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(10);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
   
   const {
     events,
@@ -59,7 +63,8 @@ const Dashboard: React.FC = () => {
       setError(null);
       
       try {
-        const response = await eventAPI.getEventHistory(user.email);
+        // Fetch events with pagination parameters
+        const response = await eventAPI.getEventHistory(user.email, currentPage, itemsPerPage);
         
         // Check if this is fallback data
         if ((response as any)._isFallbackData) {
@@ -68,8 +73,19 @@ const Dashboard: React.FC = () => {
           setUsingFallbackData(false);
         }
         
-        // Handle the backend response structure
-        const backendEvents = response.data.data?.events || response.data.events || response.data.data || response.data;
+        // Extract events and pagination data from the nested response structure
+        const backendEvents = response.data.data?.events || [];
+        const pagination = response.data.data?.pagination || response.data.pagination;
+        
+        // Update pagination state from backend
+        if (pagination) {
+          setTotalPages(pagination.totalPages || 1);
+          setTotalItems(pagination.totalItems || backendEvents.length);
+        } else {
+          // Fallback if pagination is not provided
+          setTotalPages(1);
+          setTotalItems(backendEvents.length);
+        }
         
         // Transform backend events to frontend EventData format
         const transformedEvents: EventData[] = Array.isArray(backendEvents) 
@@ -137,43 +153,22 @@ const Dashboard: React.FC = () => {
     };
 
     fetchEventHistory();
-  }, [user?.email, backendUser, backendUserLoading]); // Wait for backend user to be ready
+  }, [user?.email, backendUser, backendUserLoading, currentPage, itemsPerPage]); // Refetch when page changes
 
-  // Filter and sort events
-  const filteredAndSortedEvents = React.useMemo(() => {
+  // For server-side pagination, we display events as-is
+  // Client-side filtering/sorting is disabled since backend handles pagination
+  const displayedEvents = events;
 
-    let filtered = events.filter(event =>
-      event.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      event.venue.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+  // Calculate display indices for pagination info
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = Math.min(startIndex + events.length, totalItems);
 
-    filtered.sort((a, b) => {
-      let aValue: string | number;
-      let bValue: string | number;
-
-      switch (sortBy) {
-        case 'name':
-          aValue = a.name.toLowerCase();
-          bValue = b.name.toLowerCase();
-          break;
-        case 'status':
-          aValue = a.status;
-          bValue = b.status;
-          break;
-        case 'date':
-        default:
-          aValue = new Date(a.dateStart).getTime();
-          bValue = new Date(b.dateStart).getTime();
-          break;
-      }
-
-      if (aValue < bValue) return sortOrder === 'asc' ? -1 : 1;
-      if (aValue > bValue) return sortOrder === 'asc' ? 1 : -1;
-      return 0;
-    });
-
-    return filtered;
-  }, [events, searchTerm, sortBy, sortOrder]);
+  // Reset to page 1 when search or filter changes (for future implementation)
+  React.useEffect(() => {
+    if (currentPage !== 1) {
+      setCurrentPage(1);
+    }
+  }, [searchTerm, sortBy, sortOrder]);
 
   const handleViewEvent = (event: EventData) => {
     navigate(`/event/${event.id}`);
@@ -385,7 +380,7 @@ const Dashboard: React.FC = () => {
 
 
       {/* Events List */}
-      {filteredAndSortedEvents.length === 0 ? (
+      {displayedEvents.length === 0 ? (
         <Card>
           <div className="text-center py-12">
             <Calendar className="mx-auto h-16 w-16 text-gray-400 mb-4" />
@@ -406,8 +401,9 @@ const Dashboard: React.FC = () => {
           </div>
         </Card>
       ) : (
-        <div className="space-y-6">
-          {filteredAndSortedEvents.map((event) => (
+        <>
+          <div className="space-y-6">
+            {displayedEvents.map((event) => (
             <Card 
               key={event.id} 
               className="hover:shadow-lg transition-all duration-200 bg-white border border-gray-200"
@@ -487,7 +483,86 @@ const Dashboard: React.FC = () => {
               </div>
             </Card>
           ))}
-        </div>
+          </div>
+
+          {/* Pagination Controls */}
+          <Card className="mt-6">
+            <div className="flex items-center justify-between">
+              <div className="text-sm text-gray-700">
+                Showing <span className="font-medium">{startIndex + 1}</span> to{' '}
+                <span className="font-medium">{endIndex}</span> of{' '}
+                <span className="font-medium">{totalItems}</span> events
+                {totalPages > 1 && (
+                  <span className="ml-2 text-gray-500">
+                    (Page {currentPage} of {totalPages})
+                  </span>
+                )}
+              </div>
+              
+              {totalPages > 1 && (
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                    disabled={currentPage === 1}
+                    icon={ChevronLeft}
+                  >
+                    Previous
+                  </Button>
+                  
+                  <div className="flex items-center gap-1">
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => {
+                      // Show first page, last page, current page, and pages around current
+                      const showPage = 
+                        page === 1 || 
+                        page === totalPages || 
+                        (page >= currentPage - 1 && page <= currentPage + 1);
+                      
+                      const showEllipsis = 
+                        (page === 2 && currentPage > 3) || 
+                        (page === totalPages - 1 && currentPage < totalPages - 2);
+
+                      if (showEllipsis) {
+                        return (
+                          <span key={page} className="px-2 text-gray-500">
+                            ...
+                          </span>
+                        );
+                      }
+
+                      if (!showPage) return null;
+
+                      return (
+                        <button
+                          key={page}
+                          onClick={() => setCurrentPage(page)}
+                          className={`px-3 py-1 text-sm rounded-md transition-colors ${
+                            currentPage === page
+                              ? 'bg-blue-600 text-white font-medium'
+                              : 'text-gray-700 hover:bg-gray-100'
+                          }`}
+                        >
+                          {page}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                    disabled={currentPage === totalPages}
+                    icon={ChevronRight}
+                  >
+                    Next
+                  </Button>
+                </div>
+              )}
+            </div>
+          </Card>
+        </>
       )}
 
       {/* Stats */}
