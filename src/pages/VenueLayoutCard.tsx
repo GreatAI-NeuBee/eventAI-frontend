@@ -1,6 +1,6 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import Card from "../components/common/Card";
+import React, { useEffect, useMemo, useRef, useState, useContext } from "react";
 import { DUMMY_FORECAST } from "../data/DUMMY_FORECAST";
+import { WeatherContext } from "../components/common/WeatherBackground";
 
 /* ========= Types ========= */
 type PctPoint = [number, number];
@@ -12,6 +12,8 @@ type StadiumMapJSON = {
   zones: { id: string; name: string; layer: number; points: PctPoint[] }[];
   exitsList?: { id: string; name: string; position: PctPoint; capacity?: number }[];
   toiletsList?: { id: string; position: PctPoint; label?: string; fixtures?: number }[];
+  shape?: "circle" | "rect";
+  rectBounds?: { x0: number; y0: number; x1: number; y1: number };
 };
 type FloorZonePolygon = {
   id: string;
@@ -127,8 +129,8 @@ function gateLoadsWithFallback(
 function indexSeriesByTime(series: GateSeries) {
   const m = new Map<string, number>();
   Object.values(series).forEach(points => points.forEach(p => {
-    const key = toKey(p.ds);
-    m.set(key, (m.get(key) ?? 0) + (p.yhat ?? 0));
+      const key = toKey(p.ds);
+      m.set(key, (m.get(key) ?? 0) + (p.yhat ?? 0));
   }));
   return m;
 }
@@ -149,6 +151,19 @@ const STADIUM_R = Math.min(VB_W/2 - STADIUM_MARGIN, VB_H/2 - STADIUM_MARGIN);
 const toRad = (d: number) => (d * Math.PI) / 180;
 const polar = (cx: number, cy: number, r: number, thetaDeg: number): [number, number] => [cx + r * Math.cos(toRad(thetaDeg)), cy + r * Math.sin(toRad(thetaDeg))];
 const arcLen = (r: number, dThetaDeg: number) => r * toRad(Math.abs(dThetaDeg));
+
+type VenueGeom =
+  | { kind: "circle"; cx: number; cy: number; r: number }
+  | { kind: "rect"; x0: number; y0: number; x1: number; y1: number };
+
+function venueGeom(plan: StadiumMapJSON): VenueGeom {
+  if (plan.shape === "rect") {
+    const m = 3;
+    const b = plan.rectBounds ?? { x0: m, y0: m, x1: VB_W - m, y1: VB_H - m };
+    return { kind: "rect", ...b };
+  }
+  return { kind: "circle", cx: 50, cy: 31.25, r: Math.min(VB_W/2 - 3, VB_H/2 - 3) };
+}
 
 /* ========= Non-obstacle walkable space ========= */
 /** Clamp any point to stay inside the stadium circle (polygons are NOT obstacles). */
@@ -562,8 +577,26 @@ function spawnExitWalkers(
 export const VenueLayoutCard: React.FC<{ event: EventData | null }> = ({ event }) => {
   const plan: StadiumMapJSON = useMemo(() => {
     if (!event?.venueLayout) return DUMMY_PLAN;
-    if (typeof event.venueLayout === "string") { try { return JSON.parse(event.venueLayout) as StadiumMapJSON; } catch { return DUMMY_PLAN; } }
-    return event.venueLayout as StadiumMapJSON;
+    if (typeof event.venueLayout === "string") {
+      try { 
+        const parsed = JSON.parse(event.venueLayout) as StadiumMapJSON;
+        // Ensure rectangular layout if not specified
+        if (!parsed.shape) {
+          parsed.shape = "rect";
+          parsed.rectBounds = { x0: 3, y0: 3, x1: 97, y1: 59.5 };
+        }
+        return parsed;
+      } catch { 
+        return DUMMY_PLAN; 
+      } 
+    }
+    const layout = event.venueLayout as StadiumMapJSON;
+    // Ensure rectangular layout if not specified
+    if (!layout.shape) {
+      layout.shape = "rect";
+      layout.rectBounds = { x0: 3, y0: 3, x1: 97, y1: 59.5 };
+    }
+    return layout;
   }, [event]);
 
   const forecast: InOutForecast = useMemo(() => {
@@ -671,7 +704,7 @@ export const VenueLayoutCard: React.FC<{ event: EventData | null }> = ({ event }
     const tick = (timestamp:number) => {
       if (timestamp - lastUpdate >= UPDATE_INTERVAL) {
         setWalkers(prev => {
-          const now = performance.now();
+        const now = performance.now();
           const next: Walker[] = [];
           for (const w of prev) {
             const expired = now - w.bornAt > w.ttl;
@@ -679,9 +712,9 @@ export const VenueLayoutCard: React.FC<{ event: EventData | null }> = ({ event }
             const updated = advanceWalker(w, UPDATE_INTERVAL);
             if (updated.motionMode !== 'wander' && updated.segIndex >= updated.path.length && updated.phase === 'exits') continue;
             next.push(updated);
-          }
-          return next;
-        });
+        }
+        return next;
+      });
         lastUpdate = timestamp;
       }
       if (mounted) raf = requestAnimationFrame(tick);
@@ -690,11 +723,17 @@ export const VenueLayoutCard: React.FC<{ event: EventData | null }> = ({ event }
     return () => { mounted=false; cancelAnimationFrame(raf); };
   }, [performanceMode]);
 
+  const { isDarkBackground, isRainBackground } = useContext(WeatherContext);
+  
+  const getTextColor = () => (isDarkBackground || isRainBackground) ? 'text-white' : 'text-gray-900';
+  const getSecondaryTextColor = () => (isDarkBackground || isRainBackground) ? 'text-white/80' : 'text-gray-600';
+  const getBgColor = () => (isDarkBackground || isRainBackground) ? 'bg-transparent' : 'bg-gradient-to-b from-white to-gray-50';
+
   return (
-    <Card className="bg-gradient-to-b from-white to-gray-50">
+    <div className={getBgColor()}>
       <div className="p-4 flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-gray-900">Venue Layout</h3>
-        <div className="flex items-center gap-3 text-sm text-gray-600">
+        <h3 className={`text-lg font-semibold ${getTextColor()}`}>Venue Layout</h3>
+        <div className={`flex items-center gap-3 text-sm ${getSecondaryTextColor()}`}>
           <span>{plan.layers} layers</span>
           <span>{plan.sections} sections</span>
           <span>{plan.exitsList?.length ?? plan.exits ?? 0} exits</span>
@@ -723,7 +762,7 @@ export const VenueLayoutCard: React.FC<{ event: EventData | null }> = ({ event }
 
       {/* Controls + Timeline */}
       <div className="px-4 pb-4">
-        <div className="flex items-center justify-between text-xs text-gray-600 mb-1">
+        <div className={`flex items-center justify-between text-xs ${getSecondaryTextColor()} mb-1`}>
           <span className="flex items-center gap-2">
             Forecast (5-min)
             <span className={`px-2 py-0.5 rounded text-[10px] font-semibold tracking-wide uppercase ${frames[idx]?.phase === "exits" ? "bg-rose-100 text-rose-700 ring-1 ring-rose-200" : "bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200"}`}>
@@ -761,7 +800,7 @@ export const VenueLayoutCard: React.FC<{ event: EventData | null }> = ({ event }
           <span className="ml-auto text-gray-500">• 1 dot ≈ {dotScale.peoplePerDot.toLocaleString()} people</span>
         </div>
       </div>
-    </Card>
+    </div>
   );
 };
 
@@ -842,7 +881,7 @@ function coerceForecast(raw: unknown, fallback: InOutForecast): InOutForecast {
       const start = obj.summary?.forecastPeriod?.start ? new Date((obj.summary.forecastPeriod.start+"Z").replace(" ","T")).getTime() : undefined;
       const end   = obj.summary?.forecastPeriod?.end   ? new Date((obj.summary.forecastPeriod.end+"Z").replace(" ","T")).getTime()   : undefined;
       const mid = (start!==undefined && end!==undefined) ? start + (end-start)/2 : undefined;
-      
+
       for (const [gate, g] of Object.entries<any>(obj.forecast)) {
         const canonGate = normalizeGateKey(gate);
         for (const f of (g?.timeFrames ?? [])) {
@@ -897,14 +936,15 @@ const StadiumPlanSVG: React.FC<{
   toiletCongestions: number[];
   sectionAgg: number[];
 }> = ({ plan, zones, phase, gateLoads, walkers, toiletCongestions, sectionAgg }) => {
-  const cx=STADIUM_CX, cy=STADIUM_CY, R=STADIUM_R;
+  const geom = venueGeom(plan);
+  const isCircle = geom.kind === "circle";
   const isExitPhase = phase === "exits";
 
   const RINGS = Math.max(1, plan.layers || 1);
   const GAP = 1.6;
   const voidRatio = 0.35;
-  const rVoid = Math.max(4, R * voidRatio);
-  const usable = R - rVoid - Math.max(0, RINGS - 1) * GAP;
+  const rVoid = Math.max(4, (isCircle ? geom.r : Math.min(geom.x1-geom.x0, geom.y1-geom.y0)/2) * voidRatio);
+  const usable = (isCircle ? geom.r : Math.min(geom.x1-geom.x0, geom.y1-geom.y0)/2) - rVoid - Math.max(0, RINGS - 1) * GAP;
   const ringThick = Math.max(1, usable / RINGS);
 
   const sections = Math.max(1, plan.sections);
@@ -938,34 +978,38 @@ const StadiumPlanSVG: React.FC<{
     <div className="relative w-full aspect-[16/10] rounded-xl overflow-hidden border border-gray-300 bg-white">
       <svg viewBox={`0 0 ${VB_W} ${VB_H}`} preserveAspectRatio="xMidYMid meet" className="h-full w-full">
         <defs>
-          {isCircularLayout && <clipPath id="stadiumClip"><circle cx={cx} cy={cy} r={R} /></clipPath>}
+          {isCircle
+            ? <clipPath id="venueClip"><circle cx={geom.cx} cy={geom.cy} r={geom.r} /></clipPath>
+            : <clipPath id="venueClip"><rect x={geom.x0} y={geom.y0} width={geom.x1-geom.x0} height={geom.y1-geom.y0} rx={1.2} ry={1.2}/></clipPath>}
           <pattern id="exitHatch" width="4" height="4" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
             <rect width="2" height="4" fill="rgba(244,63,94,0.12)" />
           </pattern>
         </defs>
 
-        {isCircularLayout && <circle cx={cx} cy={cy} r={R} fill="#ffffff" stroke="#e5e7eb" strokeWidth={0.8} />}
+        {isCircle
+          ? <circle cx={geom.cx} cy={geom.cy} r={geom.r} fill="#fff"/>
+          : <rect x={geom.x0} y={geom.y0} width={geom.x1-geom.x0} height={geom.y1-geom.y0} fill="#fff" stroke="#e5e7eb" strokeWidth={0.8}/>}
 
-        <g clipPath={isCircularLayout ? "url(#stadiumClip)" : undefined}>
-          {/* rings - only for circular layout */}
-          {isCircularLayout && Array.from({ length: RINGS }, (_, li) => {
+        <g clipPath="url(#venueClip)">
+          {/* rings - only for circular layouts */}
+          {isCircle && Array.from({ length: RINGS }, (_, li) => {
             const rIn = rVoid + li * (ringThick + GAP);
             const rOut = rIn + ringThick;
             return (
               <g key={`ring-${li}`}>
-                <circle cx={cx} cy={cy} r={rIn} fill="none" stroke="#cbd5e1" strokeOpacity={0.35} strokeWidth={0.5} strokeDasharray="1,1" />
-                <circle cx={cx} cy={cy} r={rOut} fill="none" stroke="#cbd5e1" strokeOpacity={0.6} strokeWidth={0.5} />
+                <circle cx={geom.cx} cy={geom.cy} r={rIn} fill="none" stroke="#cbd5e1" strokeOpacity={0.35} strokeWidth={0.5} strokeDasharray="1,1" />
+                <circle cx={geom.cx} cy={geom.cy} r={rOut} fill="none" stroke="#cbd5e1" strokeOpacity={0.6} strokeWidth={0.5} />
               </g>
             );
           })}
 
-          {/* Section dividers - only for circular layout */}
-          {isCircularLayout && sectionAngles.map((angle, i) => {
+          {/* Section dividers - only for circular layouts */}
+          {isCircle && sectionAngles.map((angle, i) => {
             const rad = (angle * Math.PI) / 180;
-            const x1 = cx + (rVoid - 0.5) * Math.cos(rad);
-            const y1 = cy + (rVoid - 0.5) * Math.sin(rad);
-            const x2 = cx + (R - 0.5) * Math.cos(rad);
-            const y2 = cy + (R - 0.5) * Math.sin(rad);
+            const x1 = geom.cx + (rVoid - 0.5) * Math.cos(rad);
+            const y1 = geom.cy + (rVoid - 0.5) * Math.sin(rad);
+            const x2 = geom.cx + (geom.r - 0.5) * Math.cos(rad);
+            const y2 = geom.cy + (geom.r - 0.5) * Math.sin(rad);
             return (
               <g key={`sec-line-${i}`}>
                 <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="#cbd5e1" strokeOpacity={0.45} strokeWidth={0.35} strokeDasharray="2,1" />
@@ -973,8 +1017,8 @@ const StadiumPlanSVG: React.FC<{
             );
           })}
 
-          {/* Section hover targets - only for circular layout */}
-          {isCircularLayout && sectionAngles.map((angle, i) => {
+          {/* Section hover targets - only for circular layouts */}
+          {isCircle && sectionAngles.map((angle, i) => {
             const a0 = angle;
             const a1 = angle + sectionStep;
             const pct = sectionAgg[i] ?? 0;
@@ -986,7 +1030,7 @@ const StadiumPlanSVG: React.FC<{
                 onMouseLeave={() => setHoverInfo(null)}
                 style={{ cursor: "pointer" }}
               >
-                <path d={sectorPath(cx, cy, rVoid, R, a0, a1)} fill="transparent" stroke="transparent" />
+                <path d={sectorPath(geom.cx, geom.cy, rVoid, geom.r, a0, a1)} fill="transparent" stroke="transparent" />
               </g>
             );
           })}
@@ -994,73 +1038,73 @@ const StadiumPlanSVG: React.FC<{
           {/* Polygons colored by congestion (visual only, NOT obstacles) */}
           {zones.map(z => {
             const pts = z.points.map(([x,y])=>`${x},${y}`).join(" ");
-            const fillBase = bandedColor(z.congestion);
+             const fillBase = bandedColor(z.congestion);
             const fillOpacity = 0.35 + (z.congestion/100)*0.25;
-            const strokeProps = isExitPhase
-              ? { stroke: "#7f1d1d", strokeOpacity: 0.35, strokeWidth: 0.35, strokeDasharray: "1.2 1" }
-              : { stroke: "#0b1220", strokeOpacity: 0.25, strokeWidth: 0.25 };
-            return (
+             const strokeProps = isExitPhase
+               ? { stroke: "#7f1d1d", strokeOpacity: 0.35, strokeWidth: 0.35, strokeDasharray: "1.2 1" }
+               : { stroke: "#0b1220", strokeOpacity: 0.25, strokeWidth: 0.25 };
+             return (
               <g
                 key={z.id}
-                onMouseEnter={() => setHoverInfo({ name: z.name, congestion: z.congestion })}
-                onMouseMove={() => setHoverInfo({ name: z.name, congestion: z.congestion })}
-                onMouseLeave={() => setHoverInfo(null)}
-                style={{ cursor: "pointer" }}
+                   onMouseEnter={() => setHoverInfo({ name: z.name, congestion: z.congestion })}
+                   onMouseMove={() => setHoverInfo({ name: z.name, congestion: z.congestion })}
+                   onMouseLeave={() => setHoverInfo(null)}
+                   style={{ cursor: "pointer" }}
               >
                 <polygon points={pts} fill={fillBase} opacity={fillOpacity} {...strokeProps} />
-                {isExitPhase ? <polygon points={pts} fill="url(#exitHatch)" opacity={0.9} pointerEvents="none" /> : null}
-              </g>
-            );
-          })}
+                 {isExitPhase ? <polygon points={pts} fill="url(#exitHatch)" opacity={0.9} pointerEvents="none" /> : null}
+               </g>
+             );
+           })}
 
           {/* toilets */}
           {(plan.toiletsList ?? []).map((t, i) => (
             <g key={t.id}
-               onMouseEnter={() => setHoverInfo({ name: t.label ?? t.id, congestion: toiletCongestions[i] ?? 0 })}
-               onMouseMove={() => setHoverInfo({ name: t.label ?? t.id, congestion: toiletCongestions[i] ?? 0 })}
+                 onMouseEnter={() => setHoverInfo({ name: t.label ?? t.id, congestion: toiletCongestions[i] ?? 0 })}
+                 onMouseMove={() => setHoverInfo({ name: t.label ?? t.id, congestion: toiletCongestions[i] ?? 0 })}
                onMouseLeave={() => setHoverInfo(null)} style={{ cursor: "pointer" }}>
-              <circle
-                cx={t.position[0]}
-                cy={t.position[1]}
+                 <circle
+                   cx={t.position[0]}
+                   cy={t.position[1]}
                 r={2.0}
-                fill="none"
-                stroke={bandedColor(toiletCongestions[i])}
-                strokeWidth={0.5}
-                opacity={0.9}
-              >
+                   fill="none"
+                   stroke={bandedColor(toiletCongestions[i])}
+                   strokeWidth={0.5}
+                   opacity={0.9}
+                 >
                 <animate attributeName="r" values="2;3;2" dur="2.6s" repeatCount="indefinite" />
                 <animate attributeName="stroke-opacity" values="0.6;1;0.6" dur="2.6s" repeatCount="indefinite" />
-              </circle>
-              <text x={t.position[0]} y={t.position[1]} fontSize={3} textAnchor="middle" dominantBaseline="central">🚻</text>
-            </g>
+                 </circle>
+                 <text x={t.position[0]} y={t.position[1]} fontSize={3} textAnchor="middle" dominantBaseline="central">🚻</text>
+               </g>
           ))}
 
           {/* walkers */}
-          <g>
+           <g>
             {walkers.map(w => (
               <circle key={w.id} cx={w.x} cy={w.y} r={0.55} fill={w.phase==="exits" ? "#ef4444" : "#2563eb"} opacity={0.95} />
-            ))}
-          </g>
-        </g>
+             ))}
+           </g>
+         </g>
 
-        {/* exits pins + current loads */}
-        {(plan.exitsList ?? []).map((e) => {
+         {/* exits pins + current loads */}
+         {(plan.exitsList ?? []).map((e) => {
           const key = normalizeGateKey((e.name?.match(/\b(\w+)\b$/)?.[1] ?? e.id) as string);
           const ppl = gateLoads[key] ?? 0;
 
-          const dotFill = isExitPhase ? "#ef4444" : "#10b981";
-          return (
-            <g key={e.id}>
-              <circle cx={e.position[0]} cy={e.position[1]} r={0.95} fill={dotFill} stroke="#0b1220" strokeOpacity={0.25} strokeWidth={0.2} />
-              <g transform={`translate(${e.position[0] + 1.8}, ${e.position[1] - 1.8})`}>
-                <rect rx={0.8} ry={0.8} width={12} height={4} fill="#111827" opacity={0.85} />
+           const dotFill = isExitPhase ? "#ef4444" : "#10b981";
+           return (
+             <g key={e.id}>
+               <circle cx={e.position[0]} cy={e.position[1]} r={0.95} fill={dotFill} stroke="#0b1220" strokeOpacity={0.25} strokeWidth={0.2} />
+               <g transform={`translate(${e.position[0] + 1.8}, ${e.position[1] - 1.8})`}>
+                 <rect rx={0.8} ry={0.8} width={12} height={4} fill="#111827" opacity={0.85} />
                 <text x={6} y={2.6} textAnchor="middle" fontSize={1.8} fill="#f9fafb">{Math.round(ppl).toLocaleString()}</text>
-              </g>
-            </g>
-          );
-        })}
-      </svg>
-
+               </g>
+             </g>
+           );
+         })}
+       </svg>
+ 
       {/* unified hover tooltip */}
       {hoverInfo ? (
         <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-[48%] bg-white/90 backdrop-blur rounded-lg px-3 py-2 text-sm shadow">
@@ -1072,11 +1116,13 @@ const StadiumPlanSVG: React.FC<{
         </div>
       ) : null}
     </div>
-  );
-};
+   );
+ };
 
 /* ========= Dummy plan (updated to match forecast data) ========= */
 const DUMMY_PLAN: StadiumMapJSON = {
+  shape: "rect",
+  rectBounds: { x0: 3, y0: 3, x1: 97, y1: 59.5 },
   exits: 7,
   zones: [],
   layers: 3,
