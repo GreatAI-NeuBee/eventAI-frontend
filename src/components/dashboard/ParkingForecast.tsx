@@ -62,12 +62,12 @@ const ParkingForecast: React.FC<ParkingForecastProps> = ({
           setParkingLocations(realParkingData);
           generateParkingForecast(realParkingData, expectedCapacity || 1000);
         } else {
-          console.log('⚠️ No real parking found, using mock data');
-          useMockParkingData();
+          console.log('⚠️ No real parking found in the area');
+          setError('No parking facilities found near this venue. Please check the venue location or contact support.');
         }
       } catch (apiError) {
-        console.warn('⚠️ Google Places API failed, using mock data:', apiError);
-        useMockParkingData();
+        console.warn('⚠️ Google Places API failed:', apiError);
+        setError('Unable to load parking data. Please check your internet connection and try again.');
       }
     } catch (err) {
       setError('Failed to load parking forecast data');
@@ -181,88 +181,6 @@ const ParkingForecast: React.FC<ParkingForecastProps> = ({
 
   // This function is already defined below, removing duplicate
 
-  const useMockParkingData = () => {
-    console.log('🎭 Using mock data for Parking Forecast');
-    
-    // Mock parking data based on real venue location
-    const mockParkingLocations: ParkingLocation[] = [
-        {
-          id: 'parking-1',
-          name: 'KLCC Mall Parking',
-          type: 'indoor',
-          capacity: 5000,
-          distance: 200,
-          price: 'RM 3/hour',
-          availability: 'high',
-          features: ['Covered', 'Security', 'EV Charging', 'Valet'],
-          coordinates: {
-            lat: venueLocation.lat + 0.001,
-            lng: venueLocation.lng + 0.001
-          }
-        },
-        {
-          id: 'parking-2',
-          name: 'Street Parking - Jalan Ampang',
-          type: 'street',
-          capacity: 150,
-          distance: 300,
-          price: 'RM 2/hour',
-          availability: 'low',
-          features: ['Metered', '2-hour limit'],
-          coordinates: {
-            lat: venueLocation.lat - 0.001,
-            lng: venueLocation.lng + 0.002
-          }
-        },
-        {
-          id: 'parking-3',
-          name: 'Avenue K Parking',
-          type: 'indoor',
-          capacity: 800,
-          distance: 450,
-          price: 'RM 4/hour',
-          availability: 'medium',
-          features: ['Covered', 'Security', 'Restaurant Validation'],
-          coordinates: {
-            lat: venueLocation.lat + 0.002,
-            lng: venueLocation.lng - 0.001
-          }
-        },
-        {
-          id: 'parking-4',
-          name: 'Open Air Parking - KLCC Park',
-          type: 'outdoor',
-          capacity: 200,
-          distance: 600,
-          price: 'RM 1.50/hour',
-          availability: 'medium',
-          features: ['Open Air', 'Park & Walk'],
-          coordinates: {
-            lat: venueLocation.lat - 0.002,
-            lng: venueLocation.lng - 0.002
-          }
-        },
-        {
-          id: 'parking-5',
-          name: 'Valet Parking - Mandarin Oriental',
-          type: 'valet',
-          capacity: 100,
-          distance: 100,
-          price: 'RM 15/event',
-          availability: 'high',
-          features: ['Valet Service', 'Premium', 'Concierge'],
-          coordinates: {
-            lat: venueLocation.lat + 0.0005,
-            lng: venueLocation.lng + 0.0005
-          }
-        }
-      ];
-
-      setParkingLocations(mockParkingLocations);
-
-      // Generate forecast data
-      generateParkingForecast(mockParkingLocations, expectedCapacity || 1000);
-  };
 
   const generateParkingForecast = (parking: ParkingLocation[], capacity: number) => {
     const totalCapacity = parking.reduce((sum, p) => sum + p.capacity, 0);
