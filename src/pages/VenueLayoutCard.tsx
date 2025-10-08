@@ -1,6 +1,6 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import Card from "../components/common/Card";
+import React, { useEffect, useMemo, useRef, useState, useContext } from "react";
 import { DUMMY_FORECAST } from "../data/DUMMY_FORECAST";
+import { WeatherContext } from "../components/common/WeatherBackground";
 
 /* ========= Types ========= */
 type PctPoint = [number, number];
@@ -689,11 +689,17 @@ export const VenueLayoutCard: React.FC<{ event: EventData | null }> = ({ event }
     return () => { mounted=false; cancelAnimationFrame(raf); };
   }, [performanceMode]);
 
+  const { isDarkBackground, isRainBackground } = useContext(WeatherContext);
+  
+  const getTextColor = () => (isDarkBackground || isRainBackground) ? 'text-white' : 'text-gray-900';
+  const getSecondaryTextColor = () => (isDarkBackground || isRainBackground) ? 'text-white/80' : 'text-gray-600';
+  const getBgColor = () => (isDarkBackground || isRainBackground) ? 'bg-transparent' : 'bg-gradient-to-b from-white to-gray-50';
+  
   return (
-    <Card className="bg-gradient-to-b from-white to-gray-50">
+    <div className={getBgColor()}>
       <div className="p-4 flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-gray-900">Venue Layout</h3>
-        <div className="flex items-center gap-3 text-sm text-gray-600">
+        <h3 className={`text-lg font-semibold ${getTextColor()}`}>Venue Layout</h3>
+        <div className={`flex items-center gap-3 text-sm ${getSecondaryTextColor()}`}>
           <span>{plan.layers} layers</span>
           <span>{plan.sections} sections</span>
           <span>{plan.exitsList?.length ?? plan.exits ?? 0} exits</span>
@@ -722,7 +728,7 @@ export const VenueLayoutCard: React.FC<{ event: EventData | null }> = ({ event }
 
       {/* Controls + Timeline */}
       <div className="px-4 pb-4">
-        <div className="flex items-center justify-between text-xs text-gray-600 mb-1">
+        <div className={`flex items-center justify-between text-xs ${getSecondaryTextColor()} mb-1`}>
           <span className="flex items-center gap-2">
             Forecast (5-min)
             <span className={`px-2 py-0.5 rounded text-[10px] font-semibold tracking-wide uppercase ${frames[idx]?.phase === "exits" ? "bg-rose-100 text-rose-700 ring-1 ring-rose-200" : "bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200"}`}>
@@ -760,7 +766,7 @@ export const VenueLayoutCard: React.FC<{ event: EventData | null }> = ({ event }
           <span className="ml-auto text-gray-500">• 1 dot ≈ {dotScale.peoplePerDot.toLocaleString()} people</span>
         </div>
       </div>
-    </Card>
+    </div>
   );
 };
 

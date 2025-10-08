@@ -1,17 +1,27 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { Save, Phone, Users, MapPin, Settings, Upload, FileText, ExternalLink, CheckCircle, Bot } from 'lucide-react';
-import Card from '../common/Card';
+import StaticGlassCard from '../common/StaticGlassCard';
 import Button from '../common/Button';
 import FileUpload from '../common/FileUpload';
 import type { StadiumMapJSON } from '../maps/StadiumMapEditor';
-import { FileUploadResult, ComprehendAnalysis } from '../../services/awsDirectService';
 import { eventAPI } from '../../api/apiClient';
+import { WeatherContext } from '../common/WeatherBackground';
+
+// Updated interfaces without AWS dependencies
+interface FileUploadResult {
+  success: boolean;
+  fileUrl?: string;
+  fileName?: string;
+  error?: string;
+}
 
 interface VenueLayoutEditorProps {
   venueLayout: StadiumMapJSON;
   eventId?: string; // Add eventId for file uploads
   onSave?: (updatedLayout: VenueLayoutEditorData) => void;
   readOnly?: boolean;
+  existingAttachmentUrls?: string[]; // Existing attachment URLs from backend
+  existingAttachmentFilenames?: string[]; // Existing attachment filenames from backend
 }
 
 export interface VenueLayoutEditorData {
@@ -26,7 +36,6 @@ export interface VenueLayoutEditorData {
   attachments?: {
     links: string[];
     context: string;
-    analyses: ComprehendAnalysis[];
   };
 }
 
@@ -40,15 +49,40 @@ const VenueLayoutEditor: React.FC<VenueLayoutEditorProps> = ({
   venueLayout,
   eventId,
   onSave,
-  readOnly = false
+  readOnly = false,
+  existingAttachmentUrls = [],
+  existingAttachmentFilenames = []
 }) => {
+  const { isDarkBackground, isRainBackground } = useContext(WeatherContext);
+  
+  // Determine text colors based on weather background
+  const getTextColor = () => {
+    if (isDarkBackground || isRainBackground) return 'text-white'; // Storm/Rain - white text
+    return 'text-gray-900'; // Clear/Sunny/Cloudy - dark text
+  };
+  
+  const getSecondaryTextColor = () => {
+    if (isDarkBackground || isRainBackground) return 'text-white/80'; // Storm/Rain
+    return 'text-gray-700'; // Clear/Sunny/Cloudy
+  };
+  
+  const getIconColor = () => {
+    if (isDarkBackground || isRainBackground) return 'text-white/80'; // Storm/Rain
+    return 'text-gray-600'; // Clear/Sunny/Cloudy
+  };
   const [gateConfig, setGateConfig] = useState<Record<string, GateConfig>>({});
   const [hasChanges, setHasChanges] = useState(false);
   const [attachments, setAttachments] = useState<{
     links: string[];
     context: string;
-    analyses: ComprehendAnalysis[];
-  }>({ links: [], context: '', analyses: [] });
+  }>({ links: [], context: '' });
+
+  // Combine existing and newly uploaded attachments for display
+  const allAttachmentUrls = [...existingAttachmentUrls, ...attachments.links];
+  const allAttachmentFilenames = [
+    ...existingAttachmentFilenames,
+    ...attachments.links.map(url => url.split('/').pop() || 'Uploaded file')
+  ];
   const [showUpdateNotification, setShowUpdateNotification] = useState<{
     show: boolean;
     gateName: string;
@@ -99,7 +133,6 @@ const VenueLayoutEditor: React.FC<VenueLayoutEditorProps> = ({
             attachmentLinks: attachments.links,
             attachmentContext: attachments.context
           });
-          console.log('✅ Attachments saved to backend');
         } catch (error) {
           console.error('❌ Failed to save attachments to backend:', error);
         }
@@ -111,28 +144,25 @@ const VenueLayoutEditor: React.FC<VenueLayoutEditorProps> = ({
     if (result.success && result.fileUrl) {
       setAttachments(prev => ({
         links: [...prev.links, result.fileUrl!],
-        analyses: result.analysisResult 
-          ? [...prev.analyses, result.analysisResult as ComprehendAnalysis]
-          : prev.analyses,
-        context: prev.context + (result.analysisResult 
-          ? `\n\nFile: ${result.fileUrl}\nAnalysis: ${(result.analysisResult as ComprehendAnalysis).summary}`
-          : `\n\nFile: ${result.fileUrl}`)
+        context: prev.context + `\n\nFile: ${result.fileName || 'uploaded file'} - ${result.fileUrl}`
       }));
       setHasChanges(true);
     }
   };
 
   const removeAttachment = (linkToRemove: string) => {
-    setAttachments(prev => {
-      const linkIndex = prev.links.indexOf(linkToRemove);
-      return {
-        links: prev.links.filter(link => link !== linkToRemove),
-        analyses: linkIndex >= 0 
-          ? prev.analyses.filter((_, index) => index !== linkIndex)
-          : prev.analyses,
-        context: prev.context.replace(new RegExp(`\\n\\nFile: ${linkToRemove}[^\\n]*(?:\\nAnalysis: [^\\n]*)?`, 'g'), '')
-      };
-    });
+    // Only allow removing newly uploaded files, not existing ones
+    const isExistingFile = existingAttachmentUrls.includes(linkToRemove);
+    
+    if (isExistingFile) {
+      console.warn('Cannot remove existing attachments from frontend');
+      return;
+    }
+    
+    setAttachments(prev => ({
+      links: prev.links.filter(link => link !== linkToRemove),
+      context: prev.context.replace(new RegExp(`\\n\\nFile: .*${linkToRemove}.*`, 'g'), '')
+    }));
     setHasChanges(true);
   };
 
@@ -168,26 +198,26 @@ const VenueLayoutEditor: React.FC<VenueLayoutEditorProps> = ({
 
   if (!venueLayout) {
     return (
-      <Card className="p-6">
-        <div className="text-center text-gray-500">
-          <MapPin className="mx-auto h-12 w-12 text-gray-400 mb-3" />
-          <p>No venue layout configured for this event.</p>
+      <StaticGlassCard intensity="medium" blur="md">
+        <div className="text-center text-white/70">
+          <MapPin className="mx-auto h-12 w-12 text-white/60 mb-3" />
+          <p className="text-white/80">No venue layout configured for this event.</p>
         </div>
-      </Card>
+      </StaticGlassCard>
     );
   }
 
   return (
     <div className="space-y-6">
       {/* Venue Layout Summary */}
-      <Card className="p-6">
+      <StaticGlassCard intensity="medium" blur="md">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-              <Settings className="h-5 w-5" />
+            <h3 className={`text-lg font-semibold ${getTextColor()} flex items-center gap-2`}>
+              <Settings className={`h-5 w-5 ${getIconColor()}`} />
               Venue Layout Configuration
             </h3>
-            <p className="text-sm text-gray-600 mt-1">
+            <p className={`text-sm ${getSecondaryTextColor()} mt-1`}>
               Configure capacity and assign person-in-charge for each gate
             </p>
           </div>
@@ -200,41 +230,41 @@ const VenueLayoutEditor: React.FC<VenueLayoutEditorProps> = ({
         </div>
 
         {/* Venue Overview */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6 p-4 bg-gray-50 rounded-lg">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6 p-4 bg-white/10 backdrop-blur-sm rounded-lg border border-white/20">
           <div className="text-center">
-            <div className="text-2xl font-bold text-blue-600">{venueLayout.sections}</div>
-            <div className="text-sm text-gray-600">Sections</div>
+            <div className="text-2xl font-bold text-blue-300">{venueLayout.sections}</div>
+            <div className={`text-sm ${getSecondaryTextColor()}`}>Sections</div>
           </div>
           <div className="text-center">
-            <div className="text-2xl font-bold text-green-600">{venueLayout.layers}</div>
-            <div className="text-sm text-gray-600">Layers</div>
+            <div className="text-2xl font-bold text-green-300">{venueLayout.layers}</div>
+            <div className={`text-sm ${getSecondaryTextColor()}`}>Layers</div>
           </div>
           <div className="text-center">
-            <div className="text-2xl font-bold text-orange-600">{venueLayout.exits}</div>
-            <div className="text-sm text-gray-600">Exits/Gates</div>
+            <div className="text-2xl font-bold text-orange-300">{venueLayout.exits}</div>
+            <div className={`text-sm ${getSecondaryTextColor()}`}>Exits/Gates</div>
           </div>
           <div className="text-center">
-            <div className="text-2xl font-bold text-purple-600">
+            <div className="text-2xl font-bold text-purple-300">
               {venueLayout.toiletsList?.length || 0}
             </div>
-            <div className="text-sm text-gray-600">Facilities</div>
+            <div className={`text-sm ${getSecondaryTextColor()}`}>Facilities</div>
           </div>
         </div>
 
         {/* Venue Layout Visualization */}
         <div className="mb-6">
-          <h4 className="text-md font-medium text-gray-900 mb-3">Layout Visualization</h4>
-          <div className="border rounded-lg p-4 bg-white">
+          <h4 className={`text-md font-medium ${getTextColor()} mb-3`}>Layout Visualization</h4>
+          <div className="border border-white/30 rounded-lg p-4 bg-white/10 backdrop-blur-sm">
             <VenueLayoutVisualization venueLayout={venueLayout} />
           </div>
         </div>
-      </Card>
+      </StaticGlassCard>
 
       {/* Gate Configuration */}
       {venueLayout.exitsList && venueLayout.exitsList.length > 0 && (
-        <Card className="p-6">
-          <h4 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-            <Users className="h-5 w-5" />
+        <StaticGlassCard intensity="medium" blur="md">
+          <h4 className={`text-lg font-semibold ${getTextColor()} mb-4 flex items-center gap-2`}>
+            <Users className={`h-5 w-5 ${getIconColor()}`} />
             Gate Configuration ({venueLayout.exitsList.length} gates)
           </h4>
           <div className="space-y-4">
@@ -243,13 +273,13 @@ const VenueLayoutEditor: React.FC<VenueLayoutEditorProps> = ({
               const isPhoneValid = !config.picPhoneNumber || validatePhoneNumber(config.picPhoneNumber);
               
               return (
-                <div key={exit.id} className="p-4 border border-gray-200 rounded-lg">
+                <div key={exit.id} className="p-4 border border-white/10 rounded-lg">
                   <div className="flex items-center justify-between mb-3">
                     <div>
-                      <h5 className="font-medium text-gray-900">{exit.name}</h5>
+                      <h5 className={`font-medium ${getTextColor()}`}>{exit.name}</h5>
                       
                     </div>
-                    <div className="text-sm text-gray-500">
+                    <div className={`text-sm ${getSecondaryTextColor()}`}>
                       Gate #{index + 1}
                     </div>
                   </div>
@@ -260,7 +290,7 @@ const VenueLayoutEditor: React.FC<VenueLayoutEditorProps> = ({
                       <Button
                         onClick={() => handleUpdateGate(exit.id, exit.name)}
                         disabled={readOnly || !config.picPhoneNumber || !validatePhoneNumber(config.picPhoneNumber)}
-                        className="flex items-center gap-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400"
+                        className="flex items-center gap-2 disabled:bg-gray-400"
                         size="sm"
                       >
                         <CheckCircle className="h-4 w-4" />
@@ -272,8 +302,8 @@ const VenueLayoutEditor: React.FC<VenueLayoutEditorProps> = ({
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     {/* Capacity Configuration */}
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        <Users className="h-4 w-4 inline mr-1" />
+                      <label className={`block text-sm font-medium ${getSecondaryTextColor()} mb-1`}>
+                        <Users className={`h-4 w-4 inline mr-1 ${getIconColor()}`} />
                         Capacity (people/hour)
                       </label>
                       <input
@@ -300,17 +330,21 @@ const VenueLayoutEditor: React.FC<VenueLayoutEditorProps> = ({
                           updateGateConfig(exit.id, 'capacity', value);
                         }}
                         disabled={readOnly}
-                        className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 disabled:bg-gray-100"
+                        className={`block w-full rounded-lg border px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 ${
+                          isDarkBackground 
+                            ? 'bg-white/10 border-white/20 text-white placeholder:text-white/60' 
+                            : 'bg-white border-gray-300 text-gray-900 placeholder:text-gray-500 disabled:bg-gray-100'
+                        }`}
                         placeholder="800"
                       />
-                      <p className="text-xs text-gray-500 mt-1">
+                      <p className={`text-xs ${getSecondaryTextColor()} mt-1`}>
                         ~{Math.round((config.capacity || 800) / 60)} people/minute
                       </p>
                     </div>
 
                     {/* PIC Name */}
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                      <label className={`block text-sm font-medium ${getSecondaryTextColor()} mb-1`}>
                         PIC Name (Optional)
                       </label>
                       <input
@@ -318,15 +352,19 @@ const VenueLayoutEditor: React.FC<VenueLayoutEditorProps> = ({
                         value={config.picName || ''}
                         onChange={(e) => updateGateConfig(exit.id, 'picName', e.target.value)}
                         disabled={readOnly}
-                        className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 disabled:bg-gray-100"
+                        className={`block w-full rounded-lg border px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 ${
+                          isDarkBackground 
+                            ? 'bg-white/10 border-white/20 text-white placeholder:text-white/60' 
+                            : 'bg-white border-gray-300 text-gray-900 placeholder:text-gray-500 disabled:bg-gray-100'
+                        }`}
                         placeholder="John Doe"
                       />
                     </div>
 
                     {/* Phone Number Configuration */}
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        <Phone className="h-4 w-4 inline mr-1" />
+                      <label className={`block text-sm font-medium ${getSecondaryTextColor()} mb-1`}>
+                        <Phone className={`h-4 w-4 inline mr-1 ${getIconColor()}`} />
                         PIC Phone Number
                       </label>
                       <input
@@ -334,10 +372,10 @@ const VenueLayoutEditor: React.FC<VenueLayoutEditorProps> = ({
                         value={config.picPhoneNumber}
                         onChange={(e) => updateGateConfig(exit.id, 'picPhoneNumber', e.target.value)}
                         disabled={readOnly}
-                        className={`block w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-1 disabled:bg-gray-100 ${
-                          isPhoneValid 
-                            ? 'border-gray-300 focus:border-primary-500 focus:ring-primary-500' 
-                            : 'border-red-300 focus:border-red-500 focus:ring-red-500'
+                        className={`block w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-1 ${
+                          isDarkBackground 
+                            ? `bg-white/10 border-white/20 text-white placeholder:text-white/60 ${!isPhoneValid ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : 'focus:border-primary-500 focus:ring-primary-500'}` 
+                            : `bg-white text-gray-900 placeholder:text-gray-500 disabled:bg-gray-100 ${isPhoneValid ? 'border-gray-300 focus:border-primary-500 focus:ring-primary-500' : 'border-red-300 focus:border-red-500 focus:ring-red-500'}`
                         }`}
                         placeholder="+60123456789"
                       />
@@ -346,7 +384,7 @@ const VenueLayoutEditor: React.FC<VenueLayoutEditorProps> = ({
                           Please enter a valid Malaysian phone number
                         </p>
                       )}
-                      <p className="text-xs text-gray-500 mt-1">
+                      <p className={`text-xs ${getSecondaryTextColor()} mt-1`}>
                         WhatsApp number for gate notifications
                       </p>
                     </div>
@@ -357,7 +395,7 @@ const VenueLayoutEditor: React.FC<VenueLayoutEditorProps> = ({
           </div>
 
           {/* Configuration Summary */}
-          <div className="mt-6 p-4 bg-blue-50 rounded-lg">
+          {/* <div className="mt-6 p-4 bg-blue-50 rounded-lg">
             <h5 className="font-medium text-blue-900 mb-2">Configuration Summary</h5>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
               <div>
@@ -381,18 +419,18 @@ const VenueLayoutEditor: React.FC<VenueLayoutEditorProps> = ({
                 </span>
               </div>
             </div>
-          </div>
-        </Card>
+          </div> */}
+        </StaticGlassCard>
       )}
 
       {/* File Upload Section */}
       {eventId && (
-        <Card className="p-6">
-          <h4 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-            <Upload className="h-5 w-5" />
+        <StaticGlassCard intensity="medium" blur="md">
+          <h4 className={`text-lg font-semibold ${getTextColor()} mb-4 flex items-center gap-2`}>
+            <Upload className={`h-5 w-5 ${getIconColor()}`} />
             Event Documents & Files
           </h4>
-          <p className="text-sm text-gray-600 mb-6">
+          <p className={`text-sm ${getSecondaryTextColor()} mb-6`}>
             Upload relevant documents such as workflows, procedures, floor plans, or any other files related to your event. 
             Our AI will analyze the content to provide better insights and recommendations.
           </p>
@@ -404,44 +442,61 @@ const VenueLayoutEditor: React.FC<VenueLayoutEditorProps> = ({
             disabled={readOnly}
             maxFiles={5}
             className="mb-6"
+            existingFiles={{
+              urls: existingAttachmentUrls,
+              filenames: existingAttachmentFilenames
+            }}
           />
 
-          {/* Uploaded Files List */}
-          {attachments.links.length > 0 && (
+          {/* All Files List (Existing + New) */}
+          {allAttachmentUrls.length > 0 && (
             <div className="space-y-4">
-              <h5 className="font-medium text-gray-900 flex items-center gap-2">
-                <FileText className="h-4 w-4" />
-                Uploaded Files ({attachments.links.length})
+              <h5 className={`font-medium ${getTextColor()} flex items-center gap-2`}>
+                <FileText className={`h-4 w-4 ${getIconColor()}`} />
+                Documents ({allAttachmentUrls.length})
               </h5>
               
               <div className="space-y-2">
-                {attachments.links.map((link, index) => {
-                  const fileName = link.split('/').pop() || 'Unknown file';
-                  const analysis = attachments.analyses[index];
+                {allAttachmentUrls.map((link, index) => {
+                  const fileName = allAttachmentFilenames[index] || 'Unknown file';
+                  const isExistingFile = existingAttachmentUrls.includes(link);
                   
                   return (
-                    <div key={link} className="flex items-start space-x-3 p-3 bg-gray-50 rounded-lg">
-                      <FileText className="h-5 w-5 text-blue-500 mt-0.5" />
+                    <div key={link} className="flex items-start space-x-3 p-3 bg-white/10 backdrop-blur-sm rounded-lg border border-white/20">
+                      <FileText className="h-5 w-5 text-blue-300 mt-0.5" />
                       
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between">
-                          <h6 className="text-sm font-medium text-gray-900 truncate">
-                            {fileName}
-                          </h6>
+                          <div className="flex items-center space-x-2">
+                            <h6 className={`text-sm font-medium ${getTextColor()} truncate`}>
+                              {fileName}
+                            </h6>
+                            {isExistingFile && (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-400/30 text-blue-100 border border-blue-300/40">
+                                Existing
+                              </span>
+                            )}
+                            {!isExistingFile && (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-400/30 text-green-100 border border-green-300/40">
+                                New
+                              </span>
+                            )}
+                          </div>
                           <div className="flex items-center space-x-2">
                             <a
                               href={link}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="text-blue-600 hover:text-blue-800 text-sm flex items-center gap-1"
+                              className="text-blue-300 hover:text-blue-100 text-sm flex items-center gap-1"
                             >
                               <ExternalLink className="h-3 w-3" />
                               View
                             </a>
-                            {!readOnly && (
+                            {!readOnly && !isExistingFile && (
                               <button
                                 onClick={() => removeAttachment(link)}
                                 className="text-red-600 hover:text-red-800 text-sm"
+                                title="Remove newly uploaded file"
                               >
                                 Remove
                               </button>
@@ -449,75 +504,16 @@ const VenueLayoutEditor: React.FC<VenueLayoutEditorProps> = ({
                           </div>
                         </div>
                         
-                        {analysis && (
-                          <div className="mt-2 p-2 bg-blue-50 rounded text-xs">
-                            <p className="text-blue-800 font-medium">AI Analysis:</p>
-                            <p className="text-blue-700 mt-1">{analysis.summary}</p>
-                            
-                            {analysis.keyPhrases.length > 0 && (
-                              <div className="mt-2">
-                                <span className="text-blue-800 font-medium">Key Topics: </span>
-                                <span className="text-blue-700">
-                                  {analysis.keyPhrases.slice(0, 3).map(kp => kp.text).join(', ')}
-                                </span>
-                              </div>
-                            )}
-                            
-                            {analysis.entities.length > 0 && (
-                              <div className="mt-1">
-                                <span className="text-blue-800 font-medium">Entities: </span>
-                                <span className="text-blue-700">
-                                  {analysis.entities.slice(0, 3).map(e => e.text).join(', ')}
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                        )}
                       </div>
                     </div>
                   );
                 })}
               </div>
 
-              {/* Combined Analysis Summary */}
-              {attachments.analyses.length > 0 && (
-                <div className="mt-6 p-4 bg-green-50 rounded-lg">
-                  <h5 className="font-medium text-green-900 mb-2">Document Analysis Summary</h5>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <span className="font-medium text-green-800">Total Documents:</span>
-                      <span className="ml-2 text-green-700">{attachments.links.length}</span>
-                    </div>
-                    <div>
-                      <span className="font-medium text-green-800">Analysis Status:</span>
-                      <span className="ml-2 text-green-700">
-                        {attachments.analyses.length} analyzed
-                      </span>
-                    </div>
-                    <div className="md:col-span-2">
-                      <span className="font-medium text-green-800">Common Themes:</span>
-                      <span className="ml-2 text-green-700">
-                        {[...new Set(attachments.analyses.flatMap(a => a.keyPhrases.slice(0, 2).map(kp => kp.text)))]
-                          .slice(0, 5).join(', ')}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              )}
             </div>
           )}
 
-          {/* Help Text */}
-          <div className="mt-6 p-4 bg-blue-50 rounded-lg">
-            <h5 className="font-medium text-blue-900 mb-2">💡 Tips for Better Analysis</h5>
-            <ul className="text-sm text-blue-800 space-y-1">
-              <li>• Upload event procedures, safety protocols, or workflow documents</li>
-              <li>• Include floor plans, capacity charts, or operational guidelines</li>
-              <li>• Text-based files (PDF, Word, Excel) provide the best analysis results</li>
-              <li>• Our AI will extract key information to improve event recommendations</li>
-            </ul>
-          </div>
-        </Card>
+        </StaticGlassCard>
       )}
 
       {/* Modern Update Notification Popup */}

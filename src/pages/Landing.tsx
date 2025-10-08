@@ -1,20 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Users, BarChart3, Zap, ArrowRight } from 'lucide-react';
+import { Calendar, TrendingUp, Users, CheckCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import Button from '../components/common/Button';
 import Logo from '../components/common/Logo';
-import Scene3DWithModels from '../components/three/Scene3DWithModels';
+import Spinner from '../components/common/Spinner';
+import GoogleIcon from '../components/icons/GoogleIcon';
 
 const Landing: React.FC = () => {
   const navigate = useNavigate();
-  const [isLoaded, setIsLoaded] = useState(false);
   const { user, signInWithGoogle, loading, error } = useAuth();
-
-  useEffect(() => {
-    setIsLoaded(true);
-  }, []);
+  const [isVideoLoading, setIsVideoLoading] = useState(true);
 
   // Redirect to dashboard if already authenticated
   useEffect(() => {
@@ -31,241 +27,300 @@ const Landing: React.FC = () => {
     }
   };
 
+  const handleVideoLoad = () => {
+    setIsVideoLoading(false);
+  };
+
   const features = [
     {
-      icon: BarChart3,
-      title: 'AI-Powered Analysis',
-      description: 'Advanced machine learning algorithms analyze crowd patterns and predict behavior.',
+      icon: Calendar,
+      title: 'Intelligent Event Planning',
+      description: 'Create and manage events with AI-powered venue layout tools and crowd flow prediction.',
     },
     {
       icon: Users,
-      title: 'Crowd Simulation',
-      description: 'Real-time simulation of crowd movement and density for better event planning.',
+      title: 'Real-time Crowd Monitoring',
+      description: 'Track crowd density and movement patterns in real-time with live updates and alerts.',
     },
     {
-      icon: BarChart3,
-      title: 'Data Visualization',
-      description: 'Interactive charts and heatmaps to visualize crowd dynamics and insights.',
-    },
-    {
-      icon: Zap,
-      title: 'Real-time Insights',
-      description: 'Get actionable recommendations and alerts for optimal crowd management.',
+      icon: TrendingUp,
+      title: 'Predictive Analytics',
+      description: 'Advanced ML models forecast crowd behavior and identify potential congestion hotspots.',
     },
   ];
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900 relative overflow-hidden">
-      {/* Background Animation */}
-      <div className="absolute inset-0 opacity-30">
-        <div className="absolute top-0 -left-4 w-72 h-72 bg-purple-300 rounded-full mix-blend-multiply filter blur-xl animate-pulse"></div>
-        <div className="absolute top-0 -right-4 w-72 h-72 bg-yellow-300 rounded-full mix-blend-multiply filter blur-xl animate-pulse animation-delay-2000"></div>
-        <div className="absolute -bottom-8 left-20 w-72 h-72 bg-pink-300 rounded-full mix-blend-multiply filter blur-xl animate-pulse animation-delay-4000"></div>
-      </div>
+  // Animation variants
+  const fadeInUp = {
+    initial: { opacity: 0, y: 30 },
+    animate: { opacity: 1, y: 0 },
+    transition: { duration: 0.6 }
+  };
 
+  const staggerContainer = {
+    animate: {
+      transition: {
+        staggerChildren: 0.1
+      }
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-pink-100 via-purple-50 to-orange-100">
       {/* Navigation */}
-      <nav className="relative z-10 px-6 py-4">
-        <div className="max-w-7xl mx-auto flex justify-between items-center">
-          <motion.div
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: isLoaded ? 1 : 0, x: isLoaded ? 0 : -20 }}
-            transition={{ duration: 0.6 }}
-          >
-            <Logo 
-              size="lg" 
-              textColor="text-white" 
-              iconColor="text-blue-400"
-              className="mb-4"
-            />
-          </motion.div>
+      <nav className="bg-white/80 backdrop-blur-sm border-b border-gray-200 sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
+          <Logo 
+            size="md" 
+            textColor="text-gray-900" 
+            iconColor="text-blue-600"
+          />
           
-          <motion.div
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: isLoaded ? 1 : 0, x: isLoaded ? 0 : 20 }}
-            transition={{ duration: 0.6, delay: 0.2 }}
+          <button
+            onClick={handleSignIn}
+            disabled={loading}
+            className="bg-white hover:bg-gray-50 border-2 border-black-400 text-black px-6 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
-            <Button 
-              onClick={handleSignIn} 
-              loading={loading}
-              disabled={loading}
-              className="bg-blue-600 hover:bg-blue-700"
-            >
-              {loading ? 'Signing In...' : 'Sign In with Google'}
-              {!loading && <ArrowRight className="ml-2 h-4 w-4" />}
-            </Button>
-          </motion.div>
+            {loading ? (
+              <>
+                <Spinner size="sm" />
+                <span>Signing in...</span>
+              </>
+            ) : (
+              <>
+                <GoogleIcon size={20} />
+                <span>Sign in with Google</span>
+              </>
+            )}
+          </button>
         </div>
       </nav>
 
       {/* Auth Error Display */}
       {error && (
-        <div className="fixed top-4 right-4 z-50 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg shadow-lg">
+        <div className="fixed top-20 right-4 z-50 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg shadow-lg">
           <p className="text-sm">{error}</p>
         </div>
       )}
 
       {/* Hero Section */}
-      <div className="relative z-10 max-w-7xl mx-auto px-6 py-20">
-        <div className="grid lg:grid-cols-2 gap-32 items-center">
-          {/* Left Content */}
-          <div className="space-y-8">
-            <motion.div
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: isLoaded ? 1 : 0, y: isLoaded ? 0 : 30 }}
-              transition={{ duration: 0.8, delay: 0.3 }}
-            >
-              <h1 className="text-5xl lg:text-6xl font-bold text-white leading-tight">
-                Smart Crowd
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-400">
-                  {' '}Simulation
-                </span>
-              </h1>
-            </motion.div>
+      <div className="max-w-5xl mx-auto px-6 py-24 text-center">
+        <motion.p 
+          className="text-gray-600 text-sm font-medium mb-4"
+          initial={{ opacity: 0, y: 40 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 1.2, ease: "easeOut" }}
+        >
+          Powered by AWS x AI
+        </motion.p>
+        
+        <motion.h1 
+          className="text-6xl font-bold text-gray-900 mb-6 leading-tight"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.1 }}
+        >
+          Crowd Control
+          <br />
+          made simple
+        </motion.h1>
+        
+        <motion.p 
+          className="text-xl text-gray-700 max-w-3xl mx-auto mb-20 leading-relaxed"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.2 }}
+        >
+          Event Buddy gives you powerful AI-driven crowd simulation, real-time monitoring 
+          for safer events, and intelligent venue planning tools to optimize every aspect 
+          of your event management.
+        </motion.p>
 
-            <motion.p
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: isLoaded ? 1 : 0, y: isLoaded ? 0 : 30 }}
-              transition={{ duration: 0.8, delay: 0.5 }}
-              className="text-xl text-gray-300 leading-relaxed"
-            >
-              Harness the power of AI to predict, analyze, and optimize crowd behavior for safer, 
-              more efficient events. Transform your event planning with intelligent insights.
-            </motion.p>
-
-            <motion.div
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: isLoaded ? 1 : 0, y: isLoaded ? 0 : 30 }}
-              transition={{ duration: 0.8, delay: 0.7 }}
-              className="flex flex-col sm:flex-row gap-4"
-            >
-              <Button
-                size="lg"
-                onClick={handleSignIn}
-                loading={loading}
-                disabled={loading}
-                className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-8 py-4"
-              >
-                {loading ? 'Signing In...' : 'Get Started'}
-                <ArrowRight className="ml-2 h-5 w-5" />
-              </Button>
-              
-              {/* <Button
-                size="lg"
-                variant="outline"
-                className="border-gray-400 text-gray-300 hover:bg-white hover:text-gray-900 px-8 py-4"
-              >
-                <Play className="mr-2 h-5 w-5" />
-                Watch Demo
-              </Button> */}
-            </motion.div>
-
-            {/* Stats */}
-            <motion.div
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: isLoaded ? 1 : 0, y: isLoaded ? 0 : 30 }}
-              transition={{ duration: 0.8, delay: 0.9 }}
-              className="grid grid-cols-3 gap-8 pt-8 border-t border-gray-700"
-            >
+        {/* Demo Video Below Title */}
+        <motion.div 
+          className="relative mt-8 max-w-4xl mx-auto"
+          initial={{ opacity: 0, y: 40 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8, delay: 0.4 }}
+        >
+          {isVideoLoading && (
+            <div className="absolute inset-0 flex items-center justify-center bg-white/50 backdrop-blur-sm rounded-2xl z-10">
               <div className="text-center">
-                <div className="text-3xl font-bold text-white">99%</div>
-                <div className="text-sm text-gray-400">Accuracy</div>
+                <Spinner size="lg" className="mb-3" />
+                <p className="text-sm text-gray-600">Loading demo video...</p>
               </div>
-              <div className="text-center">
-                <div className="text-3xl font-bold text-white">500+</div>
-                <div className="text-sm text-gray-400">Events Analyzed</div>
-              </div>
-              <div className="text-center">
-                <div className="text-3xl font-bold text-white">24/7</div>
-                <div className="text-sm text-gray-400">Real-time Monitoring</div>
-              </div>
-            </motion.div>
-          </div>
-
-          {/* Right 3D Scene */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: isLoaded ? 1 : 0, scale: isLoaded ? 1 : 0.8 }}
-            transition={{ duration: 1, delay: 0.5 }}
-            className="h-[400px] relative"
+            </div>
+          )}
+          <video
+            className="w-full rounded-2xl shadow-2xl"
+            autoPlay
+            loop
+            muted
+            playsInline
+            onLoadedData={handleVideoLoad}
           >
-            <Scene3DWithModels 
-              useCustomModels={true}
-              showCarousel={false}
-              showCrowd={false}
-              showInfoBanner={false}
-            />
-          </motion.div>
-        </div>
+            <source src="/videos/modelControl.mp4" type="video/mp4" />
+            Your browser does not support the video tag.
+          </video>
+        </motion.div>
       </div>
 
       {/* Features Section */}
-      <div className="relative z-10 max-w-7xl mx-auto px-6 py-20">
-        <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: isLoaded ? 1 : 0, y: isLoaded ? 0 : 30 }}
-          transition={{ duration: 0.8, delay: 1.1 }}
-          className="text-center mb-16"
+      <motion.div 
+        className="max-w-7xl mx-auto px-6 py-20"
+        initial="initial"
+        whileInView="animate"
+        viewport={{ once: true, margin: "-100px" }}
+        variants={staggerContainer}
+      >
+        <motion.h2 
+          className="text-4xl font-bold text-gray-900 text-center mb-4"
+          variants={fadeInUp}
         >
-          <h2 className="text-4xl font-bold text-white mb-4">
-            Powerful Features for Event Success
-          </h2>
-          <p className="text-xl text-gray-300">
-            Everything you need to create safer, more efficient events
-          </p>
-        </motion.div>
-
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
-          {features.map((feature, index) => {
+          Everything you need
+          <br />
+          to manage your events
+        </motion.h2>
+        
+        <motion.div 
+          className="grid md:grid-cols-3 gap-8 mt-16"
+          variants={staggerContainer}
+        >
+          {features.map((feature) => {
             const Icon = feature.icon;
             return (
               <motion.div
                 key={feature.title}
-                initial={{ opacity: 0, y: 30 }}
-                animate={{ opacity: isLoaded ? 1 : 0, y: isLoaded ? 0 : 30 }}
-                transition={{ duration: 0.6, delay: 1.3 + index * 0.1 }}
-                className="bg-white/10 backdrop-blur-lg rounded-xl p-6 hover:bg-white/20 transition-all duration-300"
+                className="bg-white rounded-2xl p-8 shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-1"
+                variants={fadeInUp}
               >
-                <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg flex items-center justify-center mb-4">
-                  <Icon className="h-6 w-6 text-white" />
+                <div className="w-14 h-14 bg-gray-100 rounded-xl flex items-center justify-center mb-6">
+                  <Icon className="h-7 w-7 text-gray-900" />
                 </div>
-                <h3 className="text-xl font-semibold text-white mb-2">
+                <h3 className="text-xl font-semibold text-gray-900 mb-3">
                   {feature.title}
                 </h3>
-                <p className="text-gray-300">
+                <p className="text-gray-600 leading-relaxed">
                   {feature.description}
                 </p>
               </motion.div>
             );
           })}
-        </div>
+        </motion.div>
+      </motion.div>
+
+      {/* Workflow Section */}
+      <div className="bg-white py-20">
+        <motion.div 
+          className="max-w-6xl mx-auto px-6"
+          initial="initial"
+          whileInView="animate"
+          viewport={{ once: true, margin: "-100px" }}
+          variants={staggerContainer}
+        >
+          <motion.h2 
+            className="text-4xl font-bold text-gray-900 text-center mb-4"
+            variants={fadeInUp}
+          >
+            Manage the entire
+            <br />
+            event workflow
+          </motion.h2>
+          <motion.p 
+            className="text-xl text-gray-600 text-center max-w-3xl mx-auto mb-16"
+            variants={fadeInUp}
+          >
+            Event Buddy is built with productivity at heart and is loaded with features to 
+            help you manage events more effectively. It's quick to learn, fast to navigate, 
+            and empowering to use.
+          </motion.p>
+          
+          <motion.div 
+            className="grid md:grid-cols-2 gap-8"
+            variants={staggerContainer}
+          >
+            <motion.div className="space-y-4" variants={fadeInUp}>
+              <div className="flex items-start gap-3">
+                <CheckCircle className="h-6 w-6 text-green-600 mt-1 flex-shrink-0" />
+                <div>
+                  <h4 className="font-semibold text-gray-900 mb-1">Flexible event tracking</h4>
+                  <p className="text-gray-600 text-sm">Track multiple events with customizable workflows and stages</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <CheckCircle className="h-6 w-6 text-green-600 mt-1 flex-shrink-0" />
+                <div>
+                  <h4 className="font-semibold text-gray-900 mb-1">AI-powered predictions</h4>
+                  <p className="text-gray-600 text-sm">Get accurate crowd density forecasts and safety recommendations</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <CheckCircle className="h-6 w-6 text-green-600 mt-1 flex-shrink-0" />
+                <div>
+                  <h4 className="font-semibold text-gray-900 mb-1">Real-time monitoring</h4>
+                  <p className="text-gray-600 text-sm">Live crowd tracking with instant alerts and notifications</p>
+                </div>
+              </div>
+            </motion.div>
+            
+            <motion.div className="space-y-4" variants={fadeInUp}>
+              <div className="flex items-start gap-3">
+                <CheckCircle className="h-6 w-6 text-green-600 mt-1 flex-shrink-0" />
+                <div>
+                  <h4 className="font-semibold text-gray-900 mb-1">Interactive venue planning</h4>
+                  <p className="text-gray-600 text-sm">Design and visualize venue layouts with drag-and-drop tools</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <CheckCircle className="h-6 w-6 text-green-600 mt-1 flex-shrink-0" />
+                <div>
+                  <h4 className="font-semibold text-gray-900 mb-1">Detailed analytics</h4>
+                  <p className="text-gray-600 text-sm">Comprehensive reports and insights for data-driven decisions</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <CheckCircle className="h-6 w-6 text-green-600 mt-1 flex-shrink-0" />
+                <div>
+                  <h4 className="font-semibold text-gray-900 mb-1">Document management</h4>
+                  <p className="text-gray-600 text-sm">Centralized storage for permits, layouts, and event materials</p>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        </motion.div>
       </div>
 
       {/* CTA Section */}
-      <div className="relative z-10 max-w-4xl mx-auto px-6 py-20 text-center">
-        <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: isLoaded ? 1 : 0, y: isLoaded ? 0 : 30 }}
-          transition={{ duration: 0.8, delay: 1.7 }}
-          className="bg-white/10 backdrop-blur-lg rounded-2xl p-12"
+      <motion.div 
+        className="max-w-4xl mx-auto px-6 py-24 text-center"
+        initial="initial"
+        whileInView="animate"
+        viewport={{ once: true, margin: "-100px" }}
+        variants={staggerContainer}
+      >
+        <motion.h2 
+          className="text-4xl font-bold text-gray-900 mb-4"
+          variants={fadeInUp}
         >
-          <h2 className="text-3xl font-bold text-white mb-4">
-            Ready to Transform Your Events?
-          </h2>
-          <p className="text-xl text-gray-300 mb-8">
-            Join thousands of event organizers who trust Event Buddy for smarter crowd management.
-          </p>
-          <Button
-            size="lg"
-            onClick={handleSignIn}
-            loading={loading}
-            disabled={loading}
-            className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-12 py-4"
-          >
-            {loading ? 'Signing In...' : 'Start Your Free Trial'}
-            <ArrowRight className="ml-2 h-5 w-5" />
-          </Button>
-        </motion.div>
-      </div>
+          Get started with Event Buddy today
+        </motion.h2>
+        <motion.p 
+          className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto"
+          variants={fadeInUp}
+        >
+          No matter what type of event, from small gatherings to large conferences, 
+          Event Buddy is the best way to ensure safety and success.
+        </motion.p>
+        <motion.button
+          onClick={handleSignIn}
+          disabled={loading}
+          className="bg-black hover:bg-gray-800 text-white px-10 py-3 rounded-lg text-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          variants={fadeInUp}
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+        >
+          {loading ? 'Signing in...' : 'Get started free'}
+        </motion.button>
+      </motion.div>
     </div>
   );
 };

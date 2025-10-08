@@ -72,7 +72,7 @@ export const eventAPI = {
   },
   
   // Get event history
-  getEventHistory: async (userEmail?: string) => {
+  getEventHistory: async (userEmail?: string, page: number = 1, limit: number = 10) => {
     if (USE_MOCK_EVENT_HISTORY) {
       console.log('🎭 Using mock data for getEventHistory');
       return mockApiClient.getEventHistory();
@@ -80,8 +80,11 @@ export const eventAPI = {
     
     try {
       console.log('🌐 Using real API for getEventHistory:', `${apiClient.defaults.baseURL}/events`);
-      // Add userEmail as query parameter if provided
-      const params = userEmail ? { userEmail } : {};
+      // Add userEmail, page, and limit as query parameters
+      const params: any = { page, limit };
+      if (userEmail) {
+        params.userEmail = userEmail;
+      }
       return await apiClient.get('/events', { params });
     } catch (error: any) {
       // If server returns 500 error, temporarily fallback to mock data
@@ -155,5 +158,74 @@ export const eventAPI = {
   getEventAttachments: (eventId: string) => {
     console.log('🌐 Using real API for getEventAttachments:', `${apiClient.defaults.baseURL}/events/${eventId}/attachments`);
     return apiClient.get(`/events/${eventId}/attachments`);
+  },
+
+  // Upload event attachments - NEW endpoint
+  uploadEventAttachments: (eventId: string, file: File) => {
+    const formData = new FormData();
+    formData.append('files', file);
+    
+    console.log('📤 Using real API for uploadEventAttachments:', `${apiClient.defaults.baseURL}/events/${eventId}/uploadEventAttachments`);
+    return apiClient.post(`/events/${eventId}/uploadEventAttachments`, formData, {
+      headers: { 
+        'Content-Type': 'multipart/form-data',
+      },
+      onUploadProgress: (progressEvent) => {
+        // This can be used for progress tracking
+        if (progressEvent.total) {
+          const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+          console.log(`Upload progress: ${progress}%`);
+        }
+      }
+    });
+  },
+
+  // Generate forecast report
+  generateForecastReport: (eventId: string, reportData?: {
+    aiPopularityAnalysis?: {
+      popularityLevel?: string;
+      popularityScore?: number;
+      audienceDemographics?: {
+        families?: number;
+        youngAdults?: number;
+        seniors?: number;
+        tourists?: number;
+      };
+      historicalIncidents?: string[];
+    };
+    weatherForecast?: {
+      temperature?: number;
+      condition?: string;
+      precipitation?: number;
+      windSpeed?: number;
+      recommendations?: string[];
+    };
+    nearestParking?: {
+      facilities?: Array<{
+        name?: string;
+        distance?: string;
+        capacity?: number;
+        walkingTime?: number;
+        availability?: string;
+      }>;
+      recommendations?: string[];
+    };
+    transitForecast?: {
+      options?: Array<{
+        name?: string;
+        type?: string;
+        route?: string;
+        frequency?: number;
+        walkingDistance?: string;
+        expectedCrowding?: string;
+      }>;
+      recommendations?: string[];
+    };
+  }) => {
+    console.log('📄 Using real API for generateForecastReport:', `${apiClient.defaults.baseURL}/forecast/${eventId}/report`);
+    console.log('📊 Report data being sent:', reportData);
+    return apiClient.post(`/forecast/${eventId}/report`, reportData || {}, {
+      headers: { 'Content-Type': 'application/json' }
+    });
   },
 };
