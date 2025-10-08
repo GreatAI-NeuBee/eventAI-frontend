@@ -494,8 +494,13 @@ const NewEvent: React.FC = () => {
               {venueLayoutJson ? (
                 <div className="text-sm space-y-1">
                   <div className="text-green-600 font-medium">
-                    ✓ {venueLayoutJson.sections} sections, {venueLayoutJson.exits} exits
+                    ✓ {venueLayoutJson.sections} sections, {venueLayoutJson.exits}/7 exits
                   </div>
+                  {venueLayoutJson.exits >= 7 && (
+                    <div className="text-orange-600 text-xs">
+                      ⚠️ Maximum exits reached
+                    </div>
+                  )}
                   {venueLayoutJson.toiletsList && venueLayoutJson.toiletsList.length > 0 && (
                     <div className="text-blue-600 text-xs">
                       + {venueLayoutJson.toiletsList.length} facilities
@@ -511,6 +516,7 @@ const NewEvent: React.FC = () => {
           </div>
           <StadiumMapEditor 
             initialLayers={2} 
+            maxExits={7}
             onChange={handleVenueLayoutChange}
           />
         </Card>
