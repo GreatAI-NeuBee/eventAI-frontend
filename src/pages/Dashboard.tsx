@@ -383,6 +383,7 @@ const Dashboard: React.FC = () => {
         </div>
       </Card>
 
+
       {/* Events List */}
       {filteredAndSortedEvents.length === 0 ? (
         <Card>

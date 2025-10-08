@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import Card from "../components/common/Card";
-import { DUMMY_FORECAST } from "../data/DUMMY_FORECAST";
+// Removed DUMMY_FORECAST import - using empty forecast instead
 
 /* ========= Types ========= */
 type PctPoint = [number, number];
@@ -306,7 +306,9 @@ export const VenueLayoutCard: React.FC<{ event: EventData | null }> = ({ event }
   // parse + filter forecast from the *event value*
   const forecast: InOutForecast = useMemo(() => {
     const raw = (event as any)?.forecastResult;
-    return coerceForecast(raw, DUMMY_FORECAST);
+    // Use empty forecast instead of dummy data
+    const emptyForecast: InOutForecast = { arrivals: {}, exits: {} };
+    return coerceForecast(raw, emptyForecast);
   }, [event]);
 
   // frames

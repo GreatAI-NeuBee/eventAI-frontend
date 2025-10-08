@@ -39,8 +39,14 @@ interface VenueLocation {
   address?: string;
 }
 
-// Cache to store weather data per event
-const weatherCache = new Map<string, WeatherData>();
+// Cache to store weather data per event with timestamps
+interface CachedWeatherData {
+  data: WeatherData;
+  timestamp: number;
+}
+
+const weatherCache = new Map<string, CachedWeatherData>();
+const CACHE_DURATION = 30 * 60 * 1000; // 30 minutes in milliseconds
 
 // Generate cache key based on venue location and event date
 const getCacheKey = (venueLocation: VenueLocation, eventDate: string): string => {
@@ -70,11 +76,14 @@ const fetchRealWeatherData = async (venueLocation: VenueLocation, eventDate: str
     console.log('🌤️ Current date:', currentDate.toISOString());
     console.log('🌤️ Days difference:', daysDifference);
     
-    // If event is more than 5 days in the future, use historical/forecast API or fallback to mock
+    // Only use mock data for events more than 5 days in the future
+    // For current day, yesterday, or near future, always try real API first
     if (daysDifference > 5) {
       console.log('🌤️ Event is more than 5 days away, using enhanced mock data');
       return generateEventSpecificWeatherData(venueLocation, eventDate);
     }
+    
+    console.log('🌤️ Event is within 5 days, attempting real API call');
     
     // Use OpenWeatherMap API for current weather and 5-day forecast
     const apiUrl = `https://api.openweathermap.org/data/2.5/forecast?lat=${venueLocation.lat}&lon=${venueLocation.lng}&appid=${apiKey}&units=metric`;
@@ -408,8 +417,17 @@ export const weatherService = {
     
     // Check if we already have cached data for this location and date
     if (weatherCache.has(cacheKey)) {
-      console.log('🌤️ Using cached weather data for:', cacheKey);
-      return weatherCache.get(cacheKey)!;
+      const cachedData = weatherCache.get(cacheKey)!;
+      const now = Date.now();
+      
+      // Check if cache is still valid (within 30 minutes)
+      if (now - cachedData.timestamp < CACHE_DURATION) {
+        console.log('🌤️ Using cached weather data for:', cacheKey);
+        return cachedData.data;
+      } else {
+        console.log('🌤️ Cache expired, fetching fresh data for:', cacheKey);
+        weatherCache.delete(cacheKey);
+      }
     }
     
     console.log('🌤️ Fetching weather data for:', cacheKey);
@@ -420,8 +438,11 @@ export const weatherService = {
       // Fetch real weather data from Google Weather API
       const weatherData = await fetchRealWeatherData(venueLocation, eventDate);
       
-      // Cache the data
-      weatherCache.set(cacheKey, weatherData);
+      // Cache the data with timestamp
+      weatherCache.set(cacheKey, {
+        data: weatherData,
+        timestamp: Date.now()
+      });
       
       console.log('🌤️ Successfully fetched and cached weather data:', weatherData);
       return weatherData;

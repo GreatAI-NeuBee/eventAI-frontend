@@ -9,6 +9,7 @@ import NewEvent from './pages/NewEvent';
 import EventDetails from './pages/EventDetails';
 import OnGoingEvent from './pages/OnGoingEvent';
 import User from './pages/User';
+import WeatherTest from './pages/WeatherTest';
 
 // Import API testing utilities (available in browser console)
 import './utils/apiTest';
@@ -57,6 +58,9 @@ function App() {
                 <User />
               </DashboardLayout>
             </ProtectedRoute>
+          } />
+          <Route path="/weather-test" element={
+            <WeatherTest />
           } />
           
           {/* Redirect old routes to dashboard */}

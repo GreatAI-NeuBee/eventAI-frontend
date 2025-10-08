@@ -7,9 +7,10 @@ import Spinner from '../components/common/Spinner';
 import VenueMap from '../components/dashboard/VenueMap';
 import TransitForecast from '../components/dashboard/TransitForecast';
 import LiveTrafficForecast from '../components/dashboard/LiveTrafficForecast';
-import TrafficForecastPanel from '../components/dashboard/TrafficForecastPanel';
 import ParkingForecast from '../components/dashboard/ParkingForecast';
 import WeatherWidget from '../components/dashboard/WeatherWidget';
+import GoogleTrafficGraph from '../components/dashboard/GoogleTrafficGraph';
+import EnhancedTrafficForecast from '../components/dashboard/EnhancedTrafficForecast';
 import VenueLayoutEditor, { VenueLayoutEditorData } from '../components/venue/VenueLayoutEditor';
 import { useEventStore } from '../store/eventStore';
 import { useAuth } from '../contexts/AuthContext';
@@ -20,7 +21,12 @@ import { VenueLayoutCard } from './VenueLayoutCard';
 /* Optional: help TS with the global google object if you use geocoder */
 declare global {
   interface Window {
-    google?: typeof google;
+    google: {
+      maps: {
+        Geocoder: new () => google.maps.Geocoder;
+        LatLng: new (lat: number, lng: number) => google.maps.LatLng;
+      };
+    };
   }
 }
 
@@ -519,9 +525,44 @@ const EventDetails: React.FC = () => {
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
             {/* Left Column */}
             <div className="xl:col-span-2 space-y-6">
-              {/* Traffic Forecast Panel - Moved to top of left column */}
+              {/* Enhanced Traffic Forecast - New comprehensive traffic analysis */}
               {currentEvent.venueLocation && (
-                <TrafficForecastPanel venueLocation={currentEvent.venueLocation} />
+                <EnhancedTrafficForecast 
+                  venueLocation={currentEvent.venueLocation}
+                  eventDate={currentEvent.dateStart}
+                  eventTimeRange={{
+                    start: new Date(currentEvent.dateStart).toLocaleTimeString('en-US', { 
+                      hour: '2-digit', 
+                      minute: '2-digit',
+                      hour12: true 
+                    }),
+                    end: new Date(currentEvent.dateEnd).toLocaleTimeString('en-US', { 
+                      hour: '2-digit', 
+                      minute: '2-digit',
+                      hour12: true 
+                    })
+                  }}
+                />
+              )}
+
+              {/* Google Traffic Graph - Detailed traffic analysis */}
+              {currentEvent.venueLocation && (
+                <GoogleTrafficGraph 
+                  venueLocation={currentEvent.venueLocation}
+                  eventDate={currentEvent.dateStart}
+                  eventTimeRange={{
+                    start: new Date(currentEvent.dateStart).toLocaleTimeString('en-US', { 
+                      hour: '2-digit', 
+                      minute: '2-digit',
+                      hour12: true 
+                    }),
+                    end: new Date(currentEvent.dateEnd).toLocaleTimeString('en-US', { 
+                      hour: '2-digit', 
+                      minute: '2-digit',
+                      hour12: true 
+                    })
+                  }}
+                />
               )}
 
               <Card className="p-6">
