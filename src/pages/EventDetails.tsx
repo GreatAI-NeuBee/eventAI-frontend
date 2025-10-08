@@ -447,8 +447,50 @@ const EventDetails: React.FC = () => {
     navigate('/dashboard');
   };
 
-  const handleViewOngoingEvent = () => {
-    if (eventId) navigate(`/event/ongoing-event/${eventId}`);
+  const handleViewOngoingEvent = async () => {
+    if (!eventId || !currentEvent) return;
+
+    try {
+      // Check if we're within the event time window
+      const now = new Date();
+      const eventStart = new Date(currentEvent.dateStart);
+      const eventEnd = new Date(currentEvent.dateEnd);
+      const isWithinEventTime = now >= eventStart && now <= eventEnd;
+
+      // If predict_result is null AND we're within event time, fetch predictions
+      if (!currentEvent.predict_result && isWithinEventTime) {
+        console.log('📡 Fetching live predictions for ongoing event...');
+        
+        try {
+          // Call the prediction API
+          const response = await eventAPI.getPrediction(eventId);
+          console.log('✅ Prediction API response:', response);
+          
+          // Update the current event with the new predict_result
+          // The backend should have updated the event, so we refetch it
+          const updatedEventResponse = await eventAPI.getEvent(eventId);
+          const updatedEvent = updatedEventResponse.data.data || updatedEventResponse.data;
+          
+          setCurrentEvent({
+            ...currentEvent,
+            predict_result: updatedEvent.predict_result || updatedEvent.predictResult,
+          });
+          
+          console.log('✅ Event updated with live predictions');
+        } catch (predictionError) {
+          console.error('❌ Failed to fetch predictions:', predictionError);
+          // Don't block navigation, just log the error
+          setForecastError('Failed to fetch live predictions. Displaying available data.');
+        }
+      }
+
+      // Navigate to ongoing event page
+      navigate(`/event/ongoing-event/${eventId}`);
+    } catch (error) {
+      console.error('Error in handleViewOngoingEvent:', error);
+      // Still navigate even if there's an error
+      navigate(`/event/ongoing-event/${eventId}`);
+    }
   };
 
   const handleGenerateForecast = async () => {
