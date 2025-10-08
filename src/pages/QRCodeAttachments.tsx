@@ -145,7 +145,7 @@ const CongestionPanel: React.FC<{ data: CongestionArea[] }> = ({ data }) => {
                 {isToilet && (
                   <button
                     onClick={() => setSelectedToilet(area)}
-                    className="mt-2 w-full text-xs font-medium text-indigo-600 hover:text-indigo-800"
+                    className="mt-2 w-full text-xs font-medium text-indigo-600 hover:text-indigo-800 cursor-pointer"
                   >
                     View Toilet Details →
                   </button>
