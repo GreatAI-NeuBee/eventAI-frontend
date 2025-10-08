@@ -340,6 +340,8 @@ const OngoingEvent: React.FC = () => {
         
         console.log('📊 OnGoingEvent - Predict Result:', predictData);
         console.log('📊 OnGoingEvent - Forecast Result:', forecastData);
+        console.log('🔍 Is Predict Result null?', predictData === null);
+        console.log('🔍 Is Forecast Result null?', forecastData === null);
         
         setPredictResult(predictData);
         setForecastResult(forecastData);
@@ -472,70 +474,92 @@ const OngoingEvent: React.FC = () => {
   );
 
   const activeEvent: any = eventDetails || currentEvent || { name: "Event", capacity: 0, date: new Date().toISOString(), venue: "" };
-  const eventDate = activeEvent?.date ? new Date(activeEvent.date) : null;
 
-  // Prepare comparison chart data for EACH GATE
+  // Prepare comparison chart data for EACH GATE (adapted to new backend structure)
   const gateComparisonCharts = useMemo(() => {
-    if (!forecastResult || !predictResult) return null;
+    if (!forecastResult || !predictResult) {
+      console.log('⚠️ Cannot create comparison charts - missing data:', { 
+        hasForecast: !!forecastResult, 
+        hasPredict: !!predictResult 
+      });
+      return null;
+    }
 
     console.log('🔍 Full Predict Result:', predictResult);
     console.log('🔍 Full Forecast Result:', forecastResult);
 
     const charts: any = {};
     
-    // Get all gates from predict_result
-    const predictGates = Object.keys(predictResult).filter(key => key.startsWith('gate_'));
-    
-    predictGates.forEach(predictGateKey => {
-      const gateName = predictGateKey.replace('gate_', 'Gate ');
-      const gateNumber = predictGateKey.replace('gate_', '');
-      
-      // Get predict time frames for this gate
-      const predictTimeFrames = predictResult[predictGateKey]?.timeFrames || [];
-      
-      // Get forecast time frames for this gate (forecast uses different naming: "1", "2", "A", "B")
+    // NEW STRUCTURE: predictions array with single snapshot per gate
+    if (!predictResult.predictions || !Array.isArray(predictResult.predictions)) {
+      console.warn('⚠️ No predictions array found in predict_result');
+      return null;
+    }
+
+    console.log('📊 Processing', predictResult.predictions.length, 'gate predictions');
+
+    // Process each gate prediction
+    predictResult.predictions.forEach((prediction: any, index: number) => {
+      const gateId = prediction.gate_id; // e.g., "gate_1", "gate_2"
+      const gateNumber = gateId.replace('gate_', ''); // "1", "2", "3"
+      const gateName = `Gate ${gateNumber}`;
+      const zone = prediction.zone || prediction.metadata?.zone || `Zone ${String.fromCharCode(65 + index)}`;
+
+      console.log(`📊 Processing ${gateName} (${zone})`);
+
+      // Get forecast time frames for this gate
       let forecastTimeFrames: any[] = [];
-      
       if (forecastResult.forecast) {
-        // Try multiple matching strategies
         forecastTimeFrames = 
-          forecastResult.forecast[gateNumber]?.timeFrames ||           // Try "1", "2", "3"
-          forecastResult.forecast[gateNumber.toUpperCase()]?.timeFrames || // Try "A", "B", "C"
-          forecastResult.forecast[`gate_${gateNumber}`]?.timeFrames || // Try "gate_1", "gate_2"
-          forecastResult.forecast[`Gate ${gateNumber}`]?.timeFrames || // Try "Gate 1", "Gate 2"
+          forecastResult.forecast[gateNumber]?.timeFrames ||
+          forecastResult.forecast[gateNumber.toUpperCase()]?.timeFrames ||
+          forecastResult.forecast[gateId]?.timeFrames ||
+          forecastResult.forecast[gateName]?.timeFrames ||
           [];
       }
-      
-      console.log(`📊 ${gateName} - Predict frames:`, predictTimeFrames.length, 'Forecast frames:', forecastTimeFrames.length);
-      console.log(`📊 ${gateName} - Forecast keys available:`, forecastResult.forecast ? Object.keys(forecastResult.forecast) : 'none');
-      
-      // Combine ALL forecast time frames with ALL predict time frames
+
+      console.log(`📊 ${gateName} - Forecast frames:`, forecastTimeFrames.length);
+
+      if (forecastTimeFrames.length === 0) {
+        console.warn(`⚠️ No forecast data for ${gateName}`);
+        return;
+      }
+
+      // Create data array with forecast + current live point
       const allTimeFrames: any[] = [];
-      
-      // Add all forecast data
+
+      // Add all forecast data points (ensure non-negative values)
+      // Convert UTC to Malaysia/Kuala Lumpur timezone (UTC+8)
+      // Ensure timestamp has 'Z' suffix for UTC, or add it if missing
       forecastTimeFrames.forEach((f: any) => {
+        const forecastValue = f.predicted ?? f.congestion ?? f.density ?? 0;
+        const utcTimestamp = f.timestamp.endsWith('Z') ? f.timestamp : `${f.timestamp}Z`;
         allTimeFrames.push({
-          timestamp: new Date(f.timestamp).toLocaleTimeString([], { 
+          timestamp: new Date(utcTimestamp).toLocaleTimeString('en-MY', { 
             hour: '2-digit', 
-            minute: '2-digit' 
+            minute: '2-digit',
+            timeZone: 'Asia/Kuala_Lumpur'
           }),
-          rawTimestamp: f.timestamp,
-          forecasted: f.predicted ?? f.congestion ?? f.density ?? 0,
+          rawTimestamp: utcTimestamp,
+          forecasted: Math.max(0, forecastValue), // Ensure non-negative
           actual: null,
         });
       });
 
-      // Add all predict/ongoing data
-      predictTimeFrames.forEach((o: any) => {
-        allTimeFrames.push({
-          timestamp: new Date(o.timestamp).toLocaleTimeString([], { 
-            hour: '2-digit', 
-            minute: '2-digit' 
-          }),
-          rawTimestamp: o.timestamp,
-          forecasted: null,
-          actual: o.actual ?? o.predicted ?? o.congestion ?? o.density ?? 0,
-        });
+      // Add current live prediction as a single point (ensure non-negative)
+      // Convert UTC to Malaysia/Kuala Lumpur timezone (UTC+8)
+      // Ensure timestamp has 'Z' suffix for UTC, or add it if missing
+      const currentCount = Math.max(0, prediction.current_people_count ?? 0);
+      const utcTimestamp = prediction.timestamp.endsWith('Z') ? prediction.timestamp : `${prediction.timestamp}Z`;
+      allTimeFrames.push({
+        timestamp: new Date(utcTimestamp).toLocaleTimeString('en-MY', { 
+          hour: '2-digit', 
+          minute: '2-digit',
+          timeZone: 'Asia/Kuala_Lumpur'
+        }),
+        rawTimestamp: utcTimestamp,
+        forecasted: null,
+        actual: currentCount,
       });
 
       // Sort by timestamp
@@ -545,102 +569,130 @@ const OngoingEvent: React.FC = () => {
         return timeA - timeB;
       });
 
-      // Filter out entries where both forecast and actual are null
-      const filteredMergedData = allTimeFrames.filter((d: any) => 
-        (d.forecasted !== null && d.forecasted !== undefined) || 
-        (d.actual !== null && d.actual !== undefined)
-      );
+      const capacity = prediction.total_capacity || prediction.metadata?.total_capacity || 100;
 
-      if (filteredMergedData.length > 0) {
-        // Get capacity from predict_result or forecast_result
-        const capacity = predictResult[predictGateKey]?.capacity || 
-                        forecastResult.forecast?.[gateNumber]?.capacity ||
-                        forecastResult.forecast?.[gateNumber.toUpperCase()]?.capacity ||
-                        0;
-        
-        console.log(`📊 ${gateName} - Final capacity:`, capacity);
-        
-        charts[gateName] = {
-          capacity: capacity,
-          labels: filteredMergedData.map((d: any) => d.timestamp),
-          datasets: [
-            {
-              label: 'Forecasted',
-              data: filteredMergedData.map((d: any) => d.forecasted),
-              borderColor: 'rgb(66, 133, 244)', // Google Blue
-              backgroundColor: 'rgba(66, 133, 244, 0.1)',
-              borderWidth: 2,
-              tension: 0.4,
-              fill: true,
-              pointRadius: 3,
-              pointHoverRadius: 5,
-              borderDash: [],
-            },
-            {
-              label: 'Ongoing (Real-time)',
-              data: filteredMergedData.map((d: any) => d.actual),
-              borderColor: 'rgb(234, 67, 53)', // Google Red
-              backgroundColor: 'rgba(234, 67, 53, 0.1)',
-              borderWidth: 2,
-              tension: 0.4,
-              fill: true,
-              pointRadius: 3,
-              pointHoverRadius: 5,
-              spanGaps: true,
-              borderDash: [],
-            },
-          ],
-        };
-      }
+      charts[gateName] = {
+        capacity: capacity,
+        zone: zone,
+        gateId: gateId,
+        currentData: prediction, // Store full prediction data for incidents
+        labels: allTimeFrames.map((d: any) => d.timestamp),
+        datasets: [
+          {
+            label: 'Forecasted',
+            data: allTimeFrames.map((d: any) => d.forecasted),
+            borderColor: 'rgb(66, 133, 244)',
+            backgroundColor: 'rgba(66, 133, 244, 0.1)',
+            borderWidth: 2,
+            tension: 0.4,
+            fill: true,
+            pointRadius: 3,
+            pointHoverRadius: 5,
+            borderDash: [],
+          },
+          {
+            label: 'Live (Real-time)',
+            data: allTimeFrames.map((d: any) => d.actual),
+            borderColor: 'rgb(234, 67, 53)',
+            backgroundColor: 'rgba(234, 67, 53, 0.1)',
+            borderWidth: 2,
+            tension: 0.4,
+            fill: true,
+            pointRadius: 4,
+            pointHoverRadius: 6,
+            spanGaps: true,
+            borderDash: [],
+          },
+        ],
+      };
+
+      console.log(`✅ ${gateName} chart created with ${allTimeFrames.length} data points`);
     });
 
-    return charts;
+    console.log('📊 Total charts created:', Object.keys(charts).length);
+    return Object.keys(charts).length > 0 ? charts : null;
   }, [forecastResult, predictResult]);
 
-  // 🚨 Incident Analysis: Extract and organize incidents by gate and time
+  // 🚨 Incident Analysis: Extract and organize incidents by gate (adapted to new structure)
   const incidentAnalysis = useMemo(() => {
-    if (!predictResult) return null;
+    if (!predictResult || !predictResult.predictions) return null;
 
     const gateData: any = {};
-    const predictGates = Object.keys(predictResult).filter(key => key.startsWith('gate_'));
 
-    predictGates.forEach(gateKey => {
-      const gate = predictResult[gateKey];
-      const gateName = gateKey.replace('gate_', 'Gate ');
-      
+    // Process each gate prediction (new structure)
+    predictResult.predictions.forEach((prediction: any, index: number) => {
+      const gateId = prediction.gate_id;
+      const gateNumber = gateId.replace('gate_', '');
+      const gateName = `Gate ${gateNumber}`;
+      const zone = prediction.zone || prediction.metadata?.zone || `Zone ${String.fromCharCode(65 + index)}`;
+
       // Initialize gate data
       gateData[gateName] = {
-        capacity: gate.capacity,
+        capacity: prediction.total_capacity || prediction.metadata?.total_capacity || 100,
+        zone: zone,
         timeFrames: []
       };
 
-      gate.timeFrames?.forEach((frame: any) => {
-        const timestamp = new Date(frame.timestamp).toLocaleString([], {
-          month: 'short',
-          day: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit'
-        });
+      // Current snapshot (convert UTC to Malaysia/Kuala Lumpur timezone)
+      // Ensure timestamp has 'Z' suffix for UTC, or add it if missing
+      const currentUtcTimestamp = prediction.timestamp.endsWith('Z') ? prediction.timestamp : `${prediction.timestamp}Z`;
+      const currentTimestamp = new Date(currentUtcTimestamp).toLocaleString('en-MY', {
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        timeZone: 'Asia/Kuala_Lumpur'
+      });
 
-        // Filter incidents (skip "No incidents" and probability <= 5%)
-        const significantIncidents = frame.incidents?.filter((incident: any) => 
+      // Filter current incidents (skip low probability)
+      const currentIncidents = prediction.forecast_next_5_min?.possible_incidents?.filter((incident: any) => 
+        incident.incident_id !== 0 && 
+        incident.incident_name !== "No incidents" && 
+        incident.probability > 0.05
+      ) || [];
+
+      // Add current timeframe (ensure non-negative counts)
+      gateData[gateName].timeFrames.push({
+        timestamp: currentTimestamp,
+        rawTimestamp: currentUtcTimestamp,
+        riskLevel: prediction.risk_level,
+        riskScore: prediction.risk_score,
+        congestionLevel: prediction.predicted_congestion_level,
+        actualCount: Math.max(0, prediction.current_people_count ?? 0),
+        incidents: currentIncidents.sort((a: any, b: any) => b.probability - a.probability),
+        hasIncidents: currentIncidents.length > 0
+      });
+
+      // Add forecast next 5 min as a future timeframe if available
+      if (prediction.forecast_next_5_min) {
+        const nextIncidents = prediction.forecast_next_5_min.possible_incidents?.filter((incident: any) => 
           incident.incident_id !== 0 && 
           incident.incident_name !== "No incidents" && 
           incident.probability > 0.05
         ) || [];
 
-        // Always add time frame, even if no significant incidents (to show gate status)
-        gateData[gateName].timeFrames.push({
-          timestamp,
-          rawTimestamp: frame.timestamp,
-          riskLevel: frame.riskLevel,
-          riskScore: frame.riskScore,
-          congestionLevel: frame.congestionLevel,
-          actualCount: frame.actual,
-          incidents: significantIncidents.sort((a: any, b: any) => b.probability - a.probability),
-          hasIncidents: significantIncidents.length > 0
+        // Calculate next timestamp (5 minutes from now, convert to Malaysia/Kuala Lumpur timezone)
+        // Use the UTC timestamp to ensure correct calculation
+        const nextTime = new Date(new Date(currentUtcTimestamp).getTime() + 5 * 60 * 1000);
+        const nextTimestamp = nextTime.toLocaleString('en-MY', {
+          month: 'short',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          timeZone: 'Asia/Kuala_Lumpur'
         });
-      });
+
+        gateData[gateName].timeFrames.push({
+          timestamp: `${nextTimestamp} (forecast)`,
+          rawTimestamp: nextTime.toISOString(),
+          riskLevel: prediction.forecast_next_5_min.risk_level,
+          riskScore: prediction.forecast_next_5_min.risk_score,
+          congestionLevel: prediction.forecast_next_5_min.predicted_congestion_level,
+          actualCount: Math.max(0, prediction.forecast_next_5_min.predicted_people_count ?? 0),
+          incidents: nextIncidents.sort((a: any, b: any) => b.probability - a.probability),
+          hasIncidents: nextIncidents.length > 0
+        });
+      }
 
       // Sort time frames by timestamp (newest first)
       gateData[gateName].timeFrames.sort((a: any, b: any) => 
@@ -673,9 +725,9 @@ const OngoingEvent: React.FC = () => {
     };
   }, [predictResult]);
 
-  // 📊 Deviation Metrics for each gate
+  // 📊 Deviation Metrics for each gate (adapted to new structure)
   const gateDeviationMetrics = useMemo(() => {
-    if (!gateComparisonCharts) return null;
+    if (!gateComparisonCharts || !predictResult) return null;
 
     const metrics: any = {};
 
@@ -685,6 +737,7 @@ const OngoingEvent: React.FC = () => {
 
       const forecastData = datasets[0].data;
       const actualData = datasets[1].data;
+      const currentData = chartData.currentData;
 
       let totalDeviation = 0;
       let validPoints = 0;
@@ -706,12 +759,16 @@ const OngoingEvent: React.FC = () => {
           avgDeviation: avgDeviation.toFixed(1),
           accuracy: accuracy.toFixed(1),
           validPoints,
+          currentRisk: currentData?.risk_level || 'Unknown',
+          currentCount: currentData?.current_people_count || 0,
+          trend: currentData?.trend_analysis?.current_trend || 'stable',
+          trendStrength: currentData?.trend_analysis?.trend_strength || 'moderate',
         };
       }
     });
 
     return Object.keys(metrics).length > 0 ? metrics : null;
-  }, [gateComparisonCharts]);
+  }, [gateComparisonCharts, predictResult]);
 
   const chartOptions = {
     responsive: true,
@@ -869,6 +926,16 @@ const OngoingEvent: React.FC = () => {
     );
   }
 
+  // Debug: Log state before rendering
+  console.log('🎯 OnGoingEvent Render State:', {
+    hasPredictResult: !!predictResult,
+    hasForecastResult: !!forecastResult,
+    hasGateComparisonCharts: !!gateComparisonCharts,
+    gateChartsCount: gateComparisonCharts ? Object.keys(gateComparisonCharts).length : 0,
+    isLoadingEvent,
+    eventId
+  });
+
   return (
     <div className="max-w-7xl mx-auto p-6 space-y-8">
       {/* Header */}
@@ -921,16 +988,34 @@ const OngoingEvent: React.FC = () => {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {Object.entries(gateComparisonCharts).map(([gateName, chartData]: [string, any]) => {
               const metrics = gateDeviationMetrics?.[gateName];
+              const currentData = chartData.currentData;
+              
+              // Risk level badge color
+              const riskColor = 
+                currentData?.risk_level === 'High' ? 'bg-red-500' :
+                currentData?.risk_level === 'Medium' ? 'bg-yellow-500' :
+                'bg-green-500';
               
               return (
                 <Card key={gateName} className="bg-gradient-to-b from-white to-blue-50">
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-2">
                       <DoorOpen className="h-5 w-5 text-gray-700" />
-                      <h3 className="text-lg font-bold text-gray-900">{gateName}</h3>
-                      <span className="text-sm text-gray-600">
-                        (Capacity: {chartData.capacity})
-                      </span>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-lg font-bold text-gray-900">{gateName}</h3>
+                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium text-white ${riskColor}`}>
+                            {currentData?.risk_level || 'Unknown'}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-gray-600 mt-1">
+                          <span>{chartData.zone}</span>
+                          <span>•</span>
+                          <span>Capacity: {chartData.capacity}</span>
+                          <span>•</span>
+                          <span>Current: {Math.max(0, currentData?.current_people_count ?? 0)}</span>
+                        </div>
+                      </div>
                     </div>
                   </div>
                   
@@ -952,26 +1037,41 @@ const OngoingEvent: React.FC = () => {
                     />
                   </div>
                   
-                  {/* Deviation Metrics for this gate */}
+                  {/* Deviation Metrics & Live Status for this gate */}
                   {metrics && (
-                    <div className="mt-4 p-3 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-xs font-semibold text-gray-900 mb-1">Accuracy Analysis</p>
-                          <p className="text-xs text-gray-600">
-                            {metrics.validPoints} data points (5-min intervals)
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-4">
-                          <div className="text-center">
-                            <p className="text-lg font-bold text-green-600">{metrics.accuracy}%</p>
-                            <p className="text-xs text-gray-600">Accuracy</p>
+                    <div className="mt-4 space-y-2">
+                      <div className="p-3 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-xs font-semibold text-gray-900 mb-1">Accuracy Analysis</p>
+                            <p className="text-xs text-gray-600">
+                              Based on {metrics.validPoints} comparison points
+                            </p>
                           </div>
-                          <div className="text-center">
-                            <p className="text-lg font-bold text-blue-600">±{metrics.avgDeviation}%</p>
-                            <p className="text-xs text-gray-600">Deviation</p>
+                          <div className="flex items-center gap-4">
+                            <div className="text-center">
+                              <p className="text-lg font-bold text-green-600">{metrics.accuracy}%</p>
+                              <p className="text-xs text-gray-600">Accuracy</p>
+                            </div>
+                            <div className="text-center">
+                              <p className="text-lg font-bold text-blue-600">±{metrics.avgDeviation}%</p>
+                              <p className="text-xs text-gray-600">Deviation</p>
+                            </div>
                           </div>
                         </div>
+                      </div>
+                      
+                      {/* Live Trend Indicator */}
+                      <div className="flex items-center justify-between p-2 bg-gray-50 rounded border border-gray-200 text-xs">
+                        <span className="text-gray-600">Trend:</span>
+                        <span className={`font-medium ${
+                          metrics.trend === 'rising' ? 'text-red-600' :
+                          metrics.trend === 'falling' ? 'text-green-600' :
+                          'text-gray-700'
+                        }`}>
+                          {metrics.trend === 'rising' ? '📈' : metrics.trend === 'falling' ? '📉' : '➡️'} 
+                          {' '}{metrics.trend} ({metrics.trendStrength})
+                        </span>
                       </div>
                     </div>
                   )}
@@ -1091,7 +1191,7 @@ const OngoingEvent: React.FC = () => {
                           latestFrame.riskLevel === 'Medium' ? 'text-yellow-600' :
                           'text-green-600'
                         }`}>
-                          {latestFrame.riskLevel} Risk • {latestFrame.actualCount}/{gateInfo.capacity} people
+                          {latestFrame.riskLevel} Risk • {Math.max(0, latestFrame.actualCount ?? 0)}/{gateInfo.capacity} people
                         </p>
                       </div>
                     )}
@@ -1154,7 +1254,7 @@ const OngoingEvent: React.FC = () => {
                             </span>
                           </div>
                           <div className="text-sm text-gray-700">
-                            <span className="font-medium">Crowd:</span> {frame.actualCount}/{gateInfo.capacity} 
+                            <span className="font-medium">Crowd:</span> {Math.max(0, frame.actualCount ?? 0)}/{gateInfo.capacity} 
                             <span className={`ml-2 font-semibold ${
                               frame.congestionLevel === 'High' ? 'text-red-600' :
                               frame.congestionLevel === 'Medium' ? 'text-yellow-600' :
@@ -1240,9 +1340,13 @@ const OngoingEvent: React.FC = () => {
         <Card padding="sm" className="bg-gradient-to-br from-emerald-50 to-emerald-100">
           <div className="text-center">
             <div className="text-2xl font-bold text-blue-600">
-              {(eventDate ?? new Date()).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+              {new Date().toLocaleTimeString('en-MY', { 
+                hour: "2-digit", 
+                minute: "2-digit",
+                timeZone: 'Asia/Kuala_Lumpur'
+              })}
             </div>
-            <div className="text-sm text-gray-600">Local Time</div>
+            <div className="text-sm text-gray-600">Malaysia Time (MYT)</div>
           </div>
         </Card>
       </div>
@@ -1301,8 +1405,18 @@ const OngoingEvent: React.FC = () => {
                   {activeEvent?.venue || activeEvent?.venueLocation?.name || "—"}
                 </span>
               </div>
-              <div className="flex justify-between"><span className="text-gray-600">Start:</span> <span className="font-medium">{activeEvent?.dateStart ? new Date(activeEvent.dateStart).toLocaleString() : "—"}</span></div>
-              <div className="flex justify-between"><span className="text-gray-600">End:</span> <span className="font-medium">{activeEvent?.dateEnd ? new Date(activeEvent.dateEnd).toLocaleString() : "—"}</span></div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Start:</span> 
+                <span className="font-medium">
+                  {activeEvent?.dateStart ? new Date(activeEvent.dateStart).toLocaleString('en-MY', { timeZone: 'Asia/Kuala_Lumpur' }) : "—"}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">End:</span> 
+                <span className="font-medium">
+                  {activeEvent?.dateEnd ? new Date(activeEvent.dateEnd).toLocaleString('en-MY', { timeZone: 'Asia/Kuala_Lumpur' }) : "—"}
+                </span>
+              </div>
             </div>
           </Card>
 
