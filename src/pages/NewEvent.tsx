@@ -11,10 +11,9 @@ import { eventAPI } from '../api/apiClient';
 import StadiumMapEditor from "../components/maps/StadiumMapEditor";
 import type { StadiumMapJSON } from '../components/maps/StadiumMapEditor';
 import { useAuth } from '../contexts/AuthContext';
-import { DesignInCanvaCTA } from '../components/DesignInCanvaCTA';
+// import { DesignInCanvaCTA } from '../components/DesignInCanvaCTA'; // <- unused; re-enable if you want to show it
 
 const NewEvent: React.FC = () => {
-  // SVG upload functionality moved to VenueLayoutEditor
   const navigate = useNavigate();
   const { addEvent, setCurrentEvent, setLoading, setError, isLoading } = useEventStore();
   const { user, backendUser, backendUserLoading } = useAuth();
@@ -51,7 +50,6 @@ const NewEvent: React.FC = () => {
     if (errors.venueLayout) setErrors(prev => ({ ...prev, venueLayout: '' }));
   };
 
-
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
 
@@ -75,8 +73,13 @@ const NewEvent: React.FC = () => {
     }
 
     if (!formData.venue.trim()) newErrors.venue = 'Venue is required';
-    if (venueLayoutJson && venueLayoutJson.sections === 0) newErrors.venueLayout = 'Venue layout must have at least one section';
+
+    if (venueLayoutJson && venueLayoutJson.sections === 0) {
+      newErrors.venueLayout = 'Venue layout must have at least one section';
+    }
+
     if (!venueLocation) newErrors.venueLocation = 'Please select a venue location on the map';
+
     if (!user?.email) newErrors.userEmail = 'You must be logged in to create an event';
 
     setErrors(newErrors);
@@ -100,13 +103,14 @@ const NewEvent: React.FC = () => {
     setError(null);
 
     try {
-      const dateOfEventStart = `${formData.eventDate}T${formData.startTime}:00Z`;
-      const dateOfEventEnd = `${formData.eventDate}T${formData.endTime}:00Z`;
-      
+      // Build ISO times from local date+time (server can interpret as needed)
+      const startISO = new Date(`${formData.eventDate}T${formData.startTime}:00`).toISOString();
+      const endISO = new Date(`${formData.eventDate}T${formData.endTime}:00`).toISOString();
+
       const submitData: any = {
         name: formData.name,
-        dateOfEventStart,
-        dateOfEventEnd,
+        dateOfEventStart: startISO,
+        dateOfEventEnd: endISO,
         venue: formData.venue,
         description: formData.description,
         userEmail: user?.email,
@@ -116,12 +120,12 @@ const NewEvent: React.FC = () => {
 
       console.log('🚀 Submitting event data to API...');
       console.log('📝 JSON payload:', submitData);
-      
+
       const response = await eventAPI.createEvent(submitData);
-      const backendEvent = response.data.data || response.data;
+      const backendEvent = response.data?.data || response.data;
 
       let status: 'draft' | 'processing' | 'completed' | 'error' | 'active' = 'active';
-      if (backendEvent.status) {
+      if (backendEvent?.status) {
         const normalized = String(backendEvent.status).toLowerCase();
         if (normalized === 'created') status = 'active';
         else if (['draft', 'processing', 'completed', 'error', 'active'].includes(normalized)) {
@@ -130,17 +134,17 @@ const NewEvent: React.FC = () => {
       }
 
       const newEvent = {
-        id: backendEvent.eventId || backendEvent.id,
-        name: backendEvent.name || formData.name,
-        dateStart: backendEvent.dateOfEventStart || dateOfEventStart,
-        dateEnd: backendEvent.dateOfEventEnd || dateOfEventEnd,
-        venue: backendEvent.venue || venueLocation?.name || venueLocation?.address || 'Event Venue',
-        description: backendEvent.description || formData.description,
+        id: backendEvent?.eventId || backendEvent?.id,
+        name: backendEvent?.name || submitData.name,
+        dateStart: backendEvent?.dateOfEventStart || startISO,
+        dateEnd: backendEvent?.dateOfEventEnd || endISO,
+        venue: backendEvent?.venue || venueLocation?.name || venueLocation?.address || 'Event Venue',
+        description: backendEvent?.description || submitData.description,
         venueLocation: venueLocation || undefined,
         venueLayout: venueLayoutJson || null,
-        userEmail: backendEvent.userEmail || submitData.userEmail,
+        userEmail: backendEvent?.userEmail || submitData.userEmail,
         status,
-        createdAt: backendEvent.createdAt || new Date().toISOString(),
+        createdAt: backendEvent?.createdAt || new Date().toISOString(),
       };
 
       addEvent(newEvent);
@@ -180,7 +184,7 @@ const NewEvent: React.FC = () => {
         {/* Event Details */}
         <Card>
           <h2 className="text-xl font-semibold text-gray-900 mb-6">Event Details</h2>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <Input
               label="Event Name"
@@ -220,9 +224,7 @@ const NewEvent: React.FC = () => {
                     name="startTime"
                   />
                 </div>
-                <div className="flex-shrink-0 text-gray-500 font-medium">
-                  to
-                </div>
+                <div className="flex-shrink-0 text-gray-500 font-medium">to</div>
                 <div className="flex-1">
                   <TimeSelector
                     value={formData.endTime}
@@ -260,8 +262,10 @@ const NewEvent: React.FC = () => {
                   if (errors.venueLocation) setErrors(prev => ({ ...prev, venueLocation: '' }));
                 }}
               />
-              {errors.venue && (
-                <p className="mt-1 text-sm text-red-600">{errors.venue}</p>
+              {(errors.venue || errors.venueLocation) && (
+                <p className="mt-1 text-sm text-red-600">
+                  {errors.venue || errors.venueLocation}
+                </p>
               )}
             </div>
           </div>
@@ -292,37 +296,31 @@ const NewEvent: React.FC = () => {
               {venueLayoutJson ? (
                 <div className="text-sm space-y-1">
                   <div className="text-green-600 font-medium">
-                    ✓ {venueLayoutJson.sections} sections, {venueLayoutJson.exits}/7 exits
+                    ✓ {venueLayoutJson.sections} sections, {(venueLayoutJson.exits ?? 0)}/7 exits
                   </div>
-                  {venueLayoutJson.exits >= 7 && (
+                  {(venueLayoutJson.exits ?? 0) >= 7 && (
                     <div className="text-orange-600 text-xs">
                       ⚠️ Maximum exits reached
                     </div>
                   )}
-                  {venueLayoutJson.toiletsList && venueLayoutJson.toiletsList.length > 0 && (
+                  {!!(venueLayoutJson.toiletsList?.length) && (
                     <div className="text-blue-600 text-xs">
                       + {venueLayoutJson.toiletsList.length} facilities
                     </div>
-                    {venueLayoutJson.toiletsList && venueLayoutJson.toiletsList.length > 0 && (
-                      <div className="text-blue-600 text-xs">
-                        + {venueLayoutJson.toiletsList.length} facilities
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="text-sm text-gray-500">
-                    No layout configured
-                  </div>
-                )}
-              </div>
+                  )}
+                </div>
+              ) : (
+                <div className="text-sm text-gray-500">No layout configured</div>
+              )}
             </div>
           </div>
-          <StadiumMapEditor 
-            initialLayers={2} 
+
+          <StadiumMapEditor
+            initialLayers={2}
             maxExits={7}
             onChange={handleVenueLayoutChange}
           />
-          
+
           {/* Canva Design Workflow Info */}
           <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
             <div className="flex items-start gap-3">
@@ -334,7 +332,7 @@ const NewEvent: React.FC = () => {
               <div className="flex-1">
                 <h3 className="text-sm font-semibold text-blue-900 mb-1">Design in Canva</h3>
                 <p className="text-sm text-blue-700 mb-2">
-                  For more complex layouts, design your venue in Canva and import it back. 
+                  For more complex layouts, design your venue in Canva and import it back.
                   Use the template above as a starting point. You can export as SVG or PNG (circles/rectangles only).
                 </p>
                 <div className="flex items-center gap-2 text-xs text-blue-600">
@@ -347,8 +345,9 @@ const NewEvent: React.FC = () => {
               </div>
             </div>
           </div>
+          {/* If you want the CTA: <DesignInCanvaCTA className="mt-3" /> */}
         </Card>
-        
+
         {errors.userEmail && (
           <Card className="bg-red-50 border-red-200">
             <div className="flex items-center gap-2 text-red-700">
@@ -366,9 +365,8 @@ const NewEvent: React.FC = () => {
           >
             Cancel
           </Button>
-          
-          <div className="flex space-x-4">
 
+          <div className="flex space-x-4">
             <Button
               type="submit"
               loading={isLoading}
