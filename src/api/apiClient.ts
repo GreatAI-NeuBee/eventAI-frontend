@@ -180,6 +180,12 @@ export const eventAPI = {
     });
   },
 
+  // Get live predictions for ongoing event
+  getPrediction: (eventId: string) => {
+    console.log('🌐 Using real API for getPrediction:', `${apiClient.defaults.baseURL}/prediction/${eventId}`);
+    return apiClient.post(`/prediction/${eventId}`);
+  },
+
   // Generate forecast report
   generateForecastReport: (eventId: string, reportData?: {
     aiPopularityAnalysis?: {
