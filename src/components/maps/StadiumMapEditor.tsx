@@ -5,7 +5,6 @@ import {
   // Download,
   RotateCcw,
   Square,
-  MousePointer2,
   Plus,
   Minus,
   Upload,
@@ -16,6 +15,7 @@ import {
 import type { Toilet } from "../../utils/toiletutils";
 // Import SVG parsing functionality (web-compatible)
 import { XMLParser } from 'fast-xml-parser';
+import { DesignInCanvaCTA } from "../DesignInCanvaCTA";
 
 /* =========================
    Types
@@ -1101,7 +1101,7 @@ const StadiumMapEditor: React.FC<{
               Stadium Map Editor
             </h2>
 
-            <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-3">
               <div className="flex items-center gap-2">
                 <label className="text-sm font-medium text-gray-700">
                   Layout Type
@@ -1122,32 +1122,42 @@ const StadiumMapEditor: React.FC<{
                 </select>
               </div>
 
-              {/* SVG Upload Section */}
-              <div className="flex flex-col gap-2">
-                <label className="text-sm font-medium text-gray-700">
-                  Import Layout
-                </label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="file"
-                    id="svg-upload"
-                    accept=".svg,image/svg+xml"
-                    onChange={handleSvgUpload}
-                    className="hidden"
-                  />
-                  <label
-                    htmlFor="svg-upload"
-                    className="flex items-center gap-2 px-3 py-2 text-sm bg-blue-50 text-blue-700 border border-blue-200 rounded-md hover:bg-blue-100 cursor-pointer transition-colors"
-                  >
-                    <Upload className="h-4 w-4" />
-                    Upload SVG Layout
-                  </label>
-                  <span className="text-xs text-gray-500">
-                    Import zones, exits, and toilets from SVG
-                  </span>
-                </div>
-              </div>
+              {/* Spacer to push Design in Canva to far right */}
+              <div className="flex-1"></div>
 
+              {/* Design in Canva Button - Far Right */}
+              <div className="flex items-center gap-2">
+                <DesignInCanvaCTA />
+              </div>
+            </div>
+
+            {/* SVG Upload Section */}
+            <div className="mt-4 flex flex-col gap-2">
+              <label className="text-sm font-medium text-gray-700">
+                Import Layout
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="file"
+                  id="svg-upload"
+                  accept=".svg,image/svg+xml"
+                  onChange={handleSvgUpload}
+                  className="hidden"
+                />
+                <label
+                  htmlFor="svg-upload"
+                  className="flex items-center gap-2 px-3 py-2 text-sm bg-blue-50 text-blue-700 border border-blue-200 rounded-md hover:bg-blue-100 cursor-pointer transition-colors"
+                >
+                  <Upload className="h-4 w-4" />
+                  Upload SVG Layout
+                </label>
+                <span className="text-xs text-gray-500">
+                  Import zones, exits, and toilets from SVG
+                </span>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3 mt-4">
               {layout === "circular" && (
                 <div className="flex flex-wrap items-center gap-3">
                   <div className="flex items-center gap-2">
