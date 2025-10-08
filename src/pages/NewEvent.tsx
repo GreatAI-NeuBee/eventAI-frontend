@@ -11,7 +11,6 @@ import { eventAPI } from '../api/apiClient';
 import StadiumMapEditor from "../components/maps/StadiumMapEditor";
 import type { StadiumMapJSON } from '../components/maps/StadiumMapEditor';
 import { useAuth } from '../contexts/AuthContext';
-import { DesignInCanvaCTA } from '../components/DesignInCanvaCTA';
 
 const NewEvent: React.FC = () => {
   const navigate = useNavigate();

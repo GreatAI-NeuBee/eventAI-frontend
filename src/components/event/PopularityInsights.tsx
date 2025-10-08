@@ -1,5 +1,5 @@
 import React, { useContext } from 'react';
-import { Users, TrendingUp, AlertCircle, Shield, Zap, Calendar, UserCheck } from 'lucide-react';
+import { TrendingUp, Zap, Calendar, UserCheck } from 'lucide-react';
 import GlassCard from '../common/GlassCard';
 import { WeatherContext } from '../common/WeatherBackground';
 import type { PopularityContent } from '../../types/simulation';
@@ -30,33 +30,12 @@ const PopularityInsights: React.FC<PopularityInsightsProps> = ({ popularityConte
   };
 
   const {
-    popularityLevel,
     popularityScore,
-    crowdFlowAnalysis,
     historicalIncidents,
     audienceDemographics,
     operationalRecommendations,
-    metadata,
-    expectedTurnout,
-    riskAssessment,
-    safetyMeasures
+    metadata
   } = popularityContent;
-
-  // Get popularity badge color based on level
-  const getPopularityColor = (level?: string) => {
-    switch (level?.toLowerCase()) {
-      case 'very high':
-        return 'bg-red-500/20 text-red-100 border-red-300/40';
-      case 'high':
-        return 'bg-orange-500/20 text-orange-100 border-orange-300/40';
-      case 'medium':
-        return 'bg-yellow-500/20 text-yellow-100 border-yellow-300/40';
-      case 'low':
-        return 'bg-blue-500/20 text-blue-100 border-blue-300/40';
-      default:
-        return 'bg-gray-500/20 text-gray-100 border-gray-300/40';
-    }
-  };
 
   return (
     <GlassCard intensity="medium" blur="md">

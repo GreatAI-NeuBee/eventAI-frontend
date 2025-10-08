@@ -17,12 +17,11 @@ interface LiveTrafficForecastProps {
 }
 
 const LiveTrafficForecast: React.FC<LiveTrafficForecastProps> = ({
-  venueLocation,
   selectedStation
 }) => {
   const [realTimeData, setRealTimeData] = useState<any>(null);
-  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
-  const [autoRefresh, setAutoRefresh] = useState(true);
+  const [, setLastUpdated] = useState<Date>(new Date());
+  const [autoRefresh] = useState(true);
   
   // Real-time traffic API configuration
   const TRAFFIC_API_KEY = import.meta.env.VITE_TOMTOM_API_KEY;

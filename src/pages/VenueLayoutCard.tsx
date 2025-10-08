@@ -971,9 +971,6 @@ const StadiumPlanSVG: React.FC<{
     `;
   };
 
-  // Check if layout is circular to apply circular restrictions
-  const isCircularLayout = plan.layoutType === "circular";
-
   return (
     <div className="relative w-full aspect-[16/10] rounded-xl overflow-hidden border border-gray-300 bg-white">
       <svg viewBox={`0 0 ${VB_W} ${VB_H}`} preserveAspectRatio="xMidYMid meet" className="h-full w-full">
