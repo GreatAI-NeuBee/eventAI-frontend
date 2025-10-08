@@ -11,6 +11,8 @@ type StadiumMapJSON = {
   zones: { id: string; name: string; layer: number; points: PctPoint[] }[];
   exitsList?: { id: string; name: string; position: PctPoint; capacity?: number }[];
   toiletsList?: { id: string; position: PctPoint; label?: string; fixtures?: number }[];
+  shape?: "circle" | "rect";
+  rectBounds?: { x0: number; y0: number; x1: number; y1: number };
 };
 type FloorZonePolygon = {
   id: string;
@@ -148,6 +150,19 @@ const STADIUM_R = Math.min(VB_W/2 - STADIUM_MARGIN, VB_H/2 - STADIUM_MARGIN);
 const toRad = (d: number) => (d * Math.PI) / 180;
 const polar = (cx: number, cy: number, r: number, thetaDeg: number): [number, number] => [cx + r * Math.cos(toRad(thetaDeg)), cy + r * Math.sin(toRad(thetaDeg))];
 const arcLen = (r: number, dThetaDeg: number) => r * toRad(Math.abs(dThetaDeg));
+
+type VenueGeom =
+  | { kind: "circle"; cx: number; cy: number; r: number }
+  | { kind: "rect"; x0: number; y0: number; x1: number; y1: number };
+
+function venueGeom(plan: StadiumMapJSON): VenueGeom {
+  if (plan.shape === "rect") {
+    const m = 3;
+    const b = plan.rectBounds ?? { x0: m, y0: m, x1: VB_W - m, y1: VB_H - m };
+    return { kind: "rect", ...b };
+  }
+  return { kind: "circle", cx: 50, cy: 31.25, r: Math.min(VB_W/2 - 3, VB_H/2 - 3) };
+}
 
 /* ========= Non-obstacle walkable space ========= */
 /** Clamp any point to stay inside the stadium circle (polygons are NOT obstacles). */
@@ -561,8 +576,26 @@ function spawnExitWalkers(
 export const VenueLayoutCard: React.FC<{ event: EventData | null }> = ({ event }) => {
   const plan: StadiumMapJSON = useMemo(() => {
     if (!event?.venueLayout) return DUMMY_PLAN;
-    if (typeof event.venueLayout === "string") { try { return JSON.parse(event.venueLayout) as StadiumMapJSON; } catch { return DUMMY_PLAN; } }
-    return event.venueLayout as StadiumMapJSON;
+    if (typeof event.venueLayout === "string") { 
+      try { 
+        const parsed = JSON.parse(event.venueLayout) as StadiumMapJSON;
+        // Ensure rectangular layout if not specified
+        if (!parsed.shape) {
+          parsed.shape = "rect";
+          parsed.rectBounds = { x0: 3, y0: 3, x1: 97, y1: 59.5 };
+        }
+        return parsed;
+      } catch { 
+        return DUMMY_PLAN; 
+      } 
+    }
+    const layout = event.venueLayout as StadiumMapJSON;
+    // Ensure rectangular layout if not specified
+    if (!layout.shape) {
+      layout.shape = "rect";
+      layout.rectBounds = { x0: 3, y0: 3, x1: 97, y1: 59.5 };
+    }
+    return layout;
   }, [event]);
 
   const forecast: InOutForecast = useMemo(() => {
@@ -902,14 +935,15 @@ const StadiumPlanSVG: React.FC<{
   toiletCongestions: number[];
   sectionAgg: number[];
 }> = ({ plan, zones, phase, gateLoads, walkers, toiletCongestions, sectionAgg }) => {
-  const cx=STADIUM_CX, cy=STADIUM_CY, R=STADIUM_R;
+  const geom = venueGeom(plan);
+  const isCircle = geom.kind === "circle";
   const isExitPhase = phase === "exits";
 
   const RINGS = Math.max(1, plan.layers || 1);
   const GAP = 1.6;
   const voidRatio = 0.35;
-  const rVoid = Math.max(4, R * voidRatio);
-  const usable = R - rVoid - Math.max(0, RINGS - 1) * GAP;
+  const rVoid = Math.max(4, (isCircle ? geom.r : Math.min(geom.x1-geom.x0, geom.y1-geom.y0)/2) * voidRatio);
+  const usable = (isCircle ? geom.r : Math.min(geom.x1-geom.x0, geom.y1-geom.y0)/2) - rVoid - Math.max(0, RINGS - 1) * GAP;
   const ringThick = Math.max(1, usable / RINGS);
 
   const sections = Math.max(1, plan.sections);
@@ -938,36 +972,46 @@ const StadiumPlanSVG: React.FC<{
 
   return (
     <div className="relative w-full aspect-[16/10] rounded-xl overflow-hidden border border-gray-300 bg-white">
-      <svg viewBox={`0 0 ${VB_W} ${VB_H}`} preserveAspectRatio="xMidYMid meet" className="h-full w-full">
-        <defs>
-          <clipPath id="stadiumClip"><circle cx={cx} cy={cy} r={R} /></clipPath>
-          <pattern id="exitHatch" width="4" height="4" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-            <rect width="2" height="4" fill="rgba(244,63,94,0.12)" />
-          </pattern>
-        </defs>
+        <svg viewBox={`0 0 ${VB_W} ${VB_H}`} preserveAspectRatio="xMidYMid meet" className="h-full w-full">
+          <defs>
+            {isCircle
+              ? <clipPath id="venueClip"><circle cx={geom.cx} cy={geom.cy} r={geom.r} /></clipPath>
+              : <clipPath id="venueClip"><rect x={geom.x0} y={geom.y0} width={geom.x1-geom.x0} height={geom.y1-geom.y0} rx={1.2} ry={1.2}/></clipPath>}
+            <pattern id="exitHatch" width="4" height="4" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+              <rect width="2" height="4" fill="rgba(244,63,94,0.12)" />
+            </pattern>
+          </defs>
 
-        <circle cx={cx} cy={cy} r={R} fill="#ffffff" stroke="#e5e7eb" strokeWidth={0.8} />
+          {isCircle
+            ? <circle cx={geom.cx} cy={geom.cy} r={geom.r} fill="#fff"/>
+            : <rect x={geom.x0} y={geom.y0} width={geom.x1-geom.x0} height={geom.y1-geom.y0} fill="#fff" stroke="" strokeWidth={0.8}/>}
 
-        <g clipPath="url(#stadiumClip)">
-          {/* rings */}
-          {Array.from({ length: RINGS }, (_, li) => {
+        <g clipPath="url(#venueClip)">
+          {/* rings - only for circular layouts */}
+          {isCircle && Array.from({ length: RINGS }, (_, li) => {
             const rIn = rVoid + li * (ringThick + GAP);
             const rOut = rIn + ringThick;
             return (
               <g key={`ring-${li}`}>
-                <circle cx={cx} cy={cy} r={rIn} fill="none" stroke="#cbd5e1" strokeOpacity={0.35} strokeWidth={0.5} strokeDasharray="1,1" />
-                <circle cx={cx} cy={cy} r={rOut} fill="none" stroke="#cbd5e1" strokeOpacity={0.6} strokeWidth={0.5} />
+                <circle cx={geom.cx} cy={geom.cy} r={rIn} fill="none" stroke="#cbd5e1" strokeOpacity={0.35} strokeWidth={0.5} strokeDasharray="1,1" />
+                <circle cx={geom.cx} cy={geom.cy} r={rOut} fill="none" stroke="#cbd5e1" strokeOpacity={0.6} strokeWidth={0.5} />
               </g>
             );
           })}
 
-          {/* Section dividers */}
-          {sectionAngles.map((angle, i) => {
+          {/* grid - only for rectangular layouts */}
+          {!isCircle && (
+            <rect x={geom.x0} y={geom.y0} width={geom.x1-geom.x0} height={geom.y1-geom.y0}
+                  fill="none" stroke="#cbd5e1" strokeOpacity={0.35} strokeDasharray="2 2" strokeWidth={0.4}/>
+          )}
+
+          {/* Section dividers - only for circular layouts */}
+          {isCircle && sectionAngles.map((angle, i) => {
             const rad = (angle * Math.PI) / 180;
-            const x1 = cx + (rVoid - 0.5) * Math.cos(rad);
-            const y1 = cy + (rVoid - 0.5) * Math.sin(rad);
-            const x2 = cx + (R - 0.5) * Math.cos(rad);
-            const y2 = cy + (R - 0.5) * Math.sin(rad);
+            const x1 = geom.cx + (rVoid - 0.5) * Math.cos(rad);
+            const y1 = geom.cy + (rVoid - 0.5) * Math.sin(rad);
+            const x2 = geom.cx + (geom.r - 0.5) * Math.cos(rad);
+            const y2 = geom.cy + (geom.r - 0.5) * Math.sin(rad);
             return (
               <g key={`sec-line-${i}`}>
                 <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="#cbd5e1" strokeOpacity={0.45} strokeWidth={0.35} strokeDasharray="2,1" />
@@ -975,8 +1019,8 @@ const StadiumPlanSVG: React.FC<{
             );
           })}
 
-          {/* Section hover targets */}
-          {sectionAngles.map((angle, i) => {
+          {/* Section hover targets - only for circular layouts */}
+          {isCircle && sectionAngles.map((angle, i) => {
             const a0 = angle;
             const a1 = angle + sectionStep;
             const pct = sectionAgg[i] ?? 0;
@@ -988,7 +1032,7 @@ const StadiumPlanSVG: React.FC<{
                 onMouseLeave={() => setHoverInfo(null)}
                 style={{ cursor: "pointer" }}
               >
-                <path d={sectorPath(cx, cy, rVoid, R, a0, a1)} fill="transparent" stroke="transparent" />
+                <path d={sectorPath(geom.cx, geom.cy, rVoid, geom.r, a0, a1)} fill="transparent" stroke="transparent" />
               </g>
             );
           })}
@@ -1079,6 +1123,8 @@ const StadiumPlanSVG: React.FC<{
 
 /* ========= Dummy plan (updated to match forecast data) ========= */
 const DUMMY_PLAN: StadiumMapJSON = {
+  shape: "rect",
+  rectBounds: { x0: 3, y0: 3, x1: 97, y1: 59.5 },
   exits: 7,
   zones: [],
   layers: 3,
