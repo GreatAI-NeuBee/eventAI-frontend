@@ -22,6 +22,20 @@ import { DesignInCanvaCTA } from "../DesignInCanvaCTA";
    ========================= */
 type PctPoint = [number, number];
 
+type FacilityType = 'toilet' | 'snack' | 'souvenir';
+type Facility = {
+  id: string;
+  type: FacilityType;
+  position: PctPoint;
+  label?: string;
+};
+
+type FacilityAction = {
+  type: 'add' | 'remove';
+  facility: Facility;
+  timestamp: number;
+};
+
 type EditorZone = {
   id: string;
   name: string;
@@ -48,6 +62,7 @@ export type StadiumMapJSON = {
   zones: { id: string; name: string; layer: number; points: PctPoint[] }[];
   exitsList?: { id: string; name: string; position: PctPoint; capacity?: number }[];
   toiletsList?: { id: string; position: PctPoint; label?: string; fixtures?: number }[];
+  facilitiesList?: { id: string; type: FacilityType; position: PctPoint; label?: string }[];
 };
 
 /* =========================
@@ -59,7 +74,6 @@ const vbH = 62.5;
 const CIRCLE_MARGIN = 3; // margin from edges
 const ANG_GAP = 2; // small angular gap between sections (degrees)
 const EXIT_DEFAULT_CAP = 800; // persons/hour default
-const TOILET_HIT_R = 2.0; // svg units for click hit-testing
 
 function circleOuterRadius(): number {
   return Math.min(vbW / 2 - CIRCLE_MARGIN, vbH / 2 - CIRCLE_MARGIN);
@@ -150,6 +164,238 @@ function arcPathD(
 }
 
 /* =========================
+   Dialog Component
+   ========================= */
+interface DialogProps {
+  isOpen: boolean;
+  onClose: () => void;
+  title: string;
+  message: string;
+  type: 'success' | 'error' | 'info';
+}
+
+const Dialog: React.FC<DialogProps> = ({ isOpen, onClose, title, message, type }) => {
+  if (!isOpen) return null;
+
+  const getIcon = () => {
+    switch (type) {
+      case 'success':
+        return '✅';
+      case 'error':
+        return '❌';
+      case 'info':
+        return 'ℹ️';
+      default:
+        return 'ℹ️';
+    }
+  };
+
+  const getBgColor = () => {
+    switch (type) {
+      case 'success':
+        return 'bg-green-50 border-green-200';
+      case 'error':
+        return 'bg-red-50 border-red-200';
+      case 'info':
+        return 'bg-blue-50 border-blue-200';
+      default:
+        return 'bg-blue-50 border-blue-200';
+    }
+  };
+
+  const getTextColor = () => {
+    switch (type) {
+      case 'success':
+        return 'text-green-800';
+      case 'error':
+        return 'text-red-800';
+      case 'info':
+        return 'text-blue-800';
+      default:
+        return 'text-blue-800';
+    }
+  };
+
+  const getButtonColor = () => {
+    switch (type) {
+      case 'success':
+        return 'bg-green-600 hover:bg-green-700 focus:ring-green-500';
+      case 'error':
+        return 'bg-red-600 hover:bg-red-700 focus:ring-red-500';
+      case 'info':
+        return 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-500';
+      default:
+        return 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-500';
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      {/* Backdrop */}
+      <div 
+        className="fixed inset-0 bg-black bg-opacity-50 transition-opacity duration-300 ease-in-out"
+        onClick={onClose}
+      />
+      
+      {/* Dialog */}
+      <div className="relative bg-white rounded-xl shadow-2xl max-w-md w-full transform transition-all duration-300 ease-in-out animate-in fade-in-0 zoom-in-95 slide-in-from-bottom-2">
+        <div className={`p-6 border-l-4 ${getBgColor()} rounded-xl`}>
+          <div className="flex items-start">
+            <div className="flex-shrink-0">
+              <div className="w-10 h-10 rounded-full flex items-center justify-center bg-white shadow-md">
+                <span className="text-2xl">{getIcon()}</span>
+              </div>
+            </div>
+            <div className="ml-4 w-full">
+              <h3 className={`text-lg font-semibold ${getTextColor()}`}>
+                {title}
+              </h3>
+              <div className={`mt-2 text-sm leading-relaxed ${getTextColor()}`}>
+                {message}
+              </div>
+            </div>
+            <div className="ml-4 flex-shrink-0">
+              <button
+                type="button"
+                className={`inline-flex items-center justify-center w-8 h-8 rounded-full ${getTextColor()} hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-500 transition-colors duration-200`}
+                onClick={onClose}
+              >
+                <span className="sr-only">Close</span>
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          </div>
+          <div className="mt-6 flex justify-end">
+            <button
+              type="button"
+              className={`inline-flex items-center px-6 py-2.5 border border-transparent text-sm font-medium rounded-lg text-white ${getButtonColor()} focus:outline-none focus:ring-2 focus:ring-offset-2 transition-all duration-200 transform hover:scale-105 active:scale-95`}
+              onClick={onClose}
+            >
+              <span className="mr-2">✓</span>
+              Got it!
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/* =========================
+   ActionRing Component
+   ========================= */
+interface ActionRingProps {
+  open: boolean;
+  x: number;
+  y: number;
+  onPick: (type: FacilityType) => void;
+  onClose: () => void;
+}
+
+const ActionRing: React.FC<ActionRingProps> = ({ open, x, y, onPick, onClose }) => {
+  if (!open) return null;
+
+  const radius = 8;
+  const sliceAngle = (2 * Math.PI) / 3;
+  
+  const facilities = [
+    { type: 'toilet' as FacilityType, emoji: '🚻', label: 'Toilet' },
+    { type: 'snack' as FacilityType, emoji: '🍔', label: 'Snack' },
+    { type: 'souvenir' as FacilityType, emoji: '🧸', label: 'Souvenir' }
+  ];
+
+  return (
+    <g>
+      {/* Background overlay */}
+      <circle cx={x} cy={y} r={radius + 2} fill="rgba(0,0,0,0.1)" />
+      
+      {/* Ring segments */}
+      {facilities.map((facility, i) => {
+        const startAngle = i * sliceAngle - Math.PI / 2;
+        const endAngle = (i + 1) * sliceAngle - Math.PI / 2;
+        
+        // Calculate path for slice
+        const x1 = x + radius * Math.cos(startAngle);
+        const y1 = y + radius * Math.sin(startAngle);
+        const x2 = x + radius * Math.cos(endAngle);
+        const y2 = y + radius * Math.sin(endAngle);
+        const largeArc = sliceAngle > Math.PI ? 1 : 0;
+        
+        const pathData = [
+          `M ${x} ${y}`,
+          `L ${x1} ${y1}`,
+          `A ${radius} ${radius} 0 ${largeArc} 1 ${x2} ${y2}`,
+          'Z'
+        ].join(' ');
+        
+        return (
+          <g key={facility.type}>
+            <path
+              d={pathData}
+              fill="rgba(59,130,246,0.8)"
+              stroke="#3b82f6"
+              strokeWidth={0.3}
+              style={{ cursor: 'pointer' }}
+              onClick={(e) => {
+                e.stopPropagation();
+                onPick(facility.type);
+              }}
+            />
+            {/* Emoji and label */}
+            <text
+              x={x + (radius * 0.6) * Math.cos(startAngle + sliceAngle / 2)}
+              y={y + (radius * 0.6) * Math.sin(startAngle + sliceAngle / 2)}
+              textAnchor="middle"
+              dominantBaseline="central"
+              fontSize={2.5}
+              style={{ cursor: 'pointer', userSelect: 'none' }}
+              onClick={(e) => {
+                e.stopPropagation();
+                onPick(facility.type);
+              }}
+            >
+              {facility.emoji}
+            </text>
+            <text
+              x={x + (radius * 0.9) * Math.cos(startAngle + sliceAngle / 2)}
+              y={y + (radius * 0.9) * Math.sin(startAngle + sliceAngle / 2)}
+              textAnchor="middle"
+              dominantBaseline="central"
+              fontSize={1.5}
+              fill="#1e40af"
+              style={{ cursor: 'pointer', userSelect: 'none' }}
+              onClick={(e) => {
+                e.stopPropagation();
+                onPick(facility.type);
+              }}
+            >
+              {facility.label}
+            </text>
+          </g>
+        );
+      })}
+      
+      {/* Center circle */}
+      <circle
+        cx={x}
+        cy={y}
+        r={2}
+        fill="rgba(255,255,255,0.9)"
+        stroke="#3b82f6"
+        strokeWidth={0.3}
+        style={{ cursor: 'pointer' }}
+        onClick={(e) => {
+          e.stopPropagation();
+          onClose();
+        }}
+      />
+    </g>
+  );
+};
+
+/* =========================
    Component
    ========================= */
 type LayoutMode = "circular" | "rect" | "custom";
@@ -162,16 +408,15 @@ const StadiumMapEditor: React.FC<{
   // UI State
   const [layout, setLayout] = React.useState<LayoutMode>("circular");
 
-  // Per-layout toilets (so each layout’s toilets “stick” to that layout)
-  const [toiletsByLayout, setToiletsByLayout] = React.useState<
-    Record<LayoutMode, Toilet[]>
+  // Per-layout facilities (so each layout's facilities "stick" to that layout)
+  const [facilitiesByLayout, setFacilitiesByLayout] = React.useState<
+    Record<LayoutMode, Facility[]>
   >({
     circular: [],
     rect: [],
     custom: [],
   });
-  const toilets = toiletsByLayout[layout]; // active list for current layout
-  const [, setHoverToiletId] = React.useState<string | null>(null);
+  const facilities = facilitiesByLayout[layout]; // active list for current layout
 
   // Circular config
   const [layers, setLayers] = React.useState<number>(
@@ -193,8 +438,28 @@ const StadiumMapEditor: React.FC<{
 
   // Tools
   const [tool, setTool] = React.useState<
-    "idle" | "draw-section" | "add-exit" | "add-rect" | "add-circle" | "move" | "add-toilet"
+    "idle" | "draw-section" | "add-exit" | "add-rect" | "add-circle" | "move" | "place-facility"
   >("idle");
+
+  // Action ring state
+  const [ringOpen, setRingOpen] = React.useState(false);
+  const [ringAnchor, setRingAnchor] = React.useState<PctPoint | null>(null);
+
+  // Dialog state
+  const [dialog, setDialog] = React.useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    type: 'success' | 'error' | 'info';
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    type: 'info'
+  });
+
+  // Facility action history for undo functionality
+  const [facilityHistory, setFacilityHistory] = React.useState<FacilityAction[]>([]);
 
   // Drafting (free polygon for custom)
   const [draftPoints, setDraftPoints] = React.useState<PctPoint[]>([]);
@@ -312,42 +577,111 @@ const StadiumMapEditor: React.FC<{
   const effectiveExits: EditorExit[] = exits;
 
   /* =========================
-     Toilets helpers
+     Facility helpers
      ========================= */
-  const setToiletsForLayout = (mode: LayoutMode, updater: (prev: Toilet[]) => Toilet[]) =>
-    setToiletsByLayout((prev) => ({
+  const setFacilitiesForLayout = (mode: LayoutMode, updater: (prev: Facility[]) => Facility[]) =>
+    setFacilitiesByLayout((prev) => ({
       ...prev,
       [mode]: updater(prev[mode]),
     }));
 
-  const addToiletAt = (p: PctPoint) => {
-    // If you have a helper creator, you can call it here instead:
-    // const t = addToilet(p); // ensure your util returns {id, position, ...}
-    const t: Toilet = {
-      id: `wc-${Date.now()}`,
+  const addFacilityAt = (type: FacilityType, p: PctPoint) => {
+    const facility: Facility = {
+      id: `fac-${Date.now()}`,
+      type,
       position: p,
-      label: `WC ${toilets.length + 1}`,
-      fixtures: 0,
+      label: defaultFacilityLabel(type, facilities),
     };
-    setToiletsForLayout(layout, (prev) => [...prev, t]);
+    
+    // Track add action
+    addFacilityAction({
+      type: 'add',
+      facility,
+      timestamp: Date.now()
+    });
+    
+    setFacilitiesForLayout(layout, (prev) => [...prev, facility]);
   };
 
-  const removeToiletById = (id: string) => {
-    setToiletsForLayout(layout, (prev) => prev.filter((x) => x.id !== id));
+  const defaultFacilityLabel = (type: FacilityType, list: Facility[]) => {
+    const idx = list.filter(f => f.type === type).length + 1;
+    return type === 'toilet' ? `WC ${idx}` : type === 'snack' ? `Snack ${idx}` : `Souvenir ${idx}`;
   };
 
-  const findNearestToilet = (p: PctPoint, list: Toilet[]) => {
-    let best: { idx: number; dist2: number } | null = null;
-    for (let i = 0; i < list.length; i++) {
-      const t = list[i];
-      const dx = t.position[0] - p[0];
-      const dy = t.position[1] - p[1];
+  const findNearbyFacilityOfType = (p: PctPoint, type: FacilityType, list: Facility[]) => {
+    let best: Facility | null = null;
+    let bestD2 = Infinity;
+    for (const f of list) {
+      if (f.type !== type) continue;
+      const dx = f.position[0] - p[0];
+      const dy = f.position[1] - p[1];
       const d2 = dx * dx + dy * dy;
-      if (best === null || d2 < best.dist2) best = { idx: i, dist2: d2 };
+      if (d2 < bestD2) {
+        bestD2 = d2;
+        best = f;
+      }
     }
-    if (!best) return null;
-    return Math.sqrt(best.dist2) <= TOILET_HIT_R ? list[best.idx] : null;
+    return Math.sqrt(bestD2) <= 2.0 ? best : null;
   };
+
+  const onFacilityPick = (type: FacilityType) => {
+    if (!ringAnchor) return;
+    const hit = findNearbyFacilityOfType(ringAnchor, type, facilities);
+    if (hit) {
+      // Track removal action
+      addFacilityAction({
+        type: 'remove',
+        facility: hit,
+        timestamp: Date.now()
+      });
+      setFacilitiesForLayout(layout, prev => prev.filter(f => f.id !== hit.id));
+    } else {
+      addFacilityAt(type, ringAnchor);
+    }
+    setRingOpen(false);
+    setRingAnchor(null);
+  };
+
+  const onRingClose = () => {
+    setRingOpen(false);
+    setRingAnchor(null);
+  };
+
+  // Dialog helper functions
+  const showDialog = (title: string, message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    setDialog({
+      isOpen: true,
+      title,
+      message,
+      type
+    });
+  };
+
+  const closeDialog = () => {
+    setDialog(prev => ({ ...prev, isOpen: false }));
+  };
+
+  // Facility undo functionality
+  const addFacilityAction = (action: FacilityAction) => {
+    setFacilityHistory(prev => [...prev, action]);
+  };
+
+  const undoLastFacilityAction = () => {
+    if (facilityHistory.length === 0) return;
+    
+    const lastAction = facilityHistory[facilityHistory.length - 1];
+    setFacilityHistory(prev => prev.slice(0, -1));
+    
+    if (lastAction.type === 'add') {
+      // Undo add: remove the facility
+      setFacilitiesForLayout(layout, prev => prev.filter(f => f.id !== lastAction.facility.id));
+    } else if (lastAction.type === 'remove') {
+      // Undo remove: add the facility back
+      setFacilitiesForLayout(layout, prev => [...prev, lastAction.facility]);
+    }
+  };
+
+  const canUndoFacility = facilityHistory.length > 0;
 
   // Helper functions for shape manipulation
   const getShapeBounds = (points: PctPoint[]) => {
@@ -454,15 +788,22 @@ const StadiumMapEditor: React.FC<{
         position: e.position,
         capacity: e.capacity ?? EXIT_DEFAULT_CAP,
       })) : undefined,
-      // ✅ Export toilets for the CURRENT layout
-      toiletsList: toilets.length > 0 ? toilets.map((t) => ({
-        id: t.id,
-        position: t.position,
-        label: t.label,
-        fixtures: t.fixtures,
+      // ✅ Export facilities for the CURRENT layout
+      facilitiesList: facilities.length > 0 ? facilities.map((f) => ({
+        id: f.id,
+        type: f.type,
+        position: f.position,
+        label: f.label,
+      })) : undefined,
+      // ✅ Maintain backward compatibility with toiletsList
+      toiletsList: facilities.filter(f => f.type === 'toilet').length > 0 ? facilities.filter(f => f.type === 'toilet').map((f, i) => ({
+        id: f.id,
+        position: f.position,
+        label: f.label ?? `WC ${i + 1}`,
+        fixtures: 0,
       })) : undefined,
     };
-  }, [effectiveZones, effectiveExits, layers, layout, toilets]);
+  }, [effectiveZones, effectiveExits, layers, layout, facilities]);
 
   React.useEffect(() => {
     onChange?.(exportJSON);
@@ -476,11 +817,37 @@ const StadiumMapEditor: React.FC<{
           deleteSelectedShape();
         }
       }
+      
+      // Dialog keyboard shortcuts
+      if (dialog.isOpen && event.key === 'Escape') {
+        closeDialog();
+        return;
+      }
+      
+      // Facility undo keyboard shortcut
+      if ((event.ctrlKey || event.metaKey) && event.key === 'z' && canUndoFacility) {
+        event.preventDefault();
+        undoLastFacilityAction();
+        return;
+      }
+      
+      // ActionRing keyboard shortcuts
+      if (ringOpen) {
+        if (event.key === 'Escape') {
+          onRingClose();
+        } else if (event.key === '1') {
+          onFacilityPick('toilet');
+        } else if (event.key === '2') {
+          onFacilityPick('snack');
+        } else if (event.key === '3') {
+          onFacilityPick('souvenir');
+        }
+      }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedShapeId, layout]);
+  }, [selectedShapeId, layout, ringOpen, dialog.isOpen, canUndoFacility, onFacilityPick, onRingClose, closeDialog, undoLastFacilityAction]);
 
   /* ============ Canvas helpers ============ */
   const svgRef = React.useRef<SVGSVGElement | null>(null);
@@ -511,11 +878,10 @@ const StadiumMapEditor: React.FC<{
       return;
     }
 
-    // Toilets: toggle add/remove on click (per current layout)
-    if (tool === "add-toilet") {
-      const hit = findNearestToilet(p, toilets);
-      if (hit) removeToiletById(hit.id);
-      else addToiletAt(p);
+    // Facilities: open action ring on click
+    if (tool === "place-facility") {
+      setRingAnchor(p);
+      setRingOpen(true);
       return;
     }
 
@@ -728,7 +1094,8 @@ const StadiumMapEditor: React.FC<{
     setDraftName("");
     setTool("idle");
     setSelectedShapeId(null);
-    // keep toilets — they are per-layout and should persist by design
+    setFacilityHistory([]); // Clear facility history when clearing all
+    // keep facilities — they are per-layout and should persist by design
   };
 
   const deleteSelectedShape = () => {
@@ -1042,18 +1409,31 @@ const StadiumMapEditor: React.FC<{
       // Update editor state
       setZones(importedZones);
       setExits(importedExits);
-      setToiletsForLayout(layout, () => importedToilets);
+      setFacilitiesForLayout(layout, () => importedToilets.map(t => ({
+        id: t.id,
+        type: 'toilet' as FacilityType,
+        position: t.position,
+        label: t.label
+      })));
       
       // Switch to custom layout mode to show imported zones
       setLayout("custom");
       setTool("idle");
       
       // Show success message
-      alert(`Successfully imported layout with ${importedZones.length} zones, ${importedExits.length} exits, and ${importedToilets.length} toilets!`);
+      showDialog(
+        'Import Successful',
+        `Successfully imported layout with ${importedZones.length} zones, ${importedExits.length} exits, and ${importedToilets.length} toilets!`,
+        'success'
+      );
       
     } catch (error) {
       console.error('SVG import failed:', error);
-      alert(`Import failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      showDialog(
+        'Import Failed',
+        `Import failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        'error'
+      );
     }
     
     // Reset file input
@@ -1113,6 +1493,7 @@ const StadiumMapEditor: React.FC<{
                     setLayout(v);
                     setTool("idle");
                     setDraftPoints([]);
+                    setFacilityHistory([]); // Clear facility history when switching layouts
                   }}
                   className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                 >
@@ -1309,17 +1690,32 @@ const StadiumMapEditor: React.FC<{
             <button
               type="button"
               onClick={() =>
-                setTool((t) => (t === "add-toilet" ? "idle" : "add-toilet"))
+                setTool((t) => (t === "place-facility" ? "idle" : "place-facility"))
               }
               className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${
-                tool === "add-toilet"
+                tool === "place-facility"
                   ? "bg-emerald-600 text-white cursor-pointer"
                   : "bg-white text-gray-800 border border-gray-300 hover:bg-gray-50 cursor-pointer"
               }`}
-              title="Click anywhere to place a toilet"
+              title="Click anywhere to place a facility"
             >
-              🚻
-              {tool === "add-toilet" ? "Placing Toilets" : "Add Toilet"}
+              ✅
+              {tool === "place-facility" ? "Placing Facility" : "Place Facility"}
+            </button>
+
+            <button
+              type="button"
+              onClick={undoLastFacilityAction}
+              disabled={!canUndoFacility}
+              className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${
+                canUndoFacility
+                  ? "bg-white text-gray-800 border border-gray-300 hover:bg-gray-50 cursor-pointer"
+                  : "bg-gray-100 text-gray-400 cursor-not-allowed"
+              }`}
+              title={canUndoFacility ? "Undo last facility action (Ctrl+Z)" : "No facility actions to undo"}
+            >
+              ↶
+              Undo Facility
             </button>
 
             <button
@@ -1473,6 +1869,7 @@ const StadiumMapEditor: React.FC<{
             viewBox={`0 0 ${vbW} ${vbH}`}
             preserveAspectRatio="xMidYMid meet"
             className="h-full w-full"
+            style={{ cursor: tool === "place-facility" ? "crosshair" : "default" }}
             onClick={onCanvasClick}
             onMouseMove={onCanvasMouseMove}
             onMouseUp={onCanvasMouseUp}
@@ -1560,7 +1957,7 @@ const StadiumMapEditor: React.FC<{
                     data-shape-id={z.id}
                     onMouseDown={(e) => onZoneMouseDown(z.id, e)}
                     style={{ 
-                      cursor: layout === "custom" ? "move" : "default" 
+                      cursor: layout === "custom" && tool === "idle" ? "move" : "default" 
                     }}
                   >
                     <polygon
@@ -1597,26 +1994,20 @@ const StadiumMapEditor: React.FC<{
               </g>
             ))}
 
-            {/* ==== TOILETS (only show in circular) ==== */}
-            {layout === "circular" &&
-              toilets.map((t) => (
-                <g
-                  key={t.id}
-                  onMouseEnter={() => setHoverToiletId(t.id)}
-                  onMouseLeave={() => setHoverToiletId(null)}
-                  style={{ cursor: "pointer" }}
+            {/* ==== FACILITIES ==== */}
+            {facilities.map((f) => (
+              <g key={f.id} style={{ cursor: "pointer" }}>
+                <text
+                  x={f.position[0]}
+                  y={f.position[1]}
+                  fontSize={3.2}
+                  textAnchor="middle"
+                  dominantBaseline="central"
                 >
-                  <text
-                    x={t.position[0]}
-                    y={t.position[1]}
-                    fontSize={3.2}            // tweak size if you like
-                    textAnchor="middle"
-                    dominantBaseline="central"
-                  >
-                    {"🚻"}
-                  </text>
-                </g>
-              ))}
+                  {f.type === 'toilet' ? '🚻' : f.type === 'snack' ? '🍔' : '🧸'}
+                </text>
+              </g>
+            ))}
 
             {/* Draft (custom) */}
             {layout === "custom" && draftPoints.length > 0 && (
@@ -1639,6 +2030,17 @@ const StadiumMapEditor: React.FC<{
               candidateExits.map((p, i) => (
                 <circle key={i} cx={p[0]} cy={p[1]} r={1.0} fill="rgba(34,197,94,0.6)" style={{ cursor: "pointer" }} />
               ))}
+            
+            {/* Action Ring */}
+            {ringOpen && ringAnchor && (
+              <ActionRing
+                open={ringOpen}
+                x={ringAnchor[0]}
+                y={ringAnchor[1]}
+                onPick={onFacilityPick}
+                onClose={onRingClose}
+              />
+            )}
           </svg>
 
           {/* Helper text */}
@@ -1654,6 +2056,8 @@ const StadiumMapEditor: React.FC<{
                 ? "Click shapes to select them • Drag to move • Use resize handles to resize"
                 : tool === "add-exit"
                 ? "Click anywhere to place an exit"
+                : tool === "place-facility"
+                ? "Click anywhere with crosshair cursor to open facility selector"
                 : "Select a tool to begin editing"
               : tool === "add-exit"
               ? "Click on a highlighted spot to add/remove an exit"
@@ -1669,12 +2073,8 @@ const StadiumMapEditor: React.FC<{
               <div>{exportJSON.layers}</div>
               <div className="font-medium">Exits:</div>
               <div>{exits.length}</div>
-              {layout === "circular" && (
-                <>
-                  <div className="font-medium">Toilets:</div>
-                  <div>{toilets.length}</div>
-                </>
-              )}
+              <div className="font-medium">Facilities:</div>
+              <div>{facilities.length}</div>
             </div>
           </div>
         </div>
@@ -1758,6 +2158,14 @@ const StadiumMapEditor: React.FC<{
       )}
       {/* JSON preview */}
    
+      {/* Dialog */}
+      <Dialog
+        isOpen={dialog.isOpen}
+        onClose={closeDialog}
+        title={dialog.title}
+        message={dialog.message}
+        type={dialog.type}
+      />
     </div>
   );
 };
