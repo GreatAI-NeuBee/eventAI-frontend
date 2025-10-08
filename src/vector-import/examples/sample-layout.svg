@@ -1,0 +1,247 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg viewBox="0 0 800 500" xmlns="http://www.w3.org/2000/svg">
+  <!-- Metadata -->
+  <g id="meta" data-layers="3" data-sections="12"></g>
+  
+  <!-- Zone 1: North Section -->
+  <polygon 
+    class="zone" 
+    data-id="z-101" 
+    data-name="North A" 
+    data-layer="1" 
+    points="400,50 500,80 480,150 420,140 380,100"
+    fill="#ff6b6b"
+    stroke="#333"
+    stroke-width="2"
+  />
+  
+  <!-- Zone 2: South Section -->
+  <polygon 
+    class="zone" 
+    data-id="z-102" 
+    data-name="South B" 
+    data-layer="1" 
+    points="400,350 500,320 480,250 420,260 380,300"
+    fill="#4ecdc4"
+    stroke="#333"
+    stroke-width="2"
+  />
+  
+  <!-- Zone 3: East Section -->
+  <polygon 
+    class="zone" 
+    data-id="z-201" 
+    data-name="East C" 
+    data-layer="2" 
+    points="600,200 650,250 600,300 550,280 570,220"
+    fill="#45b7d1"
+    stroke="#333"
+    stroke-width="2"
+  />
+  
+  <!-- Zone 4: West Section -->
+  <polygon 
+    class="zone" 
+    data-id="z-202" 
+    data-name="West D" 
+    data-layer="2" 
+    points="200,200 150,250 200,300 250,280 230,220"
+    fill="#96ceb4"
+    stroke="#333"
+    stroke-width="2"
+  />
+  
+  <!-- Zone 5: Center Section -->
+  <polygon 
+    class="zone" 
+    data-id="z-301" 
+    data-name="Center E" 
+    data-layer="3" 
+    points="350,200 450,200 450,300 350,300"
+    fill="#feca57"
+    stroke="#333"
+    stroke-width="2"
+  />
+  
+  <!-- Exit 1: North Gate -->
+  <circle 
+    class="exit" 
+    data-id="exit-1" 
+    data-name="North Gate" 
+    data-capacity="100"
+    cx="400" 
+    cy="30" 
+    r="15"
+    fill="#22c55e"
+    stroke="#16a34a"
+    stroke-width="3"
+  />
+  
+  <!-- Exit 2: South Gate -->
+  <circle 
+    class="exit" 
+    data-name="South Gate" 
+    data-id="exit-2" 
+    data-capacity="150"
+    cx="400" 
+    cy="470" 
+    r="15"
+    fill="#22c55e"
+    stroke="#16a34a"
+    stroke-width="3"
+  />
+  
+  <!-- Exit 3: East Gate -->
+  <circle 
+    class="exit" 
+    data-id="exit-3" 
+    data-name="East Gate" 
+    data-capacity="80"
+    cx="700" 
+    cy="250" 
+    r="12"
+    fill="#22c55e"
+    stroke="#16a34a"
+    stroke-width="3"
+  />
+  
+  <!-- Exit 4: West Gate -->
+  <circle 
+    class="exit" 
+    data-id="exit-4" 
+    data-name="West Gate" 
+    data-capacity="120"
+    cx="100" 
+    cy="250" 
+    r="12"
+    fill="#22c55e"
+    stroke="#16a34a"
+    stroke-width="3"
+  />
+  
+  <!-- Exit 5: Northeast Gate -->
+  <circle 
+    class="exit" 
+    data-id="exit-5" 
+    data-name="NE Gate" 
+    data-capacity="60"
+    cx="650" 
+    cy="100" 
+    r="10"
+    fill="#22c55e"
+    stroke="#16a34a"
+    stroke-width="3"
+  />
+  
+  <!-- Exit 6: Northwest Gate -->
+  <circle 
+    class="exit" 
+    data-id="exit-6" 
+    data-name="NW Gate" 
+    data-capacity="90"
+    cx="150" 
+    cy="100" 
+    r="10"
+    fill="#22c55e"
+    stroke="#16a34a"
+    stroke-width="3"
+  />
+  
+  <!-- Exit 7: Southeast Gate -->
+  <circle 
+    class="exit" 
+    data-id="exit-7" 
+    data-name="SE Gate" 
+    data-capacity="70"
+    cx="650" 
+    cy="400" 
+    r="10"
+    fill="#22c55e"
+    stroke="#16a34a"
+    stroke-width="3"
+  />
+  
+  <!-- Toilet 1: North -->
+  <circle 
+    class="toilet" 
+    data-id="wc-1" 
+    data-label="WC North" 
+    data-fixtures="4"
+    cx="450" 
+    cy="120" 
+    r="8"
+    fill="#3b82f6"
+    stroke="#2563eb"
+    stroke-width="2"
+  />
+  
+  <!-- Toilet 2: South -->
+  <circle 
+    class="toilet" 
+    data-id="wc-2" 
+    data-label="WC South" 
+    data-fixtures="6"
+    cx="350" 
+    cy="380" 
+    r="8"
+    fill="#3b82f6"
+    stroke="#2563eb"
+    stroke-width="2"
+  />
+  
+  <!-- Toilet 3: East -->
+  <circle 
+    class="toilet" 
+    data-id="wc-3" 
+    data-label="WC East" 
+    data-fixtures="3"
+    cx="580" 
+    cy="250" 
+    r="6"
+    fill="#3b82f6"
+    stroke="#2563eb"
+    stroke-width="2"
+  />
+  
+  <!-- Toilet 4: West -->
+  <circle 
+    class="toilet" 
+    data-id="wc-4" 
+    data-label="WC West" 
+    data-fixtures="5"
+    cx="220" 
+    cy="250" 
+    r="6"
+    fill="#3b82f6"
+    stroke="#2563eb"
+    stroke-width="2"
+  />
+  
+  <!-- Toilet 5: Center -->
+  <circle 
+    class="toilet" 
+    data-id="wc-5" 
+    data-label="WC Center" 
+    data-fixtures="8"
+    cx="400" 
+    cy="250" 
+    r="7"
+    fill="#3b82f6"
+    stroke="#2563eb"
+    stroke-width="2"
+  />
+  
+  <!-- Labels for exits -->
+  <text x="400" y="25" text-anchor="middle" font-family="Arial" font-size="12" fill="#16a34a" font-weight="bold">North Gate</text>
+  <text x="400" y="490" text-anchor="middle" font-family="Arial" font-size="12" fill="#16a34a" font-weight="bold">South Gate</text>
+  <text x="720" y="245" text-anchor="middle" font-family="Arial" font-size="12" fill="#16a34a" font-weight="bold">East Gate</text>
+  <text x="80" y="245" text-anchor="middle" font-family="Arial" font-size="12" fill="#16a34a" font-weight="bold">West Gate</text>
+  
+  <!-- Labels for zones -->
+  <text x="420" y="100" text-anchor="middle" font-family="Arial" font-size="14" fill="#333" font-weight="bold">North A</text>
+  <text x="420" y="300" text-anchor="middle" font-family="Arial" font-size="14" fill="#333" font-weight="bold">South B</text>
+  <text x="600" y="250" text-anchor="middle" font-family="Arial" font-size="14" fill="#333" font-weight="bold">East C</text>
+  <text x="200" y="250" text-anchor="middle" font-family="Arial" font-size="14" fill="#333" font-weight="bold">West D</text>
+  <text x="400" y="250" text-anchor="middle" font-family="Arial" font-size="14" fill="#333" font-weight="bold">Center E</text>
+</svg>
+

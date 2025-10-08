@@ -13,6 +13,7 @@ import type { StadiumMapJSON } from '../components/maps/StadiumMapEditor';
 import { useAuth } from '../contexts/AuthContext';
 
 const NewEvent: React.FC = () => {
+  // SVG upload functionality moved to VenueLayoutEditor
   const navigate = useNavigate();
   const { addEvent, setCurrentEvent, setLoading, setError, isLoading } = useEventStore();
   const { user, backendUser, backendUserLoading } = useAuth();
@@ -24,6 +25,9 @@ const NewEvent: React.FC = () => {
     endTime: '',
     venue: '',
     description: '',
+    eventType: 'event' as 'concert' | 'event',
+    featuredGuest: '',
+    location: '',
   });
 
   const [venueLayoutJson, setVenueLayoutJson] = useState<StadiumMapJSON | null>(null);
@@ -38,31 +42,54 @@ const NewEvent: React.FC = () => {
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  // Function to extract country/location from venue address
+  const extractLocationFromAddress = (address?: string): string => {
+    if (!address) return '';
+    
+    // Common patterns to extract country/location
+    const addressParts = address.split(',').map(part => part.trim());
+    
+    // Last part is usually the country
+    if (addressParts.length > 0) {
+      const lastPart = addressParts[addressParts.length - 1];
+      
+      // If it's a known country, return it
+      if (lastPart.toLowerCase().includes('malaysia') || lastPart === 'MY') {
+        return 'Malaysia';
+      }
+      if (lastPart.toLowerCase().includes('singapore') || lastPart === 'SG') {
+        return 'Singapore';
+      }
+      if (lastPart.toLowerCase().includes('thailand') || lastPart === 'TH') {
+        return 'Thailand';
+      }
+      if (lastPart.toLowerCase().includes('indonesia') || lastPart === 'ID') {
+        return 'Indonesia';
+      }
+      
+      // Otherwise return the last part (likely country or state)
+      return lastPart;
+    }
+    
+    return '';
+  };
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
-    
-    // Clear error when user starts typing
-    if (errors[name]) {
-      setErrors(prev => ({ ...prev, [name]: '' }));
-    }
+    if (errors[name]) setErrors(prev => ({ ...prev, [name]: '' }));
   };
 
   const handleVenueLayoutChange = (venueLayoutData: StadiumMapJSON) => {
     setVenueLayoutJson(venueLayoutData);
-    
-    // Clear error when layout is updated
-    if (errors.venueLayout) {
-      setErrors(prev => ({ ...prev, venueLayout: '' }));
-    }
+    if (errors.venueLayout) setErrors(prev => ({ ...prev, venueLayout: '' }));
   };
+
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
 
-    if (!formData.name.trim()) {
-      newErrors.name = 'Event name is required';
-    }
+    if (!formData.name.trim()) newErrors.name = 'Event name is required';
 
     if (!formData.eventDate) {
       newErrors.eventDate = 'Event date is required';
@@ -70,33 +97,28 @@ const NewEvent: React.FC = () => {
       const eventDate = new Date(formData.eventDate);
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      
-      if (eventDate < today) {
-        newErrors.eventDate = 'Event date cannot be in the past';
-      }
+      if (eventDate < today) newErrors.eventDate = 'Event date cannot be in the past';
     }
 
-    if (!formData.startTime) {
-      newErrors.startTime = 'Start time is required';
-    }
-
-    if (!formData.endTime) {
-      newErrors.endTime = 'End time is required';
-    } else if (formData.startTime && formData.endTime) {
-      // Compare times within the same day
-      const [startHour, startMin] = formData.startTime.split(':').map(Number);
-      const [endHour, endMin] = formData.endTime.split(':').map(Number);
-      
-      const startMinutes = startHour * 60 + startMin;
-      const endMinutes = endHour * 60 + endMin;
-      
-      if (endMinutes <= startMinutes) {
-        newErrors.endTime = 'End time must be after start time';
-      }
+    if (!formData.startTime) newErrors.startTime = 'Start time is required';
+    if (!formData.endTime) newErrors.endTime = 'End time is required';
+    if (formData.startTime && formData.endTime) {
+      const [sh, sm] = formData.startTime.split(':').map(Number);
+      const [eh, em] = formData.endTime.split(':').map(Number);
+      if (eh * 60 + em <= sh * 60 + sm) newErrors.endTime = 'End time must be after start time';
     }
 
     if (!formData.venue.trim()) {
       newErrors.venue = 'Venue is required';
+    }
+
+    if (!formData.location.trim()) {
+      newErrors.location = 'Location is required';
+    }
+
+    // Validate featured guest for concerts
+    if (formData.eventType === 'concert' && !formData.featuredGuest.trim()) {
+      newErrors.featuredGuest = 'Featured guest is required for concerts';
     }
 
     // Venue layout validation (optional but if provided should have at least 1 section)
@@ -119,17 +141,12 @@ const NewEvent: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!validateForm()) {
-      return;
-    }
+    if (!validateForm()) return;
 
-    // Check if backend user is ready
     if (backendUserLoading) {
       setError('Account setup in progress. Please wait a moment and try again.');
       return;
     }
-
     if (!backendUser) {
       setError('Account setup incomplete. Please refresh the page and try again.');
       return;
@@ -139,57 +156,41 @@ const NewEvent: React.FC = () => {
     setError(null);
 
     try {
-      // Create JSON payload for API submission (using server-expected field names)
-      // Combine date and time fields into datetime format for API
       const dateOfEventStart = `${formData.eventDate}T${formData.startTime}:00Z`;
       const dateOfEventEnd = `${formData.eventDate}T${formData.endTime}:00Z`;
       
       const submitData: any = {
         name: formData.name,
-        dateOfEventStart: dateOfEventStart,
-        dateOfEventEnd: dateOfEventEnd,
+        dateOfEventStart,
+        dateOfEventEnd,
         venue: formData.venue,
         description: formData.description,
+        popularity: {
+          type: formData.eventType,
+          feat: formData.featuredGuest || undefined,
+          location: formData.location,
+        },
+        userEmail: user?.email,
+        venueLocation: venueLocation || undefined,
+        venueLayout: venueLayoutJson || undefined,
       };
-      
-      // Add logged-in user email
-      if (user?.email) {
-        submitData.userEmail = user.email;
-      }
-      
-      if (venueLocation) {
-        submitData.venueLocation = venueLocation;
-      }
-      
-      // Include venue layout JSON if available
-      if (venueLayoutJson) {
-        submitData.venueLayout = venueLayoutJson;
-        console.log('📍 Including venue layout with', venueLayoutJson.sections, 'sections,', venueLayoutJson.exits, 'exits, and', venueLayoutJson.toiletsList?.length || 0, 'toilets');
-      } else {
-        console.log('📍 No venue layout configured for this event');
-      }
 
-      // Debug: Log the JSON data being submitted
       console.log('🚀 Submitting event data to API...');
       console.log('📝 JSON payload:', submitData);
+      console.log('🎭 Popularity data:', submitData.popularity);
       
       const response = await eventAPI.createEvent(submitData);
-      console.log('✅ Event created successfully:', response.data);
-      
-      // Transform backend response to frontend EventData format
       const backendEvent = response.data.data || response.data;
-      
-      // Map backend status to frontend status
+
       let status: 'draft' | 'processing' | 'completed' | 'error' | 'active' = 'active';
       if (backendEvent.status) {
-        const normalizedStatus = backendEvent.status.toLowerCase();
-        if (normalizedStatus === 'created') {
-          status = 'active';
-        } else if (['draft', 'processing', 'completed', 'error', 'active'].includes(normalizedStatus)) {
-          status = normalizedStatus as typeof status;
+        const normalized = String(backendEvent.status).toLowerCase();
+        if (normalized === 'created') status = 'active';
+        else if (['draft', 'processing', 'completed', 'error', 'active'].includes(normalized)) {
+          status = normalized as typeof status;
         }
       }
-      
+
       const newEvent = {
         id: backendEvent.eventId || backendEvent.id,
         name: backendEvent.name || formData.name,
@@ -204,19 +205,15 @@ const NewEvent: React.FC = () => {
         createdAt: backendEvent.createdAt || new Date().toISOString(),
       };
 
-      // Add event to store
       addEvent(newEvent);
       setCurrentEvent(newEvent);
-
-      // Navigate to dashboard
       navigate(`/event/${newEvent.id}`);
     } catch (error: any) {
       console.error('❌ Error creating event:', error);
       console.error('Error response:', error.response?.data);
       console.error('Error status:', error.response?.status);
-      
+
       let errorMessage = 'Failed to create event';
-      
       if (error.response?.status === 404) {
         errorMessage = 'API endpoint not found. Please check if the server is running at https://eventbuddy-api.munymunyhom.tech';
       } else if (error.response?.status >= 500) {
@@ -226,7 +223,6 @@ const NewEvent: React.FC = () => {
       } else if (error.message) {
         errorMessage = error.message;
       }
-      
       setError(errorMessage);
     } finally {
       setLoading(false);
@@ -279,10 +275,7 @@ const NewEvent: React.FC = () => {
                     value={formData.startTime}
                     onChange={(value) => {
                       setFormData(prev => ({ ...prev, startTime: value }));
-                      // Clear error when user selects a time
-                      if (errors.startTime) {
-                        setErrors(prev => ({ ...prev, startTime: '' }));
-                      }
+                      if (errors.startTime) setErrors(prev => ({ ...prev, startTime: '' }));
                     }}
                     placeholder="Select start time"
                     error={!!(errors.startTime || errors.endTime)}
@@ -297,10 +290,7 @@ const NewEvent: React.FC = () => {
                     value={formData.endTime}
                     onChange={(value) => {
                       setFormData(prev => ({ ...prev, endTime: value }));
-                      // Clear error when user selects a time
-                      if (errors.endTime) {
-                        setErrors(prev => ({ ...prev, endTime: '' }));
-                      }
+                      if (errors.endTime) setErrors(prev => ({ ...prev, endTime: '' }));
                     }}
                     placeholder="Select end time"
                     error={!!(errors.startTime || errors.endTime)}
@@ -324,17 +314,26 @@ const NewEvent: React.FC = () => {
                 value={formData.venue}
                 onValueChange={(value) => {
                   setFormData(prev => ({ ...prev, venue: value }));
-                  // Clear error when user starts typing
-                  if (errors.venue) {
-                    setErrors(prev => ({ ...prev, venue: '' }));
-                  }
+                  if (errors.venue) setErrors(prev => ({ ...prev, venue: '' }));
                 }}
                 onVenueSelected={(location) => {
                   setVenueLocation(location);
-                  setFormData(prev => ({ ...prev, venue: location.name || location.address || '' }));
-                  // Clear venue location error if exists
-                  if (errors.venueLocation) {
-                    setErrors(prev => ({ ...prev, venueLocation: '' }));
+                  const venueName = location.name || location.address || '';
+                  const extractedLocation = extractLocationFromAddress(location.address);
+                  
+                  setFormData(prev => ({ 
+                    ...prev, 
+                    venue: venueName,
+                    location: extractedLocation 
+                  }));
+                  
+                  // Clear venue and location errors if exist
+                  if (errors.venueLocation || errors.location) {
+                    setErrors(prev => ({ 
+                      ...prev, 
+                      venueLocation: '', 
+                      location: '' 
+                    }));
                   }
                 }}
               />
@@ -342,6 +341,67 @@ const NewEvent: React.FC = () => {
                 <p className="mt-1 text-sm text-red-600">{errors.venue}</p>
               )}
             </div>
+          </div>
+
+          {/* Event Type Selection */}
+          <div className="mt-6">
+            <label className="block text-sm font-medium text-gray-700 mb-3">
+              Event Type *
+            </label>
+            <div className="flex gap-4">
+              <label className="flex items-center cursor-pointer">
+                <input
+                  type="radio"
+                  name="eventType"
+                  value="event"
+                  checked={formData.eventType === 'event'}
+                  onChange={handleInputChange}
+                  className="w-4 h-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                />
+                <span className="ml-2 text-sm text-gray-700">Event</span>
+              </label>
+              <label className="flex items-center cursor-pointer">
+                <input
+                  type="radio"
+                  name="eventType"
+                  value="concert"
+                  checked={formData.eventType === 'concert'}
+                  onChange={handleInputChange}
+                  className="w-4 h-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                />
+                <span className="ml-2 text-sm text-gray-700">Concert</span>
+              </label>
+            </div>
+          </div>
+
+          {/* Featured Guest - Only show for concerts */}
+          {formData.eventType === 'concert' && (
+            <div className="mt-6">
+              <Input
+                label="Featured Guest / Artist"
+                name="featuredGuest"
+                value={formData.featuredGuest}
+                onChange={handleInputChange}
+                placeholder="e.g., Blackpink, Taylor Swift"
+                error={errors.featuredGuest}
+                required
+              />
+            </div>
+          )}
+
+          {/* Location - Auto-populated from venue */}
+          <div className="mt-6">
+            <Input
+              label="Location"
+              name="location"
+              value={formData.location}
+              onChange={handleInputChange}
+              placeholder="e.g., Malaysia, Singapore"
+              error={errors.location}
+              required
+              disabled={!formData.venue}
+              helperText={!formData.venue ? "Location will be auto-filled when you select a venue" : ""}
+            />
           </div>
 
           <div className="mt-6">
@@ -359,8 +419,7 @@ const NewEvent: React.FC = () => {
           </div>
         </Card>
 
-       
-        {/* User Authentication Error */}
+        {/* Venue Layout Builder */}
         <Card>
           <div className="flex items-center justify-between mb-4">
             <div>
@@ -371,8 +430,13 @@ const NewEvent: React.FC = () => {
               {venueLayoutJson ? (
                 <div className="text-sm space-y-1">
                   <div className="text-green-600 font-medium">
-                    ✓ {venueLayoutJson.sections} sections, {venueLayoutJson.exits} exits
+                    ✓ {venueLayoutJson.sections} sections, {venueLayoutJson.exits}/7 exits
                   </div>
+                  {(venueLayoutJson.exits ?? 0) >= 7 && (
+                    <div className="text-orange-600 text-xs">
+                      ⚠️ Maximum exits reached
+                    </div>
+                  )}
                   {venueLayoutJson.toiletsList && venueLayoutJson.toiletsList.length > 0 && (
                     <div className="text-blue-600 text-xs">
                       + {venueLayoutJson.toiletsList.length} facilities
@@ -388,8 +452,34 @@ const NewEvent: React.FC = () => {
           </div>
           <StadiumMapEditor 
             initialLayers={2} 
+            maxExits={7}
             onChange={handleVenueLayoutChange}
           />
+          
+          {/* Canva Design Workflow Info */}
+          <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex items-start gap-3">
+              <div className="flex-shrink-0">
+                <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                  <span className="text-blue-600 text-sm font-semibold">💡</span>
+                </div>
+              </div>
+              <div className="flex-1">
+                <h3 className="text-sm font-semibold text-blue-900 mb-1">Design in Canva</h3>
+                <p className="text-sm text-blue-700 mb-2">
+                  For more complex layouts, design your venue in Canva and import it back. 
+                  Use the template above as a starting point. You can export as SVG or PNG (circles/rectangles only).
+                </p>
+                <div className="flex items-center gap-2 text-xs text-blue-600">
+                  <span>1. Design in Canva</span>
+                  <span>→</span>
+                  <span>2. Add metadata</span>
+                  <span>→</span>
+                  <span>3. Upload back</span>
+                </div>
+              </div>
+            </div>
+          </div>
         </Card>
         
         {errors.userEmail && (
@@ -411,55 +501,7 @@ const NewEvent: React.FC = () => {
           </Button>
           
           <div className="flex space-x-4">
-            {/* <Button
-              type="button"
-              variant="outline"
-              onClick={async (e) => {
-                e.preventDefault();
-                // Navigate to dashboard to run forecast
-                if (validateForm()) {
-                  setLoading(true);
-                  setError(null);
 
-                  try {
-                    // Create FormData for file upload
-                    const submitData = new FormData();
-                    submitData.append('name', formData.name);
-                    submitData.append('capacity', formData.capacity);
-                    submitData.append('date', formData.date);
-                    submitData.append('venue', formData.venue);
-                    submitData.append('description', formData.description);
-                    
-                    if (files.ticketingData) {
-                      submitData.append('ticketingData', files.ticketingData);
-                    }
-                    
-                    if (files.venueLayout) {
-                      submitData.append('venueLayout', files.venueLayout);
-                    }
-
-                    const response = await eventAPI.createEvent(submitData);
-                    const newEvent = response.data;
-
-                    // Add event to store
-                    addEvent(newEvent);
-                    setCurrentEvent(newEvent);
-
-                    // Navigate to dashboard
-                    navigate(`/event/${newEvent.id}`);
-                  } catch (error: any) {
-                    console.error('Error creating event:', error);
-                    setError(error.response?.data?.message || 'Failed to create event');
-                  } finally {
-                    setLoading(false);
-                  }
-                }
-              }}
-              disabled={isLoading}
-            >
-              Create Event & Run Forecast
-            </Button> */}
-            
             <Button
               type="submit"
               loading={isLoading}
