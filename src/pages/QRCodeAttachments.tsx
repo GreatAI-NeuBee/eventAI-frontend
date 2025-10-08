@@ -284,9 +284,6 @@ const QuickGuidelines: React.FC = () => (
       <li>Report emergencies via the info desk or hotline.</li>
     </ul>
 
-    <div className="mt-4 p-3 bg-indigo-50 border border-indigo-100 rounded-lg text-xs text-indigo-800">
-      📘 For detailed emergency routes and evacuation info, see the full PDF below.
-    </div>
   </div>
 );
 
@@ -439,14 +436,6 @@ const UserEventView: React.FC = () => {
         size: '1.5 MB',
         url: 'https://example.com/files/event-guidelines.pdf',
         uploadedAt: '2025-10-01 14:00',
-      },
-      {
-        id: '2',
-        name: 'Hall_A_FloorPlan.png',
-        type: 'image',
-        size: '2.1 MB',
-        url: 'https://example.com/files/floorplan.png',
-        uploadedAt: '2025-10-01 14:15',
       },
     ]);
 
