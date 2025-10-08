@@ -8,6 +8,7 @@ type StadiumMapJSON = {
   sections: number;
   layers: number;
   exits?: number;
+  layoutType?: string;
   zones: { id: string; name: string; layer: number; points: PctPoint[] }[];
   exitsList?: { id: string; name: string; position: PctPoint; capacity?: number }[];
   toiletsList?: { id: string; position: PctPoint; label?: string; fixtures?: number }[];
@@ -128,8 +129,8 @@ function gateLoadsWithFallback(
 function indexSeriesByTime(series: GateSeries) {
   const m = new Map<string, number>();
   Object.values(series).forEach(points => points.forEach(p => {
-    const key = toKey(p.ds);
-    m.set(key, (m.get(key) ?? 0) + (p.yhat ?? 0));
+      const key = toKey(p.ds);
+      m.set(key, (m.get(key) ?? 0) + (p.yhat ?? 0));
   }));
   return m;
 }
@@ -576,7 +577,7 @@ function spawnExitWalkers(
 export const VenueLayoutCard: React.FC<{ event: EventData | null }> = ({ event }) => {
   const plan: StadiumMapJSON = useMemo(() => {
     if (!event?.venueLayout) return DUMMY_PLAN;
-    if (typeof event.venueLayout === "string") { 
+    if (typeof event.venueLayout === "string") {
       try { 
         const parsed = JSON.parse(event.venueLayout) as StadiumMapJSON;
         // Ensure rectangular layout if not specified
@@ -703,7 +704,7 @@ export const VenueLayoutCard: React.FC<{ event: EventData | null }> = ({ event }
     const tick = (timestamp:number) => {
       if (timestamp - lastUpdate >= UPDATE_INTERVAL) {
         setWalkers(prev => {
-          const now = performance.now();
+        const now = performance.now();
           const next: Walker[] = [];
           for (const w of prev) {
             const expired = now - w.bornAt > w.ttl;
@@ -711,9 +712,9 @@ export const VenueLayoutCard: React.FC<{ event: EventData | null }> = ({ event }
             const updated = advanceWalker(w, UPDATE_INTERVAL);
             if (updated.motionMode !== 'wander' && updated.segIndex >= updated.path.length && updated.phase === 'exits') continue;
             next.push(updated);
-          }
-          return next;
-        });
+        }
+        return next;
+      });
         lastUpdate = timestamp;
       }
       if (mounted) raf = requestAnimationFrame(tick);
@@ -727,7 +728,7 @@ export const VenueLayoutCard: React.FC<{ event: EventData | null }> = ({ event }
   const getTextColor = () => (isDarkBackground || isRainBackground) ? 'text-white' : 'text-gray-900';
   const getSecondaryTextColor = () => (isDarkBackground || isRainBackground) ? 'text-white/80' : 'text-gray-600';
   const getBgColor = () => (isDarkBackground || isRainBackground) ? 'bg-transparent' : 'bg-gradient-to-b from-white to-gray-50';
-  
+
   return (
     <div className={getBgColor()}>
       <div className="p-4 flex items-center justify-between">
@@ -880,7 +881,7 @@ function coerceForecast(raw: unknown, fallback: InOutForecast): InOutForecast {
       const start = obj.summary?.forecastPeriod?.start ? new Date((obj.summary.forecastPeriod.start+"Z").replace(" ","T")).getTime() : undefined;
       const end   = obj.summary?.forecastPeriod?.end   ? new Date((obj.summary.forecastPeriod.end+"Z").replace(" ","T")).getTime()   : undefined;
       const mid = (start!==undefined && end!==undefined) ? start + (end-start)/2 : undefined;
-      
+
       for (const [gate, g] of Object.entries<any>(obj.forecast)) {
         const canonGate = normalizeGateKey(gate);
         for (const f of (g?.timeFrames ?? [])) {
@@ -970,21 +971,24 @@ const StadiumPlanSVG: React.FC<{
     `;
   };
 
+  // Check if layout is circular to apply circular restrictions
+  const isCircularLayout = plan.layoutType === "circular";
+
   return (
     <div className="relative w-full aspect-[16/10] rounded-xl overflow-hidden border border-gray-300 bg-white">
-        <svg viewBox={`0 0 ${VB_W} ${VB_H}`} preserveAspectRatio="xMidYMid meet" className="h-full w-full">
-          <defs>
-            {isCircle
-              ? <clipPath id="venueClip"><circle cx={geom.cx} cy={geom.cy} r={geom.r} /></clipPath>
-              : <clipPath id="venueClip"><rect x={geom.x0} y={geom.y0} width={geom.x1-geom.x0} height={geom.y1-geom.y0} rx={1.2} ry={1.2}/></clipPath>}
-            <pattern id="exitHatch" width="4" height="4" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-              <rect width="2" height="4" fill="rgba(244,63,94,0.12)" />
-            </pattern>
-          </defs>
-
+      <svg viewBox={`0 0 ${VB_W} ${VB_H}`} preserveAspectRatio="xMidYMid meet" className="h-full w-full">
+        <defs>
           {isCircle
-            ? <circle cx={geom.cx} cy={geom.cy} r={geom.r} fill="#fff"/>
-            : <rect x={geom.x0} y={geom.y0} width={geom.x1-geom.x0} height={geom.y1-geom.y0} fill="#fff" stroke="" strokeWidth={0.8}/>}
+            ? <clipPath id="venueClip"><circle cx={geom.cx} cy={geom.cy} r={geom.r} /></clipPath>
+            : <clipPath id="venueClip"><rect x={geom.x0} y={geom.y0} width={geom.x1-geom.x0} height={geom.y1-geom.y0} rx={1.2} ry={1.2}/></clipPath>}
+          <pattern id="exitHatch" width="4" height="4" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+            <rect width="2" height="4" fill="rgba(244,63,94,0.12)" />
+          </pattern>
+        </defs>
+
+        {isCircle
+          ? <circle cx={geom.cx} cy={geom.cy} r={geom.r} fill="#fff"/>
+          : <rect x={geom.x0} y={geom.y0} width={geom.x1-geom.x0} height={geom.y1-geom.y0} fill="#fff" stroke="#e5e7eb" strokeWidth={0.8}/>}
 
         <g clipPath="url(#venueClip)">
           {/* rings - only for circular layouts */}
@@ -998,12 +1002,6 @@ const StadiumPlanSVG: React.FC<{
               </g>
             );
           })}
-
-          {/* grid - only for rectangular layouts */}
-          {!isCircle && (
-            <rect x={geom.x0} y={geom.y0} width={geom.x1-geom.x0} height={geom.y1-geom.y0}
-                  fill="none" stroke="#cbd5e1" strokeOpacity={0.35} strokeDasharray="2 2" strokeWidth={0.4}/>
-          )}
 
           {/* Section dividers - only for circular layouts */}
           {isCircle && sectionAngles.map((angle, i) => {
@@ -1040,73 +1038,73 @@ const StadiumPlanSVG: React.FC<{
           {/* Polygons colored by congestion (visual only, NOT obstacles) */}
           {zones.map(z => {
             const pts = z.points.map(([x,y])=>`${x},${y}`).join(" ");
-            const fillBase = bandedColor(z.congestion);
+             const fillBase = bandedColor(z.congestion);
             const fillOpacity = 0.35 + (z.congestion/100)*0.25;
-            const strokeProps = isExitPhase
-              ? { stroke: "#7f1d1d", strokeOpacity: 0.35, strokeWidth: 0.35, strokeDasharray: "1.2 1" }
-              : { stroke: "#0b1220", strokeOpacity: 0.25, strokeWidth: 0.25 };
-            return (
+             const strokeProps = isExitPhase
+               ? { stroke: "#7f1d1d", strokeOpacity: 0.35, strokeWidth: 0.35, strokeDasharray: "1.2 1" }
+               : { stroke: "#0b1220", strokeOpacity: 0.25, strokeWidth: 0.25 };
+             return (
               <g
                 key={z.id}
-                onMouseEnter={() => setHoverInfo({ name: z.name, congestion: z.congestion })}
-                onMouseMove={() => setHoverInfo({ name: z.name, congestion: z.congestion })}
-                onMouseLeave={() => setHoverInfo(null)}
-                style={{ cursor: "pointer" }}
+                   onMouseEnter={() => setHoverInfo({ name: z.name, congestion: z.congestion })}
+                   onMouseMove={() => setHoverInfo({ name: z.name, congestion: z.congestion })}
+                   onMouseLeave={() => setHoverInfo(null)}
+                   style={{ cursor: "pointer" }}
               >
                 <polygon points={pts} fill={fillBase} opacity={fillOpacity} {...strokeProps} />
-                {isExitPhase ? <polygon points={pts} fill="url(#exitHatch)" opacity={0.9} pointerEvents="none" /> : null}
-              </g>
-            );
-          })}
+                 {isExitPhase ? <polygon points={pts} fill="url(#exitHatch)" opacity={0.9} pointerEvents="none" /> : null}
+               </g>
+             );
+           })}
 
           {/* toilets */}
           {(plan.toiletsList ?? []).map((t, i) => (
             <g key={t.id}
-               onMouseEnter={() => setHoverInfo({ name: t.label ?? t.id, congestion: toiletCongestions[i] ?? 0 })}
-               onMouseMove={() => setHoverInfo({ name: t.label ?? t.id, congestion: toiletCongestions[i] ?? 0 })}
+                 onMouseEnter={() => setHoverInfo({ name: t.label ?? t.id, congestion: toiletCongestions[i] ?? 0 })}
+                 onMouseMove={() => setHoverInfo({ name: t.label ?? t.id, congestion: toiletCongestions[i] ?? 0 })}
                onMouseLeave={() => setHoverInfo(null)} style={{ cursor: "pointer" }}>
-              <circle
-                cx={t.position[0]}
-                cy={t.position[1]}
+                 <circle
+                   cx={t.position[0]}
+                   cy={t.position[1]}
                 r={2.0}
-                fill="none"
-                stroke={bandedColor(toiletCongestions[i])}
-                strokeWidth={0.5}
-                opacity={0.9}
-              >
+                   fill="none"
+                   stroke={bandedColor(toiletCongestions[i])}
+                   strokeWidth={0.5}
+                   opacity={0.9}
+                 >
                 <animate attributeName="r" values="2;3;2" dur="2.6s" repeatCount="indefinite" />
                 <animate attributeName="stroke-opacity" values="0.6;1;0.6" dur="2.6s" repeatCount="indefinite" />
-              </circle>
-              <text x={t.position[0]} y={t.position[1]} fontSize={3} textAnchor="middle" dominantBaseline="central">🚻</text>
-            </g>
+                 </circle>
+                 <text x={t.position[0]} y={t.position[1]} fontSize={3} textAnchor="middle" dominantBaseline="central">🚻</text>
+               </g>
           ))}
 
           {/* walkers */}
-          <g>
+           <g>
             {walkers.map(w => (
               <circle key={w.id} cx={w.x} cy={w.y} r={0.55} fill={w.phase==="exits" ? "#ef4444" : "#2563eb"} opacity={0.95} />
-            ))}
-          </g>
-        </g>
+             ))}
+           </g>
+         </g>
 
-        {/* exits pins + current loads */}
-        {(plan.exitsList ?? []).map((e) => {
+         {/* exits pins + current loads */}
+         {(plan.exitsList ?? []).map((e) => {
           const key = normalizeGateKey((e.name?.match(/\b(\w+)\b$/)?.[1] ?? e.id) as string);
           const ppl = gateLoads[key] ?? 0;
 
-          const dotFill = isExitPhase ? "#ef4444" : "#10b981";
-          return (
-            <g key={e.id}>
-              <circle cx={e.position[0]} cy={e.position[1]} r={0.95} fill={dotFill} stroke="#0b1220" strokeOpacity={0.25} strokeWidth={0.2} />
-              <g transform={`translate(${e.position[0] + 1.8}, ${e.position[1] - 1.8})`}>
-                <rect rx={0.8} ry={0.8} width={12} height={4} fill="#111827" opacity={0.85} />
+           const dotFill = isExitPhase ? "#ef4444" : "#10b981";
+           return (
+             <g key={e.id}>
+               <circle cx={e.position[0]} cy={e.position[1]} r={0.95} fill={dotFill} stroke="#0b1220" strokeOpacity={0.25} strokeWidth={0.2} />
+               <g transform={`translate(${e.position[0] + 1.8}, ${e.position[1] - 1.8})`}>
+                 <rect rx={0.8} ry={0.8} width={12} height={4} fill="#111827" opacity={0.85} />
                 <text x={6} y={2.6} textAnchor="middle" fontSize={1.8} fill="#f9fafb">{Math.round(ppl).toLocaleString()}</text>
-              </g>
-            </g>
-          );
-        })}
-      </svg>
-
+               </g>
+             </g>
+           );
+         })}
+       </svg>
+ 
       {/* unified hover tooltip */}
       {hoverInfo ? (
         <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-[48%] bg-white/90 backdrop-blur rounded-lg px-3 py-2 text-sm shadow">
@@ -1118,8 +1116,8 @@ const StadiumPlanSVG: React.FC<{
         </div>
       ) : null}
     </div>
-  );
-};
+   );
+ };
 
 /* ========= Dummy plan (updated to match forecast data) ========= */
 const DUMMY_PLAN: StadiumMapJSON = {
