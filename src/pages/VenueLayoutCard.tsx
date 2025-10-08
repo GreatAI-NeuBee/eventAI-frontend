@@ -601,7 +601,9 @@ export const VenueLayoutCard: React.FC<{ event: EventData | null }> = ({ event }
 
   const forecast: InOutForecast = useMemo(() => {
     const raw = (event as any)?.forecastResult;
-    return coerceForecast(raw, DUMMY_FORECAST);
+    // Use empty forecast instead of dummy data
+    const emptyForecast: InOutForecast = { arrivals: {}, exits: {} };
+    return coerceForecast(raw, emptyForecast);
   }, [event]);
 
   const frames = useMemo(() => buildFramesFromForecast(plan, forecast), [plan, forecast]);

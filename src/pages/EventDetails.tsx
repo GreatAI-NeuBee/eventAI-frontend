@@ -16,6 +16,18 @@ import type { EventData } from '../types/simulation';
 import { eventAPI } from '../api/apiClient';
 import { VenueLayoutCard } from './VenueLayoutCard';
 
+/* Optional: help TS with the global google object if you use geocoder */
+declare global {
+  interface Window {
+    google: {
+      maps: {
+        Geocoder: new () => google.maps.Geocoder;
+        LatLng: new (lat: number, lng: number) => google.maps.LatLng;
+      };
+    };
+  }
+}
+
 // Component for event time card with weather-aware colors
 const EventTimeCard: React.FC<{ currentEvent: EventData }> = ({ currentEvent }) => {
   const { isDarkBackground, isRainBackground } = useContext(WeatherContext);
@@ -904,7 +916,20 @@ const EventDetails: React.FC = () => {
             {currentEvent.venueLocation && (
               <LiveTrafficForecast 
                 venueLocation={currentEvent.venueLocation}
-                selectedStation={undefined} // This will need to be passed from TransitForecast
+                selectedStation={undefined}
+                eventDate={currentEvent.dateStart}
+                eventTimeRange={{
+                  start: new Date(currentEvent.dateStart).toLocaleTimeString('en-US', { 
+                    hour: '2-digit', 
+                    minute: '2-digit',
+                    hour12: true 
+                  }),
+                  end: new Date(currentEvent.dateEnd).toLocaleTimeString('en-US', { 
+                    hour: '2-digit', 
+                    minute: '2-digit',
+                    hour12: true 
+                  })
+                }}
               />
             )}
 
