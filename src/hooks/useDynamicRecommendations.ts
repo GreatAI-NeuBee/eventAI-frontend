@@ -32,7 +32,7 @@ export const useDynamicRecommendations = ({
 
     console.log('Generating dynamic recommendations for:', simulationResult);
     const dynamicRecommendations: DynamicRecommendation[] = [];
-    const { crowdDensity, hotspots } = simulationResult;
+    const { crowdDensity } = simulationResult;
 
     // Get the latest density data for each location
     const latestDensities = crowdDensity.reduce((acc, data) => {
@@ -105,21 +105,6 @@ export const useDynamicRecommendations = ({
       }
     });
 
-    // Analyze hotspots for additional recommendations
-    hotspots.forEach((hotspot, index) => {
-      if (hotspot.intensity > 0.8) {
-        dynamicRecommendations.push({
-          id: `hotspot-${index}`,
-          type: 'warning',
-          title: `Hotspot Detected: ${hotspot.location}`,
-          description: `High-intensity crowd concentration detected at ${hotspot.location} with ${Math.round(hotspot.intensity * 100)}% intensity.`,
-          priority: 'high',
-          action: 'Deploy Crowd Management Team',
-          location: hotspot.location,
-          density: hotspot.intensity
-        });
-      }
-    });
 
     // Analyze trends for predictive recommendations
     const locations = [...new Set(crowdDensity.map(d => d.location))];

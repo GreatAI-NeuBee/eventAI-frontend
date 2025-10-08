@@ -9,7 +9,7 @@ const ApiStatus: React.FC<ApiStatusProps> = ({ className = "" }) => {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [apiStatus, setApiStatus] = useState<'checking' | 'online' | 'offline'>('checking');
 
-  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api/v1';
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://eventbuddy-api.munymunyhom.tech/api/v1';
 
   useEffect(() => {
     const checkApiStatus = async () => {
@@ -18,7 +18,7 @@ const ApiStatus: React.FC<ApiStatusProps> = ({ className = "" }) => {
         const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
 
         // Use the health endpoint at the server root, not API base URL
-        const response = await fetch(`http://localhost:3000/health`, {
+        const response = await fetch(`https://eventbuddy-api.munymunyhom.tech/health`, {
           signal: controller.signal,
           method: 'GET',
         });

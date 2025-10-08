@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useContext } from 'react';
+import React, { useEffect, useMemo, useRef, useState, useContext } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { AlertTriangle, TrendingUp, Calendar, MapPin, Play, FileDown } from 'lucide-react';
 import GlassCard from '../components/common/GlassCard';
@@ -6,7 +6,7 @@ import Button from '../components/common/Button';
 import Spinner from '../components/common/Spinner';
 import WeatherBackground, { WeatherContext } from '../components/common/WeatherBackground';
 import VenueMap from '../components/dashboard/VenueMap';
-import TransitForecast from '../components/dashboard/TransitForecast';
+import LiveTrafficForecast from '../components/dashboard/LiveTrafficForecast';
 import ParkingForecast from '../components/dashboard/ParkingForecast';
 import VenueLayoutEditor, { VenueLayoutEditorData } from '../components/venue/VenueLayoutEditor';
 import PopularityInsights from '../components/event/PopularityInsights';
@@ -261,132 +261,111 @@ const EventDetails: React.FC = () => {
   // Helper for section header colors
   const getSectionHeaderColor = () => (isDarkBackground || isRainBackground) ? 'text-white' : 'text-gray-900';
 
-  // Helper function to extract gates from venue layout
-  const extractGatesFromVenueLayout = (venueLayout: any): { gates: string[], gates_crowd: number[] } => {
-    const gates: string[] = [];
-    const gates_crowd: number[] = [];
-    
-    if (!venueLayout) {
-      console.warn('No venue layout provided for gate extraction');
-      return { gates, gates_crowd };
-    }
 
-    // Extract exits (represented as A, B, C, D, E - max 5)
-    if (venueLayout.exitsList && Array.isArray(venueLayout.exitsList)) {
-      const exitCount = Math.min(venueLayout.exitsList.length, 5); // Max 5 exits
-      const exitLetters = ['A', 'B', 'C', 'D', 'E'];
-      
-      for (let i = 0; i < exitCount; i++) {
-        gates.push(exitLetters[i]);
-        // Get capacity from exitsList, default to 800 if not specified
-        const capacity = venueLayout.exitsList[i]?.capacity || 800;
-        gates_crowd.push(capacity);
-      }
-      
-      console.log(`🚪 Extracted ${exitCount} exit gates:`, gates.slice(0, exitCount));
-      console.log(`🚪 Exit capacities:`, gates_crowd.slice(0, exitCount));
-    }
-
-    // Extract toilets (represented as 1, 2 - max 2)
-    if (venueLayout.toiletsList && Array.isArray(venueLayout.toiletsList)) {
-      const toiletCount = Math.min(venueLayout.toiletsList.length, 2); // Max 2 toilets
-      
-      for (let i = 1; i <= toiletCount; i++) {
-        gates.push(i.toString());
-        // Get capacity from toiletsList, default to 50 if not specified
-        const capacity = venueLayout.toiletsList[i-1]?.capacity || 50;
-        gates_crowd.push(capacity);
-      }
-      
-      console.log(`🚽 Extracted ${toiletCount} toilet gates:`, gates.slice(-toiletCount));
-      console.log(`🚽 Toilet capacities:`, gates_crowd.slice(-toiletCount));
-    }
-
-    console.log('🎯 Total gates extracted:', gates);
-    console.log('🎯 Total gate capacities:', gates_crowd);
-    return { gates, gates_crowd };
-  };
-
-  // Helper function to get venue location with coordinates
-  const getVenueLocationWithCoordinates = async (eventData: any) => {
-    // If venueLocation already has coordinates, return it
-    if (eventData.venueLocation && eventData.venueLocation.lat && eventData.venueLocation.lng) {
-      return eventData.venueLocation;
-    }
-
-    // If we have a venue string, try to geocode it
-    const venueString = eventData.venue || eventData.venueLocation?.name || eventData.venueLocation?.address;
-    if (venueString) {
-      // Wait for Google Maps to load
-      let retries = 0;
-      const maxRetries = 10;
-      while (retries < maxRetries && (!window.google || !window.google.maps || !window.google.maps.Geocoder)) {
-        console.log(`⏳ Waiting for Google Maps to load... (attempt ${retries + 1}/${maxRetries})`);
-        await new Promise(resolve => setTimeout(resolve, 500));
-        retries++;
-      }
-
-      if (window.google && window.google.maps && window.google.maps.Geocoder) {
-        try {
-          const geocoder = new google.maps.Geocoder();
-          const result = await new Promise<google.maps.GeocoderResult[]>((resolve, reject) => {
-            geocoder.geocode({ address: venueString }, (results, status) => {
-              if (status === 'OK' && results && results.length > 0) {
-                resolve(results);
-              } else {
-                reject(new Error(`Geocoding failed: ${status}`));
-              }
-            });
-          });
-
-          const location = result[0].geometry.location;
-          const geocodedLocation = {
-            lat: location.lat(),
-            lng: location.lng(),
-            name: venueString,
-            address: result[0].formatted_address,
-          };
-          return geocodedLocation;
-        } catch (error) {
-          console.warn('⚠️ Geocoding failed:', error);
-        }
-      }
-    }
-
-    // Default fallback location (Kuala Lumpur city center)
-    const defaultLocation = {
-      lat: 3.139,
-      lng: 101.6869,
-      name: venueString || 'Event Venue',
-      address: venueString || 'Kuala Lumpur, Malaysia',
-    };
-    return defaultLocation;
-  };
-  
   const {
     currentEvent,
     events,
     setCurrentEvent,
-    simulationResult,
     isLoading,
     error,
   } = useEventStore();
 
   // Build the object the child expects from data you already have
-  const viewEvent = React.useMemo(
+  const viewEvent = useMemo(
     () => (currentEvent ? { ...currentEvent, forecastResult } : null),
     [currentEvent, forecastResult]
   );
 
+  // ---- Helpers ----
+  const extractGatesFromVenueLayout = (venueLayout: any): { gates: string[]; gates_crowd: number[] } => {
+    const gates: string[] = [];
+    const gates_crowd: number[] = [];
 
-  // Note: useSimulation and useDynamicRecommendations hooks removed as we're using direct forecast generation
+    if (!venueLayout) {
+      console.warn('No venue layout provided for gate extraction');
+      return { gates, gates_crowd };
+    }
 
-  // Note: Simulation monitoring removed as we're using forecast generation instead
+    // Exits A..E
+    if (venueLayout.exitsList && Array.isArray(venueLayout.exitsList)) {
+      const exitCount = Math.min(venueLayout.exitsList.length, 5);
+      const exitLetters = ['A', 'B', 'C', 'D', 'E'];
+      for (let i = 0; i < exitCount; i++) {
+        gates.push(exitLetters[i]);
+        const capacity = venueLayout.exitsList[i]?.capacity ?? 800;
+        gates_crowd.push(capacity);
+      }
+    }
 
-  // Fetch event details from API when component mounts or eventId changes
+    // Toilets 1..2
+    if (venueLayout.toiletsList && Array.isArray(venueLayout.toiletsList)) {
+      const toiletCount = Math.min(venueLayout.toiletsList.length, 2);
+      for (let i = 1; i <= toiletCount; i++) {
+        gates.push(i.toString());
+        const capacity = venueLayout.toiletsList[i - 1]?.capacity ?? 50;
+        gates_crowd.push(capacity);
+      }
+    }
+
+    return { gates, gates_crowd };
+  };
+
+  const getVenueLocationWithCoordinates = async (eventData: any) => {
+    if (eventData.venueLocation?.lat && eventData.venueLocation?.lng) {
+      return eventData.venueLocation;
+    }
+
+    const venueString =
+      eventData.venue || eventData.venueLocation?.name || eventData.venueLocation?.address;
+
+    if (venueString) {
+      // Wait for Google Maps to load
+      let retries = 0;
+      const maxRetries = 10;
+      while (
+        retries < maxRetries &&
+        (!window.google || !window.google.maps || !window.google.maps.Geocoder)
+      ) {
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        retries++;
+      }
+
+      if (window.google?.maps?.Geocoder) {
+        try {
+          const geocoder = new google.maps.Geocoder();
+          const results = await new Promise<google.maps.GeocoderResult[]>((resolve, reject) => {
+            geocoder.geocode({ address: venueString }, (res, status) => {
+              if (status === 'OK' && res && res.length > 0) resolve(res);
+              else reject(new Error(`Geocoding failed: ${status}`));
+            });
+          });
+
+          const loc = results[0].geometry.location;
+          return {
+            lat: loc.lat(),
+            lng: loc.lng(),
+            name: venueString,
+            address: results[0].formatted_address,
+          };
+        } catch (e) {
+          console.warn('Geocoding failed:', e);
+        }
+      } else {
+        console.warn('Google Maps not loaded after waiting');
+      }
+    }
+
+    return {
+      lat: 3.139,
+      lng: 101.6869,
+      name: venueString || 'Event Venue',
+      address: venueString || 'Kuala Lumpur, Malaysia',
+    };
+  };
+
+  // ---- Effects ----
   useEffect(() => {
     if (!eventId) {
-      console.warn('EventDetails: No event ID provided');
       navigate('/dashboard');
       return;
     }
@@ -398,19 +377,24 @@ const EventDetails: React.FC = () => {
         // Handle the backend response structure
         const eventData = response.data.data || response.data;
 
-        
-        // Transform backend event to frontend EventData format
         const transformedEvent: EventData = {
           id: eventData.eventId || eventData.id,
           name: eventData.name,
           dateStart: eventData.dateOfEventStart || eventData.dateStart,
           dateEnd: eventData.dateOfEventEnd || eventData.dateEnd,
-          venue: eventData.venue || eventData.venueLocation?.name || eventData.venueLocation?.address || 'Venue location',
+          venue:
+            eventData.venue ||
+            eventData.venueLocation?.name ||
+            eventData.venueLocation?.address ||
+            'Venue location',
           description: eventData.description || '',
           venueLocation: await getVenueLocationWithCoordinates(eventData),
           venueLayout: eventData.venueLayout,
           userEmail: eventData.userEmail,
-          status: eventData.status?.toLowerCase() === 'created' ? 'active' : (eventData.status?.toLowerCase() || 'completed') as EventData['status'],
+          status:
+            (eventData.status?.toLowerCase() === 'created'
+              ? 'active'
+              : (eventData.status?.toLowerCase() || 'completed')) as EventData['status'],
           createdAt: eventData.createdAt,
           attachmentUrls: eventData.attachmentUrls || [],
           attachmentFilenames: eventData.attachmentFilenames || [],
@@ -418,24 +402,19 @@ const EventDetails: React.FC = () => {
         };
         
         setCurrentEvent(transformedEvent);
-        
-        // Check if forecastResult exists (note: API returns 'forecastResult', not 'forecast_result')
+
         if (eventData.forecastResult) {
           setForecastResult(eventData.forecastResult);
-          
-          // Handle nested forecast structure - data might be under 'forecast' property
-          const forecastData = eventData.forecastResult.forecast || eventData.forecastResult;
-          
-          // Set simulation result in the store for components to use
-          if (forecastData.crowdDensity || forecastData.hotspots || forecastData.summary) {
+          const forecastData =
+            eventData.forecastResult.forecast || eventData.forecastResult;
+
+          if (forecastData.crowdDensity || forecastData.summary) {
             const simulationData = {
-              eventId: eventId,
+              eventId,
               crowdDensity: forecastData.crowdDensity || [],
-              hotspots: forecastData.hotspots || [],
               recommendations: forecastData.recommendations || [],
-              scenarios: forecastData.scenarios || { entry: {}, exit: {}, congestion: {} }
+              scenarios: forecastData.scenarios || { entry: {}, exit: {}, congestion: {} },
             };
-            // Update the simulation result in the store
             const { setSimulationResult } = useEventStore.getState();
             setSimulationResult(simulationData);
           }
@@ -461,81 +440,68 @@ const EventDetails: React.FC = () => {
     fetchEventDetails();
   }, [eventId, navigate, setCurrentEvent, events]);
 
-  // Handle back navigation
+  // ---- Handlers ----
   const handleBackToDashboard = () => {
-    // Reset monitoring when going back to dashboard
     monitoringEventId.current = null;
     setCurrentEvent(null);
     navigate('/dashboard');
   };
 
-  // Handle navigation to ongoing event
   const handleViewOngoingEvent = () => {
-    if (eventId) {
-      navigate(`/event/ongoing-event/${eventId}`);
-    }
+    if (eventId) navigate(`/event/ongoing-event/${eventId}`);
   };
 
-  // Handle forecast generation
   const handleGenerateForecast = async () => {
     if (!eventId || !currentEvent) return;
-    
+
     setIsForecastLoading(true);
     setForecastError(null);
-    
+
     try {
       
       // Extract gates and their capacities from venue layout
       const { gates, gates_crowd } = extractGatesFromVenueLayout(currentEvent.venueLayout);
-      
       if (gates.length === 0) {
-        throw new Error('No gates found in venue layout. Please configure exits and toilets in the venue layout.');
+        throw new Error(
+          'No gates found in venue layout. Please configure exits and toilets in the venue layout.'
+        );
       }
-      
-      // Prepare forecast request data
-      // Time gap logic: API provides forecast for pre-event and post-event periods
-      // During the actual event time (between schedule_start_time and event_end_time),
-      // event_capacity simulates late arrivals with a low fixed number
+
       const forecastRequestData = {
         eventid: eventId,
-        gates: gates,
-        gates_crowd: gates_crowd,
+        gates,
+        gates_crowd,
         schedule_start_time: currentEvent.dateStart,
         event_end_time: currentEvent.dateEnd,
-        event_capacity: 5, // Fixed low capacity for late arrivals during event
-        method_exits: "mirror_delay",
-        freq: "5min"
+        event_capacity: 5,
+        method_exits: 'mirror_delay',
+        freq: '5min',
       };
       
       
       const response = await eventAPI.generateForecast(forecastRequestData);
       const forecastData = response.data;
-      
-      // Enhanced forecast data with venue location for real Google Maps integration
+
       const enhancedForecastData = {
         ...forecastData,
-        venueLocation: currentEvent.venueLocation, // Include real venue location
+        venueLocation: currentEvent.venueLocation,
         eventDetails: {
           name: currentEvent.name,
           dateStart: currentEvent.dateStart,
           dateEnd: currentEvent.dateEnd,
-          venue: currentEvent.venue
-        }
+          venue: currentEvent.venue,
+        },
       };
-      
+
       setForecastResult(enhancedForecastData);
-      
-      // Set simulation result in the store for components to use
+
       const simulationData = {
-        eventId: eventId,
+        eventId,
         crowdDensity: forecastData.crowdDensity || [],
-        hotspots: forecastData.hotspots || [],
         recommendations: forecastData.recommendations || [],
         scenarios: forecastData.scenarios || { entry: {}, exit: {}, congestion: {} },
-        venueLocation: currentEvent.venueLocation // Add venue location to simulation data
+        venueLocation: currentEvent.venueLocation,
       };
-      
-      // Update the simulation result in the store
       const { setSimulationResult } = useEventStore.getState();
       setSimulationResult(simulationData);
       
@@ -609,20 +575,10 @@ const EventDetails: React.FC = () => {
   // Handle venue configuration save
   const handleVenueConfigSave = async (updatedConfig: VenueLayoutEditorData) => {
     try {
-      
-      // Here you could save the configuration to the backend
-      // For now, we'll just store it locally and show success feedback
-      console.log('💾 Venue configuration updated:', updatedConfig);
-      
-      // You could add an API call here to save the gate configuration:
+      console.log('Venue configuration updated:', updatedConfig);
       // await eventAPI.updateVenueConfig(eventId, updatedConfig);
-      
-      // Show success message (you could add a toast notification here)
-      console.log('✅ Venue configuration saved successfully');
-      
-    } catch (error) {
-      console.error('❌ Failed to save venue configuration:', error);
-      // You could show an error message here
+    } catch (e) {
+      console.error('Failed to save venue configuration:', e);
     }
   };
 
@@ -635,7 +591,6 @@ const EventDetails: React.FC = () => {
       active: { color: 'bg-emerald-100 text-emerald-800', label: 'Active' },
     };
 
-    // Fallback to 'completed' if status is not recognized
     const config = statusConfig[status] || statusConfig.completed;
     return (
       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${config.color}`}>
@@ -644,7 +599,7 @@ const EventDetails: React.FC = () => {
     );
   };
 
-  // Show loading state
+  // ---- Early returns ----
   if (isLoading || isLoadingEventDetails) {
     return (
       <WeatherBackground 
@@ -664,7 +619,6 @@ const EventDetails: React.FC = () => {
     );
   }
 
-  // Show authentication error if user is not logged in
   if (!user) {
     return (
       <WeatherBackground 
@@ -691,7 +645,6 @@ const EventDetails: React.FC = () => {
     );
   }
 
-  // Show error if no current event
   if (!currentEvent) {
     return (
       <WeatherBackground 
@@ -718,7 +671,24 @@ const EventDetails: React.FC = () => {
     );
   }
 
-  // Debug logging removed
+  // ---- Derived recommendations (no IIFE) ----
+  const recommendations: Array<{ title: string; description: string; action?: string; priority?: 'high' | 'medium' | 'low' }> =
+    (forecastResult?.recommendations?.length ? forecastResult.recommendations : [
+      {
+        title: 'Optimize Entry Flow',
+        description:
+          'Based on venue layout analysis, consider opening additional entry points 30 minutes before event start to reduce bottlenecks.',
+        action: 'Deploy staff to gates A and C',
+        priority: 'high',
+      },
+      {
+        title: 'Peak Time Management',
+        description:
+          'Expected high congestion between 2:30-3:00 PM. Prepare crowd control measures for main concourse areas.',
+        action: 'Station security at hotspot zones',
+        priority: 'medium',
+      },
+    ]) as any[];
 
   return (
     <WeatherBackground 
@@ -807,7 +777,6 @@ const EventDetails: React.FC = () => {
           )}
         </div>
       )}
-      
 
       {/* Main Dashboard Content - Only show if forecast exists */}
       {forecastResult && Object.keys(forecastResult).length > 0 && (
@@ -816,25 +785,15 @@ const EventDetails: React.FC = () => {
           <div className="xl:col-span-2 space-y-6">
             <GlassCard intensity="medium" blur="md">
               <h3 className={`text-lg font-semibold mb-4 ${getSectionHeaderColor()}`}>Crowd Density Simulation</h3>
-              {/* <SimulationChart
-                data={forecastResult?.crowdDensity || simulationResult?.crowdDensity || []}
-                title="Crowd Density Simulation"
-                onLocationSelect={setSelectedLocation}
-                selectedLocation={selectedLocation}
-              /> */}
-                <VenueLayoutCard event={viewEvent} />
-
+              <VenueLayoutCard event={viewEvent} />
             </GlassCard>
 
             <GlassCard intensity="medium" blur="md">
               <h3 className={`text-lg font-semibold mb-4 ${getSectionHeaderColor()}`}>Venue Layout</h3>
               <VenueMap
-                hotspots={forecastResult?.hotspots || simulationResult?.hotspots || []}
                 venueLocation={currentEvent.venueLocation}
               />
             </GlassCard>
-
-            
           </div>
 
           {/* Right Column - Recommendations and Forecasts */}
@@ -843,27 +802,6 @@ const EventDetails: React.FC = () => {
               <h3 className={`text-lg font-semibold mb-4 ${getSectionHeaderColor()}`}>AI Recommendations</h3>
               <div className="space-y-3">
                 {(() => {
-                  // Generate mock AI recommendations based on event data
-                  const mockRecommendations = [
-                    {
-                      title: "Optimize Entry Flow",
-                      description: "Based on venue layout analysis, consider opening additional entry points 30 minutes before event start to reduce bottlenecks.",
-                      action: "Deploy staff to gates A and C",
-                      priority: "high"
-                    },
-                    {
-                      title: "Peak Time Management",
-                      description: "Expected high congestion between 2:30-3:00 PM. Prepare crowd control measures for main concourse areas.",
-                      action: "Station security at hotspot zones",
-                      priority: "medium"
-                    },
-                  ];
-
-                  // Use API recommendations if available, otherwise use mock data
-                  const recommendations = (forecastResult?.recommendations?.length > 0) 
-                    ? forecastResult.recommendations 
-                    : mockRecommendations;
-
                   return recommendations.map((rec: any, index: number) => {
                     // Dynamic colors based on weather
                     const priorityColors = (isDarkBackground || isRainBackground) ? {
@@ -920,14 +858,17 @@ const EventDetails: React.FC = () => {
               </div>
             </GlassCard>
 
-        
-
-            {/* Transit and Parking Forecasts in Right Column */}
+            {/* Live Traffic Forecast */}
             {currentEvent.venueLocation && (
-              <div className="space-y-6">
-                <TransitForecast venueLocation={currentEvent.venueLocation} />
-                <ParkingForecast venueLocation={currentEvent.venueLocation} />
-              </div>
+              <LiveTrafficForecast 
+                venueLocation={currentEvent.venueLocation}
+                selectedStation={undefined} // This will need to be passed from TransitForecast
+              />
+            )}
+
+            {/* Parking Forecast */}
+            {currentEvent.venueLocation && (
+              <ParkingForecast venueLocation={currentEvent.venueLocation} />
             )}
           </div>
         </div>
@@ -945,3 +886,4 @@ const EventDetails: React.FC = () => {
 };
 
 export default EventDetails;
+

@@ -9,7 +9,7 @@ A React-based frontend application for intelligent crowd simulation and event pl
 - **Event Creation**: Create new events with capacity, date, venue details
 - **File Upload**: Upload ticketing data (CSV) and venue layouts (images/JSON)
 - **Real-time Simulation**: Monitor simulation processing with live status updates
-- **Interactive Dashboard**: View crowd density charts, venue hotspots, and scenario analysis
+- **Interactive Dashboard**: View crowd density charts and scenario analysis
 - **AI Recommendations**: Receive prioritized suggestions for crowd management
 - **Event History**: Track and manage past event simulations
 - **Responsive Design**: Modern, mobile-friendly interface built with Tailwind CSS
@@ -42,7 +42,7 @@ src/
 │   │   └── Spinner.tsx
 │   ├── dashboard/           # Dashboard-specific components
 │   │   ├── SimulationChart.tsx  # Crowd density over time (Recharts)
-│   │   ├── VenueMap.tsx         # Venue layout with hotspots
+│   │   ├── VenueMap.tsx         # Venue layout visualization
 │   │   ├── RecommendationCard.tsx # Actionable suggestions
 │   │   └── ScenarioTabs.tsx     # Entry, exit, congestion views
 │   └── layout/
@@ -104,7 +104,7 @@ src/
 
 3. **View Results** (`/dashboard`):
    - Interactive crowd density charts over time
-   - Venue map with predicted hotspots highlighted
+   - Venue layout visualization
    - Prioritized recommendations for crowd management
    - Scenario analysis (entry, exit, congestion)
 
@@ -139,7 +139,7 @@ The app expects a backend API with these endpoints:
 
 ### Environment Variables
 
-- `VITE_API_BASE_URL`: Backend API base URL (default: http://localhost:8000/api)
+- `VITE_API_BASE_URL`: Backend API base URL (default: https://eventbuddy-api.munymunyhom.tech/api/v1)
 
 ## 🧪 Development
 

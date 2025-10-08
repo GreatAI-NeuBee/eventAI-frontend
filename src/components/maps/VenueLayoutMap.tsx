@@ -28,24 +28,14 @@ interface NearbyPlace {
   occupied?: number; // Currently occupied spots
 }
 
-interface Hotspot {
-  x: number;
-  y: number;
-  intensity: number;
-  location: string;
-}
 
 interface VenueLayoutMapProps {
   venueLocation: LocationData;
-  hotspots?: Hotspot[];
-  showHotspots?: boolean;
   title?: string;
 }
 
 const VenueLayoutMap: React.FC<VenueLayoutMapProps> = ({
   venueLocation,
-  hotspots = [],
-  showHotspots = false,
   title = "Venue Layout & Nearby Parking"
 }) => {
   const [nearbyPlaces, setNearbyPlaces] = useState<NearbyPlace[]>([]);
@@ -546,18 +536,6 @@ const VenueLayoutMap: React.FC<VenueLayoutMapProps> = ({
     return '#64748b';
   };
 
-  // Convert hotspot coordinates to map coordinates
-  // const getHotspotMapPosition = (hotspot: Hotspot) => {
-  //   // Convert percentage-based coordinates to actual map coordinates
-  //   // This is a rough approximation - in a real app you'd need proper coordinate transformation
-  //   const latOffset = (hotspot.y - 50) * 0.001; // Convert to degrees
-  //   const lngOffset = (hotspot.x - 50) * 0.001;
-  //   
-  //   return {
-  //     lat: venueLocation.lat + latOffset,
-  //     lng: venueLocation.lng + lngOffset
-  //   };
-  // };
 
   if (!apiKey) {
     return (
@@ -613,18 +591,6 @@ const VenueLayoutMap: React.FC<VenueLayoutMapProps> = ({
             <Building className="h-4 w-4 mr-1" />
             Nearby
           </Button>
-          
-          {/* Test Button for Mock Data */}
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => {
-              console.log('Forcing mock data load...');
-              loadNearbyPlaces();
-            }}
-          >
-            Test
-          </Button>
         </div>
       </div>
 
@@ -639,29 +605,6 @@ const VenueLayoutMap: React.FC<VenueLayoutMapProps> = ({
         </div>
       </div>
 
-      {/* Legend */}
-      <div className="mb-4 flex flex-wrap gap-4 text-sm">
-        {showHotspots && hotspots.length > 0 && (
-          <>
-            <div className="flex items-center">
-              <div className="w-3 h-3 bg-red-500 rounded-full mr-2"></div>
-              <span>High Density (80%+)</span>
-            </div>
-            <div className="flex items-center">
-              <div className="w-3 h-3 bg-orange-500 rounded-full mr-2"></div>
-              <span>Medium-High (60-80%)</span>
-            </div>
-            <div className="flex items-center">
-              <div className="w-3 h-3 bg-yellow-500 rounded-full mr-2"></div>
-              <span>Medium (40-60%)</span>
-            </div>
-            <div className="flex items-center">
-              <div className="w-3 h-3 bg-green-500 rounded-full mr-2"></div>
-              <span>Low (&lt;40%)</span>
-            </div>
-          </>
-        )}
-      </div>
 
       {/* Map */}
       <div className="h-96 rounded-lg overflow-hidden border border-gray-200 mb-4">
@@ -913,7 +856,6 @@ const VenueLayoutMap: React.FC<VenueLayoutMapProps> = ({
         <p>
           📍 Interactive map showing venue location and surrounding area. 
           {showNearbyPlaces && ' Markers show nearby parking facilities important for event planning.'}
-          {showHotspots && hotspots.length > 0 && ' Colored circles indicate predicted crowd density areas.'}
         </p>
       </div>
     </Card>

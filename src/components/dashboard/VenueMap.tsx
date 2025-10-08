@@ -2,15 +2,7 @@ import React from 'react';
 import VenueLayoutMap from '../maps/VenueLayoutMap';
 import Card from '../common/Card';
 
-interface Hotspot {
-  x: number;
-  y: number;
-  intensity: number;
-  location: string;
-}
-
 interface VenueMapProps {
-  hotspots: Hotspot[];
   venueLocation?: {
     lat: number;
     lng: number;
@@ -23,63 +15,26 @@ interface VenueMapProps {
 }
 
 const VenueMap: React.FC<VenueMapProps> = ({ 
-  hotspots, 
   venueLocation,
   venueImage, 
-  title = 'Venue Layout & Predicted Hotspots' 
+  title = 'Venue Layout' 
 }) => {
   // If we have venue location data, use the new Google Maps layout
   if (venueLocation) {
     return (
       <VenueLayoutMap
         venueLocation={venueLocation}
-        hotspots={hotspots}
-        showHotspots={true}
         title={title}
       />
     );
   }
 
   // Fallback to original implementation for backward compatibility
-  // Get intensity color based on hotspot intensity
-  const getHotspotColor = (intensity: number) => {
-    if (intensity >= 0.8) return 'bg-red-500';
-    if (intensity >= 0.6) return 'bg-orange-500';
-    if (intensity >= 0.4) return 'bg-yellow-500';
-    return 'bg-green-500';
-  };
-
-  // Get hotspot size based on intensity
-  const getHotspotSize = (intensity: number) => {
-    if (intensity >= 0.8) return 'w-6 h-6';
-    if (intensity >= 0.6) return 'w-5 h-5';
-    if (intensity >= 0.4) return 'w-4 h-4';
-    return 'w-3 h-3';
-  };
 
   return (
     <Card>
       <h3 className="text-lg font-semibold text-gray-900 mb-4">{title}</h3>
       
-      {/* Legend */}
-      <div className="mb-4 flex flex-wrap gap-4 text-sm">
-        <div className="flex items-center">
-          <div className="w-3 h-3 bg-red-500 rounded-full mr-2"></div>
-          <span>High Density (80%+)</span>
-        </div>
-        <div className="flex items-center">
-          <div className="w-3 h-3 bg-orange-500 rounded-full mr-2"></div>
-          <span>Medium-High (60-80%)</span>
-        </div>
-        <div className="flex items-center">
-          <div className="w-3 h-3 bg-yellow-500 rounded-full mr-2"></div>
-          <span>Medium (40-60%)</span>
-        </div>
-        <div className="flex items-center">
-          <div className="w-3 h-3 bg-green-500 rounded-full mr-2"></div>
-          <span>Low (&lt;40%)</span>
-        </div>
-      </div>
 
       {/* Venue Map Container */}
       <div className="relative bg-gray-100 rounded-lg overflow-hidden" style={{ minHeight: '400px' }}>
@@ -104,47 +59,8 @@ const VenueMap: React.FC<VenueMapProps> = ({
           </div>
         )}
 
-        {/* Hotspots Overlay */}
-        {hotspots && hotspots.length > 0 && (
-          <div className="absolute inset-0">
-            {hotspots.map((hotspot, index) => (
-              <div
-                key={index}
-                className={`absolute transform -translate-x-1/2 -translate-y-1/2 rounded-full opacity-80 hover:opacity-100 transition-opacity cursor-pointer ${getHotspotColor(hotspot.intensity)} ${getHotspotSize(hotspot.intensity)}`}
-                style={{
-                  left: `${hotspot.x * 100}%`,
-                  top: `${hotspot.y * 100}%`,
-                }}
-                title={`${hotspot.location}: ${Math.round(hotspot.intensity * 100)}% density`}
-              >
-                {/* Pulse animation for high intensity hotspots */}
-                {hotspot.intensity >= 0.8 && (
-                  <div className={`absolute inset-0 rounded-full ${getHotspotColor(hotspot.intensity)} animate-ping opacity-50`}></div>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
       </div>
 
-      {/* Hotspots List */}
-      {hotspots && hotspots.length > 0 && (
-        <div className="mt-4">
-          <h4 className="text-sm font-medium text-gray-900 mb-2">Detected Hotspots</h4>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 text-sm">
-            {hotspots
-              .sort((a, b) => b.intensity - a.intensity)
-              .map((hotspot, index) => (
-                <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                  <span className="font-medium">{hotspot.location}</span>
-                  <span className={`px-2 py-1 rounded text-xs font-medium text-white ${getHotspotColor(hotspot.intensity)}`}>
-                    {Math.round(hotspot.intensity * 100)}%
-                  </span>
-                </div>
-              ))}
-          </div>
-        </div>
-      )}
     </Card>
   );
 };

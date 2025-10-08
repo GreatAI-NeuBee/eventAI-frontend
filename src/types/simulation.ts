@@ -5,12 +5,6 @@ interface SimulationResult {
     location: string;
     density: number;
   }[];
-  hotspots: {
-    x: number;
-    y: number;
-    intensity: number;
-    location: string;
-  }[];
   recommendations: {
     id: string;
     type: 'warning' | 'info' | 'success';

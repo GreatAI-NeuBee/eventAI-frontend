@@ -215,7 +215,7 @@ const NewEvent: React.FC = () => {
 
       let errorMessage = 'Failed to create event';
       if (error.response?.status === 404) {
-        errorMessage = 'API endpoint not found. Please check if the server is running at http://localhost:3000';
+        errorMessage = 'API endpoint not found. Please check if the server is running at https://eventbuddy-api.munymunyhom.tech';
       } else if (error.response?.status >= 500) {
         errorMessage = 'Server error occurred. Please try again later.';
       } else if (error.response?.data?.message) {

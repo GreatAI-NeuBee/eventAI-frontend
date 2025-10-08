@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // API Base URL
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api/v1';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://eventbuddy-api.munymunyhom.tech/api/v1';
 
 // Create axios instance with base configuration
 const apiClient = axios.create({
