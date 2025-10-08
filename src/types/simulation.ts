@@ -107,6 +107,8 @@ interface EventData {
   attachmentUrls?: string[]; // Array of attachment URLs
   attachmentFilenames?: string[]; // Array of attachment filenames (corresponds to URLs by index)
   popularityContent?: PopularityContent; // AI-analyzed popularity and crowd insights
+  predict_result?: any; // Live prediction data from the backend
+  forecast_result?: any; // Forecast prediction data from the backend
 }
 
 export type { SimulationResult, EventData, PopularityContent };

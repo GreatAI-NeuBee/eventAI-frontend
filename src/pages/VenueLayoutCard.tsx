@@ -1,12 +1,6 @@
-<<<<<<< HEAD
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import Card from "../components/common/Card";
-// Removed DUMMY_FORECAST import - using empty forecast instead
-=======
 import React, { useEffect, useMemo, useRef, useState, useContext } from "react";
 import { DUMMY_FORECAST } from "../data/DUMMY_FORECAST";
 import { WeatherContext } from "../components/common/WeatherBackground";
->>>>>>> f4742c83ccc323228b61ec4d9cb93f973680938e
 
 /* ========= Types ========= */
 type PctPoint = [number, number];

@@ -8,12 +8,6 @@ import WeatherBackground, { WeatherContext } from '../components/common/WeatherB
 import VenueMap from '../components/dashboard/VenueMap';
 import LiveTrafficForecast from '../components/dashboard/LiveTrafficForecast';
 import ParkingForecast from '../components/dashboard/ParkingForecast';
-<<<<<<< HEAD
-import WeatherWidget from '../components/dashboard/WeatherWidget';
-import GoogleTrafficGraph from '../components/dashboard/GoogleTrafficGraph';
-import EnhancedTrafficForecast from '../components/dashboard/EnhancedTrafficForecast';
-=======
->>>>>>> f4742c83ccc323228b61ec4d9cb93f973680938e
 import VenueLayoutEditor, { VenueLayoutEditorData } from '../components/venue/VenueLayoutEditor';
 import PopularityInsights from '../components/event/PopularityInsights';
 import { useEventStore } from '../store/eventStore';
@@ -22,7 +16,6 @@ import type { EventData } from '../types/simulation';
 import { eventAPI } from '../api/apiClient';
 import { VenueLayoutCard } from './VenueLayoutCard';
 
-<<<<<<< HEAD
 /* Optional: help TS with the global google object if you use geocoder */
 declare global {
   interface Window {
@@ -34,7 +27,7 @@ declare global {
     };
   }
 }
-=======
+
 // Component for event time card with weather-aware colors
 const EventTimeCard: React.FC<{ currentEvent: EventData }> = ({ currentEvent }) => {
   const { isDarkBackground, isRainBackground } = useContext(WeatherContext);
@@ -262,7 +255,6 @@ const EventHeader: React.FC<{
     </div>
   );
 };
->>>>>>> f4742c83ccc323228b61ec4d9cb93f973680938e
 
 const EventDetails: React.FC = () => {
   const { eventId } = useParams<{ eventId: string }>();
@@ -467,8 +459,50 @@ const EventDetails: React.FC = () => {
     navigate('/dashboard');
   };
 
-  const handleViewOngoingEvent = () => {
-    if (eventId) navigate(`/event/ongoing-event/${eventId}`);
+  const handleViewOngoingEvent = async () => {
+    if (!eventId || !currentEvent) return;
+
+    try {
+      // Check if we're within the event time window
+      const now = new Date();
+      const eventStart = new Date(currentEvent.dateStart);
+      const eventEnd = new Date(currentEvent.dateEnd);
+      const isWithinEventTime = now >= eventStart && now <= eventEnd;
+
+      // If predict_result is null AND we're within event time, fetch predictions
+      if (!currentEvent.predict_result && isWithinEventTime) {
+        console.log('📡 Fetching live predictions for ongoing event...');
+        
+        try {
+          // Call the prediction API
+          const response = await eventAPI.getPrediction(eventId);
+          console.log('✅ Prediction API response:', response);
+          
+          // Update the current event with the new predict_result
+          // The backend should have updated the event, so we refetch it
+          const updatedEventResponse = await eventAPI.getEvent(eventId);
+          const updatedEvent = updatedEventResponse.data.data || updatedEventResponse.data;
+          
+          setCurrentEvent({
+            ...currentEvent,
+            predict_result: updatedEvent.predict_result || updatedEvent.predictResult,
+          });
+          
+          console.log('✅ Event updated with live predictions');
+        } catch (predictionError) {
+          console.error('❌ Failed to fetch predictions:', predictionError);
+          // Don't block navigation, just log the error
+          setForecastError('Failed to fetch live predictions. Displaying available data.');
+        }
+      }
+
+      // Navigate to ongoing event page
+      navigate(`/event/ongoing-event/${eventId}`);
+    } catch (error) {
+      console.error('Error in handleViewOngoingEvent:', error);
+      // Still navigate even if there's an error
+      navigate(`/event/ongoing-event/${eventId}`);
+    }
   };
 
   const handleGenerateForecast = async () => {
@@ -800,51 +834,6 @@ const EventDetails: React.FC = () => {
 
       {/* Main Dashboard Content - Only show if forecast exists */}
       {forecastResult && Object.keys(forecastResult).length > 0 && (
-<<<<<<< HEAD
-        <div className="space-y-8">
-          <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-            {/* Left Column */}
-            <div className="xl:col-span-2 space-y-6">
-              {/* Enhanced Traffic Forecast - New comprehensive traffic analysis */}
-              {currentEvent.venueLocation && (
-                <EnhancedTrafficForecast 
-                  venueLocation={currentEvent.venueLocation}
-                  eventDate={currentEvent.dateStart}
-                  eventTimeRange={{
-                    start: new Date(currentEvent.dateStart).toLocaleTimeString('en-US', { 
-                      hour: '2-digit', 
-                      minute: '2-digit',
-                      hour12: true 
-                    }),
-                    end: new Date(currentEvent.dateEnd).toLocaleTimeString('en-US', { 
-                      hour: '2-digit', 
-                      minute: '2-digit',
-                      hour12: true 
-                    })
-                  }}
-                />
-              )}
-
-              {/* Google Traffic Graph - Detailed traffic analysis */}
-              {currentEvent.venueLocation && (
-                <GoogleTrafficGraph 
-                  venueLocation={currentEvent.venueLocation}
-                  eventDate={currentEvent.dateStart}
-                  eventTimeRange={{
-                    start: new Date(currentEvent.dateStart).toLocaleTimeString('en-US', { 
-                      hour: '2-digit', 
-                      minute: '2-digit',
-                      hour12: true 
-                    }),
-                    end: new Date(currentEvent.dateEnd).toLocaleTimeString('en-US', { 
-                      hour: '2-digit', 
-                      minute: '2-digit',
-                      hour12: true 
-                    })
-                  }}
-                />
-              )}
-=======
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
           {/* Left Column - Simulation Chart and Venue Map */}
           <div className="xl:col-span-2 space-y-6">
@@ -852,7 +841,6 @@ const EventDetails: React.FC = () => {
               <h3 className={`text-lg font-semibold mb-4 ${getSectionHeaderColor()}`}>Crowd Density Simulation</h3>
               <VenueLayoutCard event={viewEvent} />
             </GlassCard>
->>>>>>> f4742c83ccc323228b61ec4d9cb93f973680938e
 
             <GlassCard intensity="medium" blur="md">
               <h3 className={`text-lg font-semibold mb-4 ${getSectionHeaderColor()}`}>Venue Layout</h3>
@@ -928,7 +916,20 @@ const EventDetails: React.FC = () => {
             {currentEvent.venueLocation && (
               <LiveTrafficForecast 
                 venueLocation={currentEvent.venueLocation}
-                selectedStation={undefined} // This will need to be passed from TransitForecast
+                selectedStation={undefined}
+                eventDate={currentEvent.dateStart}
+                eventTimeRange={{
+                  start: new Date(currentEvent.dateStart).toLocaleTimeString('en-US', { 
+                    hour: '2-digit', 
+                    minute: '2-digit',
+                    hour12: true 
+                  }),
+                  end: new Date(currentEvent.dateEnd).toLocaleTimeString('en-US', { 
+                    hour: '2-digit', 
+                    minute: '2-digit',
+                    hour12: true 
+                  })
+                }}
               />
             )}
 

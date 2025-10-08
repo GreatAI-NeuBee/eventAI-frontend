@@ -22,14 +22,10 @@ interface LiveTrafficForecastProps {
 }
 
 const LiveTrafficForecast: React.FC<LiveTrafficForecastProps> = ({
-<<<<<<< HEAD
   venueLocation,
   selectedStation,
   eventDate,
   eventTimeRange
-=======
-  selectedStation
->>>>>>> f4742c83ccc323228b61ec4d9cb93f973680938e
 }) => {
   const [realTimeData, setRealTimeData] = useState<any>(null);
   const [, setLastUpdated] = useState<Date>(new Date());
@@ -120,15 +116,14 @@ const LiveTrafficForecast: React.FC<LiveTrafficForecastProps> = ({
 
   // Auto-fetch traffic data when component mounts
   useEffect(() => {
-    if (venueLocation && selectedStation && !realTimeData) {
+    if (selectedStation && !realTimeData) {
       console.log('🚀 Auto-fetching live traffic forecast on component mount');
       fetchRealTimeTrafficData();
     }
-  }, [venueLocation, selectedStation, fetchRealTimeTrafficData]);
+  }, [selectedStation, fetchRealTimeTrafficData, realTimeData]);
 
-  if (!selectedStation) {
-    return null;
-  }
+  // Use venue location if no specific station is selected
+  const displayName = selectedStation?.name || venueLocation?.name || venueLocation?.address || 'Event Venue';
 
   return (
     <Card className="mb-6">
@@ -139,7 +134,7 @@ const LiveTrafficForecast: React.FC<LiveTrafficForecastProps> = ({
               Live Traffic Forecast
             </h3>
             <p className="text-sm text-gray-600">
-              Real-time traffic conditions and predictions for {selectedStation?.name}
+              Real-time traffic conditions and predictions for {displayName}
             </p>
           </div>
           {realTimeData && (

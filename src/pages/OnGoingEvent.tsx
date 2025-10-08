@@ -490,20 +490,25 @@ const OngoingEvent: React.FC = () => {
 
     const charts: any = {};
     
-    // NEW STRUCTURE: predictions array with single snapshot per gate
-    if (!predictResult.predictions || !Array.isArray(predictResult.predictions)) {
-      console.warn('⚠️ No predictions array found in predict_result');
+    // UPDATED STRUCTURE: Check for gate_* keys with timeFrames (preferred)
+    const predictGateKeys = Object.keys(predictResult).filter(key => key.startsWith('gate_'));
+    
+    if (predictGateKeys.length === 0) {
+      console.warn('⚠️ No gate_* keys found in predict_result');
       return null;
     }
 
-    console.log('📊 Processing', predictResult.predictions.length, 'gate predictions');
+    console.log('📊 Processing', predictGateKeys.length, 'gates with time-series data');
 
-    // Process each gate prediction
-    predictResult.predictions.forEach((prediction: any, index: number) => {
-      const gateId = prediction.gate_id; // e.g., "gate_1", "gate_2"
-      const gateNumber = gateId.replace('gate_', ''); // "1", "2", "3"
+    // Process each gate using gate_* keys
+    predictGateKeys.forEach((predictGateKey, index) => {
+      const gateNumber = predictGateKey.replace('gate_', ''); // "1", "2", "3"
       const gateName = `Gate ${gateNumber}`;
-      const zone = prediction.zone || prediction.metadata?.zone || `Zone ${String.fromCharCode(65 + index)}`;
+      const gateData = predictResult[predictGateKey];
+      
+      // Get zone name from predictions array if available
+      const predictionMeta = predictResult.predictions?.find((p: any) => p.gate_id === predictGateKey);
+      const zone = predictionMeta?.zone || predictionMeta?.metadata?.zone || `Zone ${String.fromCharCode(65 + index)}`;
 
       console.log(`📊 Processing ${gateName} (${zone})`);
 
@@ -513,15 +518,18 @@ const OngoingEvent: React.FC = () => {
         forecastTimeFrames = 
           forecastResult.forecast[gateNumber]?.timeFrames ||
           forecastResult.forecast[gateNumber.toUpperCase()]?.timeFrames ||
-          forecastResult.forecast[gateId]?.timeFrames ||
+          forecastResult.forecast[predictGateKey]?.timeFrames ||
           forecastResult.forecast[gateName]?.timeFrames ||
           [];
       }
 
-      console.log(`📊 ${gateName} - Forecast frames:`, forecastTimeFrames.length);
+      // Get predict time frames from the gate_* key
+      const predictTimeFrames = gateData.timeFrames || [];
 
-      if (forecastTimeFrames.length === 0) {
-        console.warn(`⚠️ No forecast data for ${gateName}`);
+      console.log(`📊 ${gateName} - Forecast frames:`, forecastTimeFrames.length, 'Predict frames:', predictTimeFrames.length);
+
+      if (forecastTimeFrames.length === 0 && predictTimeFrames.length === 0) {
+        console.warn(`⚠️ No data for ${gateName}`);
         return;
       }
 
@@ -530,7 +538,6 @@ const OngoingEvent: React.FC = () => {
 
       // Add all forecast data points (ensure non-negative values)
       // Convert UTC to Malaysia/Kuala Lumpur timezone (UTC+8)
-      // Ensure timestamp has 'Z' suffix for UTC, or add it if missing
       forecastTimeFrames.forEach((f: any) => {
         const forecastValue = f.predicted ?? f.congestion ?? f.density ?? 0;
         const utcTimestamp = f.timestamp.endsWith('Z') ? f.timestamp : `${f.timestamp}Z`;
@@ -546,20 +553,21 @@ const OngoingEvent: React.FC = () => {
         });
       });
 
-      // Add current live prediction as a single point (ensure non-negative)
+      // Add all predict/live time-series data points (ensure non-negative)
       // Convert UTC to Malaysia/Kuala Lumpur timezone (UTC+8)
-      // Ensure timestamp has 'Z' suffix for UTC, or add it if missing
-      const currentCount = Math.max(0, prediction.current_people_count ?? 0);
-      const utcTimestamp = prediction.timestamp.endsWith('Z') ? prediction.timestamp : `${prediction.timestamp}Z`;
-      allTimeFrames.push({
-        timestamp: new Date(utcTimestamp).toLocaleTimeString('en-MY', { 
-          hour: '2-digit', 
-          minute: '2-digit',
-          timeZone: 'Asia/Kuala_Lumpur'
-        }),
-        rawTimestamp: utcTimestamp,
-        forecasted: null,
-        actual: currentCount,
+      predictTimeFrames.forEach((p: any) => {
+        const actualValue = p.actual ?? p.predicted ?? p.congestion ?? p.density ?? 0;
+        const utcTimestamp = p.timestamp.endsWith('Z') ? p.timestamp : `${p.timestamp}Z`;
+        allTimeFrames.push({
+          timestamp: new Date(utcTimestamp).toLocaleTimeString('en-MY', { 
+            hour: '2-digit', 
+            minute: '2-digit',
+            timeZone: 'Asia/Kuala_Lumpur'
+          }),
+          rawTimestamp: utcTimestamp,
+          forecasted: null,
+          actual: Math.max(0, actualValue), // Ensure non-negative
+        });
       });
 
       // Sort by timestamp
@@ -569,13 +577,13 @@ const OngoingEvent: React.FC = () => {
         return timeA - timeB;
       });
 
-      const capacity = prediction.total_capacity || prediction.metadata?.total_capacity || 100;
+      const capacity = gateData.capacity || predictionMeta?.total_capacity || predictionMeta?.metadata?.total_capacity || 100;
 
       charts[gateName] = {
         capacity: capacity,
         zone: zone,
-        gateId: gateId,
-        currentData: prediction, // Store full prediction data for incidents
+        gateId: predictGateKey,
+        currentData: predictionMeta || { current_people_count: 0, risk_level: 'Low' }, // Store full prediction data for incidents
         labels: allTimeFrames.map((d: any) => d.timestamp),
         datasets: [
           {
