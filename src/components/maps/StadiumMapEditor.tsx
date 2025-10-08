@@ -12,7 +12,18 @@ import {
 // If you already have helpers, keep these imports.
 // (Not required by this component to function.)
 // import { addToilet } from "../../utils/toiletutils";
-import type { Toilet } from "../../utils/toiletutils";
+// import type { Toilet } from "../../utils/toiletutils";
+
+// Store types
+type StoreType = "toilet" | "snack" | "souvenir";
+
+type Store = {
+  id: string;
+  type: StoreType;
+  position: PctPoint;
+  label?: string;
+  fixtures?: number;
+};
 
 /* =========================
    Types
@@ -158,16 +169,21 @@ const StadiumMapEditor: React.FC<{
   // UI State
   const [layout, setLayout] = React.useState<LayoutMode>("circular");
 
-  // Per-layout toilets (so each layout’s toilets “stick” to that layout)
-  const [toiletsByLayout, setToiletsByLayout] = React.useState<
-    Record<LayoutMode, Toilet[]>
+  // Per-layout stores (so each layout's stores "stick" to that layout)
+  const [storesByLayout, setStoresByLayout] = React.useState<
+    Record<LayoutMode, Store[]>
   >({
     circular: [],
     rect: [],
     custom: [],
   });
-  const toilets = toiletsByLayout[layout]; // active list for current layout
-  const [, setHoverToiletId] = React.useState<string | null>(null);
+  const stores = storesByLayout[layout]; // active list for current layout
+  const [, setHoverStoreId] = React.useState<string | null>(null);
+
+  // Action ring state
+  const [actionRingCenter, setActionRingCenter] = React.useState<PctPoint | null>(null);
+  const [isDragging, setIsDragging] = React.useState(false);
+  const [dragStartAngle, setDragStartAngle] = React.useState<number | null>(null);
 
   // Circular config
   const [layers, setLayers] = React.useState<number>(
@@ -295,41 +311,65 @@ const StadiumMapEditor: React.FC<{
   const effectiveExits: EditorExit[] = exits;
 
   /* =========================
-     Toilets helpers
-     ========================= */
-  const setToiletsForLayout = (mode: LayoutMode, updater: (prev: Toilet[]) => Toilet[]) =>
-    setToiletsByLayout((prev) => ({
+      Stores helpers
+      ========================= */
+  const setStoresForLayout = (mode: LayoutMode, updater: (prev: Store[]) => Store[]) =>
+    setStoresByLayout((prev) => ({
       ...prev,
       [mode]: updater(prev[mode]),
     }));
 
-  const addToiletAt = (p: PctPoint) => {
-    // If you have a helper creator, you can call it here instead:
-    // const t = addToilet(p); // ensure your util returns {id, position, ...}
-    const t: Toilet = {
-      id: `wc-${Date.now()}`,
+  const addStoreAt = (p: PctPoint, type: StoreType) => {
+    const store: Store = {
+      id: `${type}-${Date.now()}`,
+      type,
       position: p,
-      label: `WC ${toilets.length + 1}`,
-      fixtures: 0,
+      fixtures: type === "toilet" ? 1 : 0,
     };
-    setToiletsForLayout(layout, (prev) => [...prev, t]);
+    setStoresForLayout(layout, (prev) => [...prev, store]);
   };
 
-  const removeToiletById = (id: string) => {
-    setToiletsForLayout(layout, (prev) => prev.filter((x) => x.id !== id));
+  const removeStoreById = (id: string) => {
+    setStoresForLayout(layout, (prev) => prev.filter((x) => x.id !== id));
   };
 
-  const findNearestToilet = (p: PctPoint, list: Toilet[]) => {
+  const findNearestStore = (p: PctPoint, list: Store[]) => {
     let best: { idx: number; dist2: number } | null = null;
     for (let i = 0; i < list.length; i++) {
-      const t = list[i];
-      const dx = t.position[0] - p[0];
-      const dy = t.position[1] - p[1];
+      const s = list[i];
+      const dx = s.position[0] - p[0];
+      const dy = s.position[1] - p[1];
       const d2 = dx * dx + dy * dy;
       if (best === null || d2 < best.dist2) best = { idx: i, dist2: d2 };
     }
     if (!best) return null;
     return Math.sqrt(best.dist2) <= TOILET_HIT_R ? list[best.idx] : null;
+  };
+
+  // Action ring helpers
+  const getStoreIcon = (type: StoreType): string => {
+    switch (type) {
+      case "toilet": return "🚻";
+      case "snack": return "🍽";
+      case "souvenir": return "🎁";
+      default: return "🏪";
+    }
+  };
+
+  const getAngleFromCenter = (center: PctPoint, point: PctPoint): number => {
+    const dx = point[0] - center[0];
+    const dy = point[1] - center[1];
+    return Math.atan2(dy, dx) * (180 / Math.PI);
+  };
+
+  const getStoreTypeFromAngle = (angle: number): StoreType => {
+    // Normalize angle to 0-360
+    const normalizedAngle = ((angle % 360) + 360) % 360;
+    
+    // Each store gets 120 degrees (360/3)
+    if (normalizedAngle >= 0 && normalizedAngle < 120) return "toilet";
+    if (normalizedAngle >= 120 && normalizedAngle < 240) return "snack";
+    return "souvenir";
   };
 
   // Export JSON
@@ -357,15 +397,15 @@ const StadiumMapEditor: React.FC<{
         position: e.position,
         capacity: e.capacity ?? EXIT_DEFAULT_CAP,
       })),
-      // ✅ Export toilets for the CURRENT layout
-      toiletsList: toilets.map((t) => ({
-        id: t.id,
-        position: t.position,
-        label: t.label,
-        fixtures: t.fixtures,
-      })),
+       // ✅ Export stores for the CURRENT layout
+       toiletsList: stores.map((s) => ({
+         id: s.id,
+         position: s.position,
+         label: s.label,
+         fixtures: s.fixtures,
+       })),
     };
-  }, [effectiveZones, effectiveExits, layers, layout, toilets]);
+  }, [effectiveZones, effectiveExits, layers, layout, stores]);
 
   React.useEffect(() => {
     onChange?.(exportJSON);
@@ -384,18 +424,23 @@ const StadiumMapEditor: React.FC<{
     return [x, y];
   };
 
-  /* ============ Interactions ============ */
-  const onCanvasClick = (evt: React.MouseEvent<SVGSVGElement>) => {
-    const p = toPct(evt);
-    if (!p) return;
+   /* ============ Interactions ============ */
+   const onCanvasClick = (evt: React.MouseEvent<SVGSVGElement>) => {
+     const p = toPct(evt);
+     if (!p) return;
 
-    // Toilets: toggle add/remove on click (per current layout)
-    if (tool === "add-toilet") {
-      const hit = findNearestToilet(p, toilets);
-      if (hit) removeToiletById(hit.id);
-      else addToiletAt(p);
-      return;
-    }
+     // Stores: show action ring on click
+     if (tool === "add-toilet") {
+       const hit = findNearestStore(p, stores);
+       if (hit) {
+         removeStoreById(hit.id);
+       } else {
+         setActionRingCenter(p);
+         setIsDragging(false);
+         setDragStartAngle(null);
+       }
+       return;
+     }
 
     // Exits
     if (tool === "add-exit") {
@@ -479,32 +524,57 @@ const StadiumMapEditor: React.FC<{
     dragStartRef.current = { id: zid, start: p };
   };
 
-  const onCanvasMouseMove = (evt: React.MouseEvent<SVGSVGElement>) => {
-    if (
-      !(
-        layout === "custom" &&
-        tool === "move" &&
-        draggingId &&
-        dragStartRef.current
-      )
-    )
-      return;
-    const p = toPct(evt);
-    if (!p) return;
-    const prev = dragStartRef.current.start;
-    const dx = p[0] - prev[0];
-    const dy = p[1] - prev[1];
-    setZones((zs) =>
-      zs.map((z) =>
-        z.id === draggingId
-          ? { ...z, points: z.points.map(([x, y]) => [x + dx, y + dy] as PctPoint) }
-          : z
-      )
-    );
-    dragStartRef.current = { id: draggingId, start: p };
-  };
+   const onCanvasMouseMove = (evt: React.MouseEvent<SVGSVGElement>) => {
+     const p = toPct(evt);
+     if (!p) return;
 
-  const onCanvasMouseUp = () => {
+     // Handle action ring dragging
+     if (actionRingCenter && tool === "add-toilet") {
+       if (!isDragging) {
+         setIsDragging(true);
+         const angle = getAngleFromCenter(actionRingCenter, p);
+         setDragStartAngle(angle);
+       }
+       return;
+     }
+
+     // Handle zone dragging
+     if (
+       layout === "custom" &&
+       tool === "move" &&
+       draggingId &&
+       dragStartRef.current
+     ) {
+       const prev = dragStartRef.current.start;
+       const dx = p[0] - prev[0];
+       const dy = p[1] - prev[1];
+       setZones((zs) =>
+         zs.map((z) =>
+           z.id === draggingId
+             ? { ...z, points: z.points.map(([x, y]) => [x + dx, y + dy] as PctPoint) }
+             : z
+         )
+       );
+       dragStartRef.current = { id: draggingId, start: p };
+     }
+   };
+
+  const onCanvasMouseUp = (evt: React.MouseEvent<SVGSVGElement>) => {
+    const p = toPct(evt);
+    
+    // Handle action ring store selection
+    if (actionRingCenter && tool === "add-toilet" && isDragging && p) {
+      const currentAngle = getAngleFromCenter(actionRingCenter, p);
+      const storeType = getStoreTypeFromAngle(currentAngle);
+      addStoreAt(actionRingCenter, storeType);
+      
+      // Reset action ring
+      setActionRingCenter(null);
+      setIsDragging(false);
+      setDragStartAngle(null);
+      return;
+    }
+    
     setDraggingId(null);
     dragStartRef.current = null;
   };
@@ -537,7 +607,10 @@ const StadiumMapEditor: React.FC<{
     setDraftPoints([]);
     setDraftName("");
     setTool("idle");
-    // keep toilets — they are per-layout and should persist by design
+    setActionRingCenter(null);
+    setIsDragging(false);
+    setDragStartAngle(null);
+    // keep stores — they are per-layout and should persist by design
   };
 
   React.useEffect(() => {
@@ -750,21 +823,21 @@ const StadiumMapEditor: React.FC<{
                 : "Add Exit"}
             </button>
 
-            <button
-              type="button"
-              onClick={() =>
-                setTool((t) => (t === "add-toilet" ? "idle" : "add-toilet"))
-              }
-              className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${
-                tool === "add-toilet"
-                  ? "bg-emerald-600 text-white cursor-pointer"
-                  : "bg-white text-gray-800 border border-gray-300 hover:bg-gray-50 cursor-pointer"
-              }`}
-              title="Click anywhere to place a toilet"
-            >
-              🚻
-              {tool === "add-toilet" ? "Placing Toilets" : "Add Toilet"}
-            </button>
+             <button
+               type="button"
+               onClick={() =>
+                 setTool((t) => (t === "add-toilet" ? "idle" : "add-toilet"))
+               }
+               className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${
+                 tool === "add-toilet"
+                   ? "bg-emerald-600 text-white cursor-pointer"
+                   : "bg-white text-gray-800 border border-gray-300 hover:bg-gray-50 cursor-pointer"
+               }`}
+               title="Click and drag to select store type (🚻🍽🎁)"
+             >
+               🏪
+               {tool === "add-toilet" ? "Placing Stores" : "Add Store"}
+             </button>
 
             <button
               type="button"
@@ -1024,26 +1097,87 @@ const StadiumMapEditor: React.FC<{
               </g>
             ))}
 
-            {/* ==== TOILETS (only show in circular) ==== */}
-            {layout === "circular" &&
-              toilets.map((t) => (
-                <g
-                  key={t.id}
-                  onMouseEnter={() => setHoverToiletId(t.id)}
-                  onMouseLeave={() => setHoverToiletId(null)}
-                  style={{ cursor: "pointer" }}
-                >
-                  <text
-                    x={t.position[0]}
-                    y={t.position[1]}
-                    fontSize={3.2}            // tweak size if you like
-                    textAnchor="middle"
-                    dominantBaseline="central"
-                  >
-                    {"🚻"}
-                  </text>
-                </g>
-              ))}
+             {/* ==== STORES ==== */}
+             {stores.map((s) => (
+               <g
+                 key={s.id}
+                 onMouseEnter={() => setHoverStoreId(s.id)}
+                 onMouseLeave={() => setHoverStoreId(null)}
+                 style={{ cursor: "pointer" }}
+               >
+                 <text
+                   x={s.position[0]}
+                   y={s.position[1]}
+                   fontSize={3.2}
+                   textAnchor="middle"
+                   dominantBaseline="central"
+                 >
+                   {getStoreIcon(s.type)}
+                 </text>
+               </g>
+             ))}
+
+             {/* ==== ACTION RING ==== */}
+             {actionRingCenter && tool === "add-toilet" && (
+               <g>
+                 {/* Action ring circle */}
+                 <circle
+                   cx={actionRingCenter[0]}
+                   cy={actionRingCenter[1]}
+                   r={8}
+                   fill="rgba(34, 197, 94, 0.1)"
+                   stroke="#22c55e"
+                   strokeWidth={1}
+                   strokeDasharray="2,2"
+                 />
+                 
+                 {/* Store type indicators */}
+                 {["toilet", "snack", "souvenir"].map((type, index) => {
+                   const angle = (index * 120) - 90; // Start from top (-90 degrees)
+                   const rad = (angle * Math.PI) / 180;
+                   const radius = 6;
+                   const x = actionRingCenter[0] + radius * Math.cos(rad);
+                   const y = actionRingCenter[1] + radius * Math.sin(rad);
+                   
+                   return (
+                     <g key={type}>
+                       {/* Background circle for better visibility */}
+                       <circle
+                         cx={x}
+                         cy={y}
+                         r={2.5}
+                         fill="white"
+                         stroke="#22c55e"
+                         strokeWidth={0.5}
+                       />
+                       {/* Store icon */}
+                       <text
+                         x={x}
+                         y={y}
+                         fontSize={2.5}
+                         textAnchor="middle"
+                         dominantBaseline="central"
+                       >
+                         {getStoreIcon(type as StoreType)}
+                       </text>
+                     </g>
+                   );
+                 })}
+                 
+                 {/* Drag indicator line */}
+                 {isDragging && dragStartAngle !== null && (
+                   <line
+                     x1={actionRingCenter[0]}
+                     y1={actionRingCenter[1]}
+                     x2={actionRingCenter[0] + 6 * Math.cos((dragStartAngle * Math.PI) / 180)}
+                     y2={actionRingCenter[1] + 6 * Math.sin((dragStartAngle * Math.PI) / 180)}
+                     stroke="#22c55e"
+                     strokeWidth={1}
+                     strokeDasharray="1,1"
+                   />
+                 )}
+               </g>
+             )}
 
             {/* Draft (custom) */}
             {layout === "custom" && draftPoints.length > 0 && (
@@ -1068,22 +1202,26 @@ const StadiumMapEditor: React.FC<{
               ))}
           </svg>
 
-          {/* Helper text */}
-          <div className="absolute bottom-3 left-3 text-xs text-gray-600 bg-white/90 backdrop-blur rounded-lg px-3 py-2 border border-gray-200 shadow-sm">
-            {layout === "custom"
-              ? tool === "add-rect"
-                ? "Click 'Confirm' to add a rectangle at the center, then use the Move tool to reposition it"
-                : tool === "draw-section"
-                ? "Click to add polygon vertices • Click 'Finish' when done"
-                : tool === "move"
-                ? "Click and drag to move shapes"
-                : tool === "add-exit"
-                ? "Click anywhere to place an exit"
-                : "Select a tool to begin editing"
-              : tool === "add-exit"
-              ? "Click on a highlighted spot to add/remove an exit"
-              : `${layout === "circular" ? "Circular" : "Rectangular"} layout • Adjust settings above`}
-          </div>
+           {/* Helper text */}
+           <div className="absolute bottom-3 left-3 text-xs text-gray-600 bg-white/90 backdrop-blur rounded-lg px-3 py-2 border border-gray-200 shadow-sm">
+             {layout === "custom"
+               ? tool === "add-rect"
+                 ? "Click 'Confirm' to add a rectangle at the center, then use the Move tool to reposition it"
+                 : tool === "draw-section"
+                 ? "Click to add polygon vertices • Click 'Finish' when done"
+                 : tool === "move"
+                 ? "Click and drag to move shapes"
+                 : tool === "add-exit"
+                 ? "Click anywhere to place an exit"
+                 : tool === "add-toilet"
+                 ? "Click to show store options, then drag to select store type"
+                 : "Select a tool to begin editing"
+               : tool === "add-exit"
+               ? "Click on a highlighted spot to add/remove an exit"
+               : tool === "add-toilet"
+               ? "Click to show store options, then drag to select store type"
+               : `${layout === "circular" ? "Circular" : "Rectangular"} layout • Adjust settings above`}
+           </div>
 
           {/* Stats overlay */}
           <div className="absolute top-3 right-3 text-xs text-gray-600 bg-white/90 backdrop-blur rounded-lg px-3 py-2 border border-gray-200 shadow-sm">
@@ -1094,12 +1232,8 @@ const StadiumMapEditor: React.FC<{
               <div>{exportJSON.layers}</div>
               <div className="font-medium">Exits:</div>
               <div>{exits.length}</div>
-              {layout === "circular" && (
-                <>
-                  <div className="font-medium">Toilets:</div>
-                  <div>{toilets.length}</div>
-                </>
-              )}
+               <div className="font-medium">Stores:</div>
+               <div>{stores.length}</div>
             </div>
           </div>
         </div>
