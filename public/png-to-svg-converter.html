@@ -265,6 +265,8 @@
           // Update preview with detected shapes
           updatePreview();
           
+          // Download button will be enabled by updateDownloadButton() in updatePreview()
+          
           if (detectedShapes.length > 0) {
             alert(`Auto-detected ${detectedShapes.length} shapes! You can now move and edit them.`);
           } else {
@@ -1063,6 +1065,7 @@
     $('#clearShapes').addEventListener('click', () => {
       shapes = [];
       updatePreview();
+      updateDownloadButton(); // Update download button state
     });
 
     // Re-detect shapes
@@ -1359,6 +1362,11 @@
       alert(`Applied adjustments: +${offsetX}px X, +${offsetY}px Y, ×${scaleFactor} scale`);
     });
 
+    // Check if download button should be enabled
+    function updateDownloadButton() {
+      downloadBtn.disabled = !(svgContent || shapes.length > 0);
+    }
+
     // Update preview with shapes
     function updatePreview() {
       if (!svgContent && !pngDataUrl) return;
@@ -1450,6 +1458,9 @@
 
       const updatedSvg = svgContent.replace('</svg>', shapesSvg + '</svg>');
       preview.innerHTML = updatedSvg;
+      
+      // Update download button state
+      updateDownloadButton();
     }
 
     // Select shape for editing
@@ -1508,10 +1519,23 @@
 
     // Download SVG
     downloadBtn.addEventListener('click', () => {
-      if (!svgContent) return;
+      if (!svgContent && shapes.length === 0) {
+        alert('Please upload a PNG file or add some shapes first');
+        return;
+      }
       
       let finalSvg = svgContent;
       let shapesSvg = '';
+      
+      // If no SVG content but we have shapes, create a basic SVG
+      if (!finalSvg && shapes.length > 0) {
+        const width = parseInt($('#canvasWidth').value) || 1000;
+        const height = parseInt($('#canvasHeight').value) || 625;
+        finalSvg = `<?xml version="1.0" encoding="UTF-8"?>
+<svg viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">
+  <rect width="${width}" height="${height}" fill="white" />
+</svg>`;
+      }
       
       shapes.forEach(shape => {
         let attrs = '';
@@ -1530,7 +1554,7 @@
         }
       });
 
-      finalSvg = svgContent.replace('</svg>', shapesSvg + '</svg>');
+      finalSvg = finalSvg.replace('</svg>', shapesSvg + '</svg>');
       
       const blob = new Blob([finalSvg], { type: 'image/svg+xml' });
       const url = URL.createObjectURL(blob);
