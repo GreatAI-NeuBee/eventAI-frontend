@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>SVG ViewBox Fixer</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root { color-scheme: light dark; }
+    body{font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;margin:0;background:#0b1220;color:#e7ecf3}
+    .wrap{max-width:900px;margin:0 auto;padding:32px}
+    .card{background:#111827;border:1px solid #1f2a3a;border-radius:14px;padding:20px;margin:20px 0}
+    label{display:block;margin:12px 0 6px;color:#b8c0cc}
+    .btn{display:inline-block;background:#7c5cff;color:white;text-decoration:none;padding:12px 16px;border-radius:10px;font-weight:700}
+    .btn:hover{opacity:.9}
+    input[type="file"]{display:block}
+    .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+    .muted{color:#9aa6b2;font-size:12px}
+    .preview{background:#0e1726;border:1px solid #1e293b;border-radius:12px;overflow:auto;padding:12px}
+    textarea{width:100%;min-height:140px;background:#0e1726;color:#e7ecf3;border:1px solid #1e293b;border-radius:10px;padding:10px}
+    .hidden-measure{position:fixed;left:-10000px;top:-10000px;opacity:0;pointer-events:none}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>SVG ViewBox Fixer</h1>
+    <p class="muted">Drop an SVG. We'll compute the content bounds, add a proper <code>viewBox</code>, remove hard <code>width/height</code>, and let you download.</p>
+
+    <div class="card">
+      <label>Upload SVG</label>
+      <input id="file" type="file" accept=".svg,image/svg+xml" />
+      <div class="row">
+        <label>Padding (px): <input id="pad" type="number" value="0" step="1" style="width:80px"/></label>
+        <label><input id="stripWH" type="checkbox" checked /> Remove width/height attributes</label>
+      </div>
+      <div class="row">
+        <button id="fix" class="btn" disabled>Fix viewBox</button>
+        <a id="download" class="btn" style="display:none" download="fixed.svg">Download fixed.svg</a>
+      </div>
+      <p class="muted">Tip: Your importer already normalizes coordinates, so we only need a correct <code>viewBox</code>. No scaling transforms are applied.</p>
+    </div>
+
+    <div class="card">
+      <h3 style="margin-top:0">Preview</h3>
+      <div id="preview" class="preview"></div>
+    </div>
+
+    <div class="card">
+      <h3 style="margin-top:0">Output Source</h3>
+      <textarea id="out" readonly></textarea>
+    </div>
+  </div>
+
+  <!-- offscreen container used for measurement -->
+  <div id="measureHost" class="hidden-measure"></div>
+
+  <script>
+    const $ = s => document.querySelector(s);
+    const fileEl = $('#file');
+    const fixBtn = $('#fix');
+    const dl = $('#download');
+    const out = $('#out');
+    const preview = $('#preview');
+    const measureHost = $('#measureHost');
+
+    let originalText = '';
+
+    fileEl.addEventListener('change', async (e) => {
+      const f = e.target.files?.[0];
+      resetUI();
+      if (!f) return;
+      if (!/\.svg$/i.test(f.name) && f.type !== 'image/svg+xml') {
+        alert('Please select an SVG file');
+        return;
+      }
+      originalText = await f.text();
+      preview.innerText = 'Loaded. Click "Fix viewBox".';
+      fixBtn.disabled = false;
+    });
+
+    fixBtn.addEventListener('click', () => {
+      try {
+        const padding = parseFloat($('#pad').value || '0') || 0;
+        const stripWH = $('#stripWH').checked;
+        const fixed = fixViewBox(originalText, { padding, stripWH });
+        out.value = fixed;
+        preview.innerHTML = fixed;
+        const blob = new Blob([fixed], { type: 'image/svg+xml' });
+        const url = URL.createObjectURL(blob);
+        dl.href = url;
+        dl.style.display = 'inline-block';
+      } catch (err) {
+        console.error(err);
+        alert('Failed to fix viewBox: ' + (err?.message || err));
+      }
+    });
+
+    function resetUI() {
+      fixBtn.disabled = true;
+      dl.style.display = 'none';
+      out.value = '';
+      preview.innerHTML = '';
+    }
+
+    function fixViewBox(svgText, { padding = 0, stripWH = true } = {}) {
+      // Parse into DOM
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(svgText, 'image/svg+xml');
+      const svg = doc.documentElement;
+
+      if (!svg || svg.tagName.toLowerCase() !== 'svg') {
+        throw new Error('Invalid SVG (no <svg> root)');
+      }
+
+      // If it already has a valid viewBox, we can still recompute/overwrite with content bounds
+      // (more robust for Canva exports that sometimes use huge artboards).
+      // 1) Mount in DOM to measure real bbox
+      const temp = document.createElement('div');
+      temp.innerHTML = new XMLSerializer().serializeToString(svg);
+      const mounted = temp.querySelector('svg');
+      measureHost.appendChild(mounted);
+
+      // Ensure it's renderable for measurement
+      mounted.setAttribute('width', mounted.getAttribute('width') || '1000');
+      mounted.setAttribute('height', mounted.getAttribute('height') || '1000');
+
+      // getBBox may throw if there's nothing, so guard
+      const bbox = mounted.getBBox ? mounted.getBBox() : { x: 0, y: 0, width: 0, height: 0 };
+
+      // Cleanup mount
+      measureHost.removeChild(mounted);
+
+      if (!isFinite(bbox.width) || !isFinite(bbox.height) || bbox.width === 0 || bbox.height === 0) {
+        // Fallback: if empty bbox, try to keep existing viewBox or bail
+        const existing = svg.getAttribute('viewBox');
+        if (existing) {
+          if (stripWH) {
+            svg.removeAttribute('width');
+            svg.removeAttribute('height');
+          }
+          return new XMLSerializer().serializeToString(svg);
+        }
+        throw new Error('Could not compute bounds; ensure the SVG has visible shapes.');
+      }
+
+      // 2) Apply padding
+      const x = bbox.x - padding;
+      const y = bbox.y - padding;
+      const w = bbox.width + padding * 2;
+      const h = bbox.height + padding * 2;
+
+      svg.setAttribute('viewBox', `${x} ${y} ${w} ${h}`);
+
+      if (stripWH) {
+        svg.removeAttribute('width');
+        svg.removeAttribute('height');
+      }
+
+      // Return serialized SVG
+      return new XMLSerializer().serializeToString(svg);
+    }
+  </script>
+</body>
+</html>

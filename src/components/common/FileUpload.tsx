@@ -1,7 +1,15 @@
-import React, { useState, useRef } from 'react';
-import { Upload, X, AlertCircle, CheckCircle, Loader } from 'lucide-react';
+import React, { useState, useRef, useContext } from 'react';
+import { Upload, X, AlertCircle, CheckCircle, Loader, FileText, File } from 'lucide-react';
 import Button from './Button';
-import { awsDirectService as awsService, FileUploadResult, ComprehendAnalysis } from '../../services/awsDirectService';
+import { eventAPI } from '../../api/apiClient';
+import { WeatherContext } from './WeatherBackground';
+
+interface FileUploadResult {
+  success: boolean;
+  fileUrl?: string;
+  fileName?: string;
+  error?: string;
+}
 
 interface FileUploadProps {
   onFileUploaded: (result: FileUploadResult) => void;
@@ -9,13 +17,17 @@ interface FileUploadProps {
   disabled?: boolean;
   maxFiles?: number;
   className?: string;
+  existingFiles?: {
+    urls: string[];
+    filenames: string[];
+  };
 }
 
 interface UploadingFile {
   id: string;
   file: File;
   progress: number;
-  status: 'uploading' | 'analyzing' | 'completed' | 'error';
+  status: 'uploading' | 'completed' | 'error';
   result?: FileUploadResult;
   error?: string;
 }
@@ -25,8 +37,10 @@ const FileUpload: React.FC<FileUploadProps> = ({
   eventId,
   disabled = false,
   maxFiles = 5,
-  className = ''
+  className = '',
+  existingFiles = { urls: [], filenames: [] }
 }) => {
+  const { isDarkBackground, isRainBackground } = useContext(WeatherContext);
   const [uploadingFiles, setUploadingFiles] = useState<UploadingFile[]>([]);
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -34,7 +48,15 @@ const FileUpload: React.FC<FileUploadProps> = ({
   const handleFileSelect = (files: FileList | null) => {
     if (!files || files.length === 0) return;
 
-    const selectedFiles = Array.from(files).slice(0, maxFiles - uploadingFiles.length);
+    const totalExistingFiles = existingFiles.urls.length + uploadingFiles.length;
+    const availableSlots = maxFiles - totalExistingFiles;
+    
+    if (availableSlots <= 0) {
+      alert(`Maximum ${maxFiles} files allowed. You already have ${totalExistingFiles} files.`);
+      return;
+    }
+
+    const selectedFiles = Array.from(files).slice(0, availableSlots);
     
     selectedFiles.forEach(file => {
       const uploadId = Date.now() + Math.random().toString(36).substr(2, 9);
@@ -56,47 +78,42 @@ const FileUpload: React.FC<FileUploadProps> = ({
 
   const uploadFile = async (uploadId: string, file: File) => {
     try {
-      const result = await awsService.uploadAndAnalyzeFile(
-        file,
-        eventId,
-        (progress) => {
-          setUploadingFiles(prev => prev.map(uf => 
-            uf.id === uploadId 
-              ? { 
-                  ...uf, 
-                  progress, 
-                  status: progress < 70 ? 'uploading' : 'analyzing' 
-                }
-              : uf
-          ));
-        }
-      );
+      // Call the backend API to upload the file
+      const response = await eventAPI.uploadEventAttachments(eventId, file);
+      
+      // Backend should return the file URLs and filename in the response
+      const result: FileUploadResult = {
+        success: true,
+        fileUrl: response.data.fileUrl || response.data.url, // Handle different response formats
+        fileName: response.data.fileName || response.data.filename || file.name, // Use backend filename if provided
+      };
 
-      // Update status
+      // Update status to completed
       setUploadingFiles(prev => prev.map(uf => 
         uf.id === uploadId 
           ? { 
               ...uf, 
               progress: 100, 
-              status: result.success ? 'completed' : 'error',
-              result,
-              error: result.error
+              status: 'completed',
+              result
             }
           : uf
       ));
 
       // Notify parent component
-      if (result.success) {
-        onFileUploaded(result);
-      }
+      onFileUploaded(result);
 
     } catch (error: any) {
+      console.error('File upload error:', error);
+      
+      const errorMessage = error.response?.data?.message || error.message || 'Upload failed';
+      
       setUploadingFiles(prev => prev.map(uf => 
         uf.id === uploadId 
           ? { 
               ...uf, 
               status: 'error',
-              error: error.message || 'Upload failed'
+              error: errorMessage
             }
           : uf
       ));
@@ -130,7 +147,6 @@ const FileUpload: React.FC<FileUploadProps> = ({
   const getStatusIcon = (status: UploadingFile['status']) => {
     switch (status) {
       case 'uploading':
-      case 'analyzing':
         return <Loader className="w-4 h-4 animate-spin text-blue-500" />;
       case 'completed':
         return <CheckCircle className="w-4 h-4 text-green-500" />;
@@ -143,13 +159,34 @@ const FileUpload: React.FC<FileUploadProps> = ({
     switch (uploadingFile.status) {
       case 'uploading':
         return `Uploading... ${uploadingFile.progress}%`;
-      case 'analyzing':
-        return 'Analyzing content...';
       case 'completed':
         return 'Upload completed';
       case 'error':
         return uploadingFile.error || 'Upload failed';
     }
+  };
+
+  // Simple file type icon function to replace AWS service dependency
+  const getFileTypeIcon = (fileType: string) => {
+    const type = fileType.toLowerCase();
+    if (type.includes('pdf')) {
+      return <FileText className="w-4 h-4 text-red-500" />;
+    } else if (type.includes('spreadsheet') || type.includes('excel') || type.includes('xlsx') || type.includes('xls')) {
+      return <FileText className="w-4 h-4 text-green-500" />;
+    } else if (type.includes('word') || type.includes('document') || type.includes('docx') || type.includes('doc')) {
+      return <FileText className="w-4 h-4 text-blue-500" />;
+    } else {
+      return <File className="w-4 h-4 text-gray-500" />;
+    }
+  };
+
+  // Simple file size formatter
+  const formatFileSize = (bytes: number): string => {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
   return (
@@ -179,14 +216,14 @@ const FileUpload: React.FC<FileUploadProps> = ({
           disabled={disabled}
         />
         
-        <Upload className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-        <h3 className="text-lg font-medium text-gray-900 mb-2">
+        <Upload className={`mx-auto h-12 w-12 mb-4 ${isDarkBackground || isRainBackground ? 'text-white/60' : 'text-gray-400'}`} />
+        <h3 className={`text-lg font-medium mb-2 ${isDarkBackground || isRainBackground ? 'text-white' : 'text-gray-900'}`}>
           Upload Event Documents
         </h3>
-        <p className="text-gray-600 mb-4">
+        <p className={`mb-4 ${isDarkBackground || isRainBackground ? 'text-white/80' : 'text-gray-600'}`}>
           Drag and drop files here, or click to select files
         </p>
-        <p className="text-sm text-gray-500">
+        <p className={`text-sm ${isDarkBackground || isRainBackground ? 'text-white/80' : 'text-gray-500'}`}>
           Supports: PDF, Excel, Word, Text files (max 10MB each)
         </p>
         
@@ -206,6 +243,9 @@ const FileUpload: React.FC<FileUploadProps> = ({
         )}
       </div>
 
+      {/* Existing Files List */}
+      
+
       {/* Uploading Files List */}
       {uploadingFiles.length > 0 && (
         <div className="space-y-2">
@@ -217,15 +257,25 @@ const FileUpload: React.FC<FileUploadProps> = ({
             >
               {/* File Icon */}
               <div className="flex-shrink-0">
-                {awsService.getFileTypeIcon(uploadingFile.file.type)}
+                {getFileTypeIcon(uploadingFile.file.type)}
               </div>
 
               {/* File Info */}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between">
-                  <p className="text-sm font-medium text-gray-900 truncate">
-                    {uploadingFile.file.name}
-                  </p>
+                  <div className="flex flex-col min-w-0">
+                    <p className="text-sm font-medium text-gray-900 truncate">
+                      {uploadingFile.status === 'completed' && uploadingFile.result?.fileName 
+                        ? uploadingFile.result.fileName 
+                        : uploadingFile.file.name}
+                    </p>
+                    {uploadingFile.status === 'completed' && uploadingFile.result?.fileName && 
+                     uploadingFile.result.fileName !== uploadingFile.file.name && (
+                      <p className="text-xs text-gray-500 truncate">
+                        Original: {uploadingFile.file.name}
+                      </p>
+                    )}
+                  </div>
                   <button
                     onClick={() => removeUploadingFile(uploadingFile.id)}
                     className="flex-shrink-0 text-gray-400 hover:text-gray-600"
@@ -240,12 +290,12 @@ const FileUpload: React.FC<FileUploadProps> = ({
                     {getStatusText(uploadingFile)}
                   </p>
                   <span className="text-xs text-gray-400">
-                    ({awsService.formatFileSize(uploadingFile.file.size)})
+                    ({formatFileSize(uploadingFile.file.size)})
                   </span>
                 </div>
 
                 {/* Progress Bar */}
-                {(uploadingFile.status === 'uploading' || uploadingFile.status === 'analyzing') && (
+                {uploadingFile.status === 'uploading' && (
                   <div className="w-full bg-gray-200 rounded-full h-1.5 mt-2">
                     <div
                       className="bg-blue-500 h-1.5 rounded-full transition-all duration-300"
@@ -254,12 +304,12 @@ const FileUpload: React.FC<FileUploadProps> = ({
                   </div>
                 )}
 
-                {/* Analysis Results Preview */}
-                {uploadingFile.status === 'completed' && uploadingFile.result?.analysisResult && (
-                  <div className="mt-2 p-2 bg-blue-50 rounded text-xs">
-                    <p className="text-blue-800 font-medium">Analysis Complete:</p>
-                    <p className="text-blue-700 mt-1">
-                      {(uploadingFile.result.analysisResult as ComprehendAnalysis).summary}
+                {/* Upload Success Message */}
+                {uploadingFile.status === 'completed' && uploadingFile.result?.fileUrl && (
+                  <div className="mt-2 p-2 bg-green-50 rounded text-xs">
+                    <p className="text-green-800 font-medium">✅ Upload Successful</p>
+                    <p className="text-green-700 mt-1 truncate">
+                      Saved as: {uploadingFile.result.fileName || 'Unknown filename'}
                     </p>
                   </div>
                 )}
@@ -269,12 +319,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
         </div>
       )}
 
-      {/* Upload Limits Info */}
-      {uploadingFiles.length > 0 && (
-        <div className="text-xs text-gray-500 text-center">
-          {uploadingFiles.length} / {maxFiles} files uploaded
-        </div>
-      )}
+      
     </div>
   );
 };

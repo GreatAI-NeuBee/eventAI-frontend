@@ -2,7 +2,7 @@
 import { UserService } from '../services/userService';
 
 export const testApiConnection = async () => {
-  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api/v1';
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://eventbuddy-api.munymunyhom.tech/api/v1';
   
   console.log('🔧 Testing API connection...');
   console.log('API Base URL:', API_BASE_URL);
@@ -10,7 +10,7 @@ export const testApiConnection = async () => {
   try {
     // Test health endpoint (at server root)
     console.log('Testing health endpoint...');
-    const healthResponse = await fetch('http://localhost:3000/health');
+    const healthResponse = await fetch('https://eventbuddy-api.munymunyhom.tech/health');
     console.log('Health check status:', healthResponse.status);
     
     if (healthResponse.ok) {
@@ -22,7 +22,7 @@ export const testApiConnection = async () => {
 
     // Test users endpoint (GET)
     console.log('Testing users GET endpoint...');
-    const usersResponse = await fetch('http://localhost:3000/api/v1/users');
+    const usersResponse = await fetch('https://eventbuddy-api.munymunyhom.tech/api/v1/users');
     console.log('Users GET status:', usersResponse.status);
     
     if (usersResponse.ok) {
@@ -49,7 +49,7 @@ export const testUserCreation = async () => {
 
   try {
     console.log('Testing direct fetch POST...');
-    const fetchResponse = await fetch('http://localhost:3000/api/v1/users', {
+    const fetchResponse = await fetch('https://eventbuddy-api.munymunyhom.tech/api/v1/users', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
