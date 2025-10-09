@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState, useContext } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { AlertTriangle, TrendingUp, Calendar, MapPin, Play, FileDown, Phone, Train } from 'lucide-react';
+import { AlertTriangle, TrendingUp, Calendar, MapPin, Play, FileDown, Phone, Train, BarChart3, Map, Settings, Lightbulb } from 'lucide-react';
 import GlassCard from '../components/common/GlassCard';
 import Button from '../components/common/Button';
 import Spinner from '../components/common/Spinner';
@@ -729,6 +729,7 @@ const EventDetails: React.FC = () => {
   const [forecastError, setForecastError] = useState<string | null>(null);
   const [isLoadingEventDetails, setIsLoadingEventDetails] = useState(true);
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
+  const [activeTab, setActiveTab] = useState<'overview' | 'insights' | 'logistics' | 'configuration'>('overview');
   
   // Ref to track if simulation monitoring is already started for this event
   const monitoringEventId = useRef<string | null>(null);
@@ -1312,147 +1313,222 @@ const EventDetails: React.FC = () => {
 
       {/* Main Dashboard Content - Only show if forecast exists */}
       {forecastResult && Object.keys(forecastResult).length > 0 && (
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-          {/* Left Column - Simulation Chart and Venue Map */}
-          <div className="xl:col-span-2 space-y-6">
-            <GlassCard intensity="medium" blur="md">
-              <h3 className={`text-lg font-semibold mb-4 ${getSectionHeaderColor()}`}>Crowd Density Simulation</h3>
-              <VenueLayoutCard event={viewEvent} />
-            </GlassCard>
+        <div className="space-y-6">
+          {/* Tabbed Interface */}
+          <GlassCard intensity="medium" blur="md">
+            {/* Tab Headers */}
+            <div className="flex space-x-1 border-b border-white/10 mb-6">
+              <button
+                onClick={() => setActiveTab('overview')}
+                className={`flex items-center gap-2 px-4 py-3 font-medium text-sm transition-all ${
+                  activeTab === 'overview'
+                    ? (isDarkBackground || isRainBackground)
+                      ? 'text-white border-b-2 border-blue-400 bg-blue-500/10'
+                      : 'text-blue-600 border-b-2 border-blue-600 bg-blue-50'
+                    : (isDarkBackground || isRainBackground)
+                      ? 'text-white/60 hover:text-white/80 hover:bg-white/5'
+                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                }`}
+              >
+                <BarChart3 className="h-4 w-4" />
+                Overview
+              </button>
+              
+              <button
+                onClick={() => setActiveTab('insights')}
+                className={`flex items-center gap-2 px-4 py-3 font-medium text-sm transition-all ${
+                  activeTab === 'insights'
+                    ? (isDarkBackground || isRainBackground)
+                      ? 'text-white border-b-2 border-blue-400 bg-blue-500/10'
+                      : 'text-blue-600 border-b-2 border-blue-600 bg-blue-50'
+                    : (isDarkBackground || isRainBackground)
+                      ? 'text-white/60 hover:text-white/80 hover:bg-white/5'
+                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                }`}
+              >
+                <Lightbulb className="h-4 w-4" />
+                AI Insights
+              </button>
+              
+              <button
+                onClick={() => setActiveTab('logistics')}
+                className={`flex items-center gap-2 px-4 py-3 font-medium text-sm transition-all ${
+                  activeTab === 'logistics'
+                    ? (isDarkBackground || isRainBackground)
+                      ? 'text-white border-b-2 border-blue-400 bg-blue-500/10'
+                      : 'text-blue-600 border-b-2 border-blue-600 bg-blue-50'
+                    : (isDarkBackground || isRainBackground)
+                      ? 'text-white/60 hover:text-white/80 hover:bg-white/5'
+                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                }`}
+              >
+                <Map className="h-4 w-4" />
+                Traffic
+              </button>
+              
+              <button
+                onClick={() => setActiveTab('configuration')}
+                className={`flex items-center gap-2 px-4 py-3 font-medium text-sm transition-all ${
+                  activeTab === 'configuration'
+                    ? (isDarkBackground || isRainBackground)
+                      ? 'text-white border-b-2 border-blue-400 bg-blue-500/10'
+                      : 'text-blue-600 border-b-2 border-blue-600 bg-blue-50'
+                    : (isDarkBackground || isRainBackground)
+                      ? 'text-white/60 hover:text-white/80 hover:bg-white/5'
+                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                }`}
+              >
+                <Settings className="h-4 w-4" />
+                Configuration
+              </button>
+            </div>
 
-            <GlassCard intensity="medium" blur="md">
-              <h3 className={`text-lg font-semibold mb-4 ${getSectionHeaderColor()}`}>Venue Layout</h3>
-              <VenueMap
-                venueLocation={currentEvent.venueLocation}
-              />
-            </GlassCard>
+            {/* Tab Content */}
+            <div className="mt-6">
+              {/* Overview Tab */}
+              {activeTab === 'overview' && (
+                <div className="space-y-8">
+                  <div className="border border-white/10 rounded-lg p-6 bg-white/5">
+                    <h3 className={`text-lg font-semibold mb-4 ${getSectionHeaderColor()}`}>Crowd Density Simulation</h3>
+                    <div className="w-full transform scale-90 origin-top">
+                      <VenueLayoutCard event={viewEvent} />
+                    </div>
+                  </div>
 
-            {/* Public Transit Information */}
-            {currentEvent.venueLocation && (
-              <TransitInformationCard venueLocation={currentEvent.venueLocation} />
-            )}
-
-            {/* Venue Layout Editor - Gate Configuration & Documents */}
-            {currentEvent?.venueLayout && (
-              <VenueLayoutEditor
-                venueLayout={currentEvent.venueLayout}
-                eventId={eventId}
-                onSave={handleVenueConfigSave}
-                readOnly={false}
-                existingAttachmentUrls={currentEvent.attachmentUrls || []}
-                existingAttachmentFilenames={currentEvent.attachmentFilenames || []}
-                hideLayoutTypeControls={true}
-              />
-            )}
-          </div>
-
-          {/* Right Column - Recommendations and Forecasts */}
-          <div className="space-y-6">
-            {/* Weather-based Recommendations */}
-            <WeatherRecommendations />
-
-            {/* Nearby Events Discovery - Show only if data exists from backend */}
-            {(() => {
-              console.log('📍 [EventDetails] Nearby Events rendering check:', {
-                has_nearby_result: !!currentEvent.nearby_result,
-                nearby_result_keys: currentEvent.nearby_result ? Object.keys(currentEvent.nearby_result) : [],
-                has_forecast: !!forecastResult,
-              });
-              return currentEvent.nearby_result ? (
-                <NearbyEventsCard 
-                  nearbyEventData={currentEvent.nearby_result}
-                />
-              ) : null;
-            })()}
-            
-            <GlassCard intensity="medium" blur="md">
-              <h3 className={`text-lg font-semibold mb-4 ${getSectionHeaderColor()}`}>AI Recommendations</h3>
-              <div className="space-y-3">
-                {(() => {
-                  return recommendations.map((rec: any, index: number) => {
-                    // Dynamic colors based on weather
-                    const priorityColors = (isDarkBackground || isRainBackground) ? {
-                      // Storm/Rain - light text on dark backgrounds
-                      high: { bg: 'bg-red-500/20', border: 'border-red-300/40', text: 'text-red-100', icon: 'text-red-200' },
-                      medium: { bg: 'bg-yellow-500/20', border: 'border-yellow-300/40', text: 'text-yellow-100', icon: 'text-yellow-200' },
-                      low: { bg: 'bg-blue-500/20', border: 'border-blue-300/40', text: 'text-blue-100', icon: 'text-blue-200' }
-                    } : {
-                      // Clear/Sunny/Cloudy - dark text on light backgrounds
-                      high: { bg: 'bg-red-100', border: 'border-red-300', text: 'text-red-900', icon: 'text-red-700' },
-                      medium: { bg: 'bg-yellow-100', border: 'border-yellow-300', text: 'text-yellow-900', icon: 'text-yellow-700' },
-                      low: { bg: 'bg-blue-100', border: 'border-blue-300', text: 'text-blue-900', icon: 'text-blue-700' }
-                    };
-                    
-                    const colors = priorityColors[rec.priority as keyof typeof priorityColors] || priorityColors.medium;
-                    
-                    return (
-                      <div key={index} className={`p-3 ${colors.bg} ${colors.border} border rounded-lg backdrop-blur-sm`}>
-                        <div className="flex items-start">
-                          <AlertTriangle className={`h-4 w-4 ${colors.icon} mt-0.5 mr-2 flex-shrink-0`} />
-                          <div className="flex-1">
-                            <div className="flex items-center justify-between mb-1">
-                              <h4 className={`text-sm font-medium ${colors.text}`}>{rec.title}</h4>
-                              {rec.priority && (
-                                <span className={`text-xs px-2 py-1 rounded-full font-medium ${
-                                  (isDarkBackground || isRainBackground) 
-                                    ? (rec.priority === 'high' ? 'bg-red-400/30 text-red-100 border border-red-300/40' :
-                                       rec.priority === 'medium' ? 'bg-yellow-400/30 text-yellow-100 border border-yellow-300/40' :
-                                       'bg-blue-400/30 text-blue-100 border border-blue-300/40')
-                                    : (rec.priority === 'high' ? 'bg-red-200 text-red-900 border border-red-400' :
-                                       rec.priority === 'medium' ? 'bg-yellow-200 text-yellow-900 border border-yellow-400' :
-                                       'bg-blue-200 text-blue-900 border border-blue-400')
-                                }`}>
-                                  {rec.priority.toUpperCase()}
-                                </span>
-                              )}
-                            </div>
-                            <p className={`text-sm ${colors.text} mt-1 opacity-90`}>{rec.description}</p>
-                            {rec.action && (
-                              <div className={`mt-2 text-xs ${colors.text} rounded px-2 py-1 border ${
-                                (isDarkBackground || isRainBackground) 
-                                  ? 'bg-white/10 backdrop-blur-sm border-white/20' 
-                                  : 'bg-white/50 border-gray-300'
-                              }`}>
-                                <span className="font-medium">💡 Action:</span> {rec.action}
-                              </div>
-                            )}
-                          </div>
-                        </div>
+                  <div className="border border-white/10 rounded-lg p-6 bg-white/5">
+                    <h3 className={`text-lg font-semibold mb-8 ${getSectionHeaderColor()}`}>Nearby Parking</h3>
+                    <div className="w-full overflow-hidden rounded-lg">
+                      <div className="w-full transform scale-95 origin-top">
+                        <VenueMap venueLocation={currentEvent.venueLocation} />
                       </div>
-                    );
-                  });
-                })()}
-              </div>
-            </GlassCard>
+                    </div>
+                  </div>
+                </div>
+              )}
 
-            {/* Live Traffic Forecast */}
-            {currentEvent.venueLocation && (
-              <LiveTrafficForecast 
-                venueLocation={currentEvent.venueLocation}
-                selectedStation={undefined}
-                eventDate={currentEvent.dateStart}
-                eventTimeRange={{
-                  start: new Date(currentEvent.dateStart).toLocaleTimeString('en-US', { 
-                    hour: '2-digit', 
-                    minute: '2-digit',
-                    hour12: true 
-                  }),
-                  end: new Date(currentEvent.dateEnd).toLocaleTimeString('en-US', { 
-                    hour: '2-digit', 
-                    minute: '2-digit',
-                    hour12: true 
-                  })
-                }}
-              />
-            )}
-          </div>
-        </div>
-      )}
+              {/* AI Insights Tab */}
+              {activeTab === 'insights' && (
+                <div className="space-y-6">
+                  {/* Weather Recommendations */}
+                  <WeatherRecommendations />
 
-      {/* AI Popularity Analysis Section - Full width at bottom */}
-      {forecastResult && Object.keys(forecastResult).length > 0 && currentEvent.popularityContent && (
-        <div className="mt-6">
-          <PopularityInsights popularityContent={currentEvent.popularityContent} />
+                  {/* AI Recommendations */}
+                  <div>
+                    <h3 className={`text-lg font-semibold mb-4 ${getSectionHeaderColor()}`}>AI Recommendations</h3>
+                    <div className="space-y-3">
+                      {recommendations.map((rec: any, index: number) => {
+                        const priorityColors = (isDarkBackground || isRainBackground) ? {
+                          high: { bg: 'bg-red-500/20', border: 'border-red-300/40', text: 'text-red-100', icon: 'text-red-200' },
+                          medium: { bg: 'bg-yellow-500/20', border: 'border-yellow-300/40', text: 'text-yellow-100', icon: 'text-yellow-200' },
+                          low: { bg: 'bg-blue-500/20', border: 'border-blue-300/40', text: 'text-blue-100', icon: 'text-blue-200' }
+                        } : {
+                          high: { bg: 'bg-red-100', border: 'border-red-300', text: 'text-red-900', icon: 'text-red-700' },
+                          medium: { bg: 'bg-yellow-100', border: 'border-yellow-300', text: 'text-yellow-900', icon: 'text-yellow-700' },
+                          low: { bg: 'bg-blue-100', border: 'border-blue-300', text: 'text-blue-900', icon: 'text-blue-700' }
+                        };
+                        
+                        const colors = priorityColors[rec.priority as keyof typeof priorityColors] || priorityColors.medium;
+                        
+                        return (
+                          <div key={index} className={`p-3 ${colors.bg} ${colors.border} border rounded-lg backdrop-blur-sm`}>
+                            <div className="flex items-start">
+                              <AlertTriangle className={`h-4 w-4 ${colors.icon} mt-0.5 mr-2 flex-shrink-0`} />
+                              <div className="flex-1">
+                                <div className="flex items-center justify-between mb-1">
+                                  <h4 className={`text-sm font-medium ${colors.text}`}>{rec.title}</h4>
+                                  {rec.priority && (
+                                    <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                                      (isDarkBackground || isRainBackground) 
+                                        ? (rec.priority === 'high' ? 'bg-red-400/30 text-red-100 border border-red-300/40' :
+                                           rec.priority === 'medium' ? 'bg-yellow-400/30 text-yellow-100 border border-yellow-300/40' :
+                                           'bg-blue-400/30 text-blue-100 border border-blue-300/40')
+                                        : (rec.priority === 'high' ? 'bg-red-200 text-red-900 border border-red-400' :
+                                           rec.priority === 'medium' ? 'bg-yellow-200 text-yellow-900 border border-yellow-400' :
+                                           'bg-blue-200 text-blue-900 border border-blue-400')
+                                    }`}>
+                                      {rec.priority.toUpperCase()}
+                                    </span>
+                                  )}
+                                </div>
+                                <p className={`text-sm ${colors.text} mt-1 opacity-90`}>{rec.description}</p>
+                                {rec.action && (
+                                  <div className={`mt-2 text-xs ${colors.text} rounded px-2 py-1 border ${
+                                    (isDarkBackground || isRainBackground) 
+                                      ? 'bg-white/10 backdrop-blur-sm border-white/20' 
+                                      : 'bg-white/50 border-gray-300'
+                                  }`}>
+                                    <span className="font-medium">💡 Action:</span> {rec.action}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Nearby Events Discovery */}
+                  {currentEvent.nearby_result && (
+                    <NearbyEventsCard nearbyEventData={currentEvent.nearby_result} />
+                  )}
+
+                  {/* AI Popularity Analysis */}
+                  {currentEvent.popularityContent && (
+                    <PopularityInsights popularityContent={currentEvent.popularityContent} />
+                  )}
+                </div>
+              )}
+
+              {/* Logistics Tab */}
+              {activeTab === 'logistics' && (
+                <div className="space-y-6">
+                  {/* Public Transit Information */}
+                  {currentEvent.venueLocation && (
+                    <TransitInformationCard venueLocation={currentEvent.venueLocation} />
+                  )}
+
+                  {/* Live Traffic Forecast */}
+                  {currentEvent.venueLocation && (
+                    <LiveTrafficForecast 
+                      venueLocation={currentEvent.venueLocation}
+                      selectedStation={undefined}
+                      eventDate={currentEvent.dateStart}
+                      eventTimeRange={{
+                        start: new Date(currentEvent.dateStart).toLocaleTimeString('en-US', { 
+                          hour: '2-digit', 
+                          minute: '2-digit',
+                          hour12: true 
+                        }),
+                        end: new Date(currentEvent.dateEnd).toLocaleTimeString('en-US', { 
+                          hour: '2-digit', 
+                          minute: '2-digit',
+                          hour12: true 
+                        })
+                      }}
+                    />
+                  )}
+                </div>
+              )}
+
+              {/* Configuration Tab */}
+              {activeTab === 'configuration' && (
+                <div className="space-y-6">
+                  {currentEvent?.venueLayout && (
+                    <VenueLayoutEditor
+                      venueLayout={currentEvent.venueLayout}
+                      eventId={eventId}
+                      onSave={handleVenueConfigSave}
+                      readOnly={false}
+                      existingAttachmentUrls={currentEvent.attachmentUrls || []}
+                      existingAttachmentFilenames={currentEvent.attachmentFilenames || []}
+                      hideLayoutTypeControls={true}
+                    />
+                  )}
+                </div>
+              )}
+            </div>
+          </GlassCard>
         </div>
       )}
       </div>
