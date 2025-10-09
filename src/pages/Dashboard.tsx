@@ -15,6 +15,7 @@ const Dashboard: React.FC = () => {
   const navigate = useNavigate();
   const { user, backendUser, backendUserLoading } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<'date' | 'name' | 'status'>('date');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [usingFallbackData, setUsingFallbackData] = useState(false);
@@ -34,6 +35,25 @@ const Dashboard: React.FC = () => {
     setLoading,
     setError,
   } = useEventStore();
+
+  // Debounce search term to avoid too many API calls
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 500); // 500ms delay
+
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  // Map frontend sortBy values to backend field names
+  const getBackendSortField = (frontendSort: 'date' | 'name' | 'status'): string => {
+    const sortMapping: Record<'date' | 'name' | 'status', string> = {
+      'date': 'date_of_event_start',
+      'name': 'name',
+      'status': 'status'
+    };
+    return sortMapping[frontendSort];
+  };
 
   // Fetch event history on component mount
   useEffect(() => {
@@ -63,8 +83,18 @@ const Dashboard: React.FC = () => {
       setError(null);
       
       try {
-        // Fetch events with pagination parameters
-        const response = await eventAPI.getEventHistory(user.email, currentPage, itemsPerPage);
+        // Map frontend sortBy to backend field name
+        const backendSortField = getBackendSortField(sortBy);
+        
+        // Fetch events with pagination, search, and sort parameters
+        const response = await eventAPI.getEventHistory(
+          user.email, 
+          currentPage, 
+          itemsPerPage,
+          debouncedSearchTerm || undefined, // Only pass if not empty
+          backendSortField,
+          sortOrder
+        );
         
         // Check if this is fallback data
         if ((response as any)._isFallbackData) {
@@ -153,7 +183,7 @@ const Dashboard: React.FC = () => {
     };
 
     fetchEventHistory();
-  }, [user?.email, backendUser, backendUserLoading, currentPage, itemsPerPage]); // Refetch when page changes
+  }, [user?.email, backendUser, backendUserLoading, currentPage, itemsPerPage, debouncedSearchTerm, sortBy, sortOrder]); // Refetch when page, search, or sort changes
 
   // For server-side pagination, we display events as-is
   // Client-side filtering/sorting is disabled since backend handles pagination
@@ -163,12 +193,10 @@ const Dashboard: React.FC = () => {
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = Math.min(startIndex + events.length, totalItems);
 
-  // Reset to page 1 when search or filter changes (for future implementation)
+  // Reset to page 1 when search or filter changes
   React.useEffect(() => {
-    if (currentPage !== 1) {
-      setCurrentPage(1);
-    }
-  }, [searchTerm, sortBy, sortOrder]);
+    setCurrentPage(1);
+  }, [debouncedSearchTerm, sortBy, sortOrder]);
 
   const handleViewEvent = (event: EventData) => {
     navigate(`/event/${event.id}`);
@@ -352,11 +380,14 @@ const Dashboard: React.FC = () => {
         <div className="flex flex-col sm:flex-row gap-4">
           <div className="flex-1">
             <Input
-              placeholder="Search events..."
+              placeholder="Search events by name, venue, or description..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               icon={Search}
             />
+            {searchTerm && searchTerm !== debouncedSearchTerm && (
+              <p className="text-xs text-gray-500 mt-1">Searching...</p>
+            )}
           </div>
           <div className="flex gap-2">
             <select
@@ -371,11 +402,46 @@ const Dashboard: React.FC = () => {
             <button
               onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
               className="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary-500"
+              title={sortOrder === 'asc' ? 'Ascending' : 'Descending'}
             >
               {sortOrder === 'asc' ? '↑' : '↓'}
             </button>
           </div>
         </div>
+        
+        {/* Active Filters Indicator */}
+        {(debouncedSearchTerm || sortBy !== 'date' || sortOrder !== 'desc') && (
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <span className="text-xs text-gray-600 font-medium">Active filters:</span>
+            {debouncedSearchTerm && (
+              <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-50 text-blue-700 rounded-md text-xs">
+                Search: "{debouncedSearchTerm}"
+                <button
+                  onClick={() => setSearchTerm('')}
+                  className="hover:text-blue-900"
+                  title="Clear search"
+                >
+                  ×
+                </button>
+              </span>
+            )}
+            {(sortBy !== 'date' || sortOrder !== 'desc') && (
+              <span className="inline-flex items-center gap-1 px-2 py-1 bg-purple-50 text-purple-700 rounded-md text-xs">
+                Sort: {sortBy === 'date' ? 'Date' : sortBy === 'name' ? 'Name' : 'Status'} ({sortOrder === 'asc' ? 'A→Z' : 'Z→A'})
+              </span>
+            )}
+            <button
+              onClick={() => {
+                setSearchTerm('');
+                setSortBy('date');
+                setSortOrder('desc');
+              }}
+              className="text-xs text-gray-600 hover:text-gray-900 underline"
+            >
+              Clear all
+            </button>
+          </div>
+        )}
       </Card>
 
 
@@ -385,17 +451,25 @@ const Dashboard: React.FC = () => {
           <div className="text-center py-12">
             <Calendar className="mx-auto h-16 w-16 text-gray-400 mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">
-              {events.length === 0 ? 'No Events Yet' : 'No Matching Events'}
+              {debouncedSearchTerm ? 'No Matching Events' : 'No Events Yet'}
             </h3>
             <p className="text-gray-600 mb-6">
-              {events.length === 0 
-                ? 'Start by creating your first event simulation'
-                : 'Try adjusting your search criteria'
+              {debouncedSearchTerm 
+                ? `No events found matching "${debouncedSearchTerm}". Try a different search term.`
+                : 'Start by creating your first event simulation'
               }
             </p>
-            {events.length === 0 && (
+            {!debouncedSearchTerm && (
               <Button onClick={() => navigate('/new-event')}>
                 Create Your First Event
+              </Button>
+            )}
+            {debouncedSearchTerm && (
+              <Button 
+                variant="outline" 
+                onClick={() => setSearchTerm('')}
+              >
+                Clear Search
               </Button>
             )}
           </div>

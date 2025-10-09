@@ -72,7 +72,15 @@ export const eventAPI = {
   },
   
   // Get event history
-  getEventHistory: async (userEmail?: string, page: number = 1, limit: number = 10) => {
+  getEventHistory: async (
+    userEmail?: string, 
+    page: number = 1, 
+    limit: number = 10,
+    search?: string,
+    sortBy?: string,
+    sortOrder?: 'asc' | 'desc',
+    upcoming?: boolean
+  ) => {
     if (USE_MOCK_EVENT_HISTORY) {
       console.log('🎭 Using mock data for getEventHistory');
       return mockApiClient.getEventHistory();
@@ -80,11 +88,25 @@ export const eventAPI = {
     
     try {
       console.log('🌐 Using real API for getEventHistory:', `${apiClient.defaults.baseURL}/events`);
-      // Add userEmail, page, and limit as query parameters
+      // Add query parameters
       const params: any = { page, limit };
       if (userEmail) {
         params.userEmail = userEmail;
       }
+      if (search) {
+        params.search = search;
+      }
+      if (sortBy) {
+        params.sortBy = sortBy;
+      }
+      if (sortOrder) {
+        params.sortOrder = sortOrder;
+      }
+      if (upcoming !== undefined) {
+        params.upcoming = upcoming;
+      }
+      
+      console.log('📊 Query params:', params);
       return await apiClient.get('/events', { params });
     } catch (error: any) {
       // If server returns 500 error, temporarily fallback to mock data
