@@ -1331,6 +1331,19 @@ const EventDetails: React.FC = () => {
             {currentEvent.venueLocation && (
               <TransitInformationCard venueLocation={currentEvent.venueLocation} />
             )}
+
+            {/* Venue Layout Editor - Gate Configuration & Documents */}
+            {currentEvent?.venueLayout && (
+              <VenueLayoutEditor
+                venueLayout={currentEvent.venueLayout}
+                eventId={eventId}
+                onSave={handleVenueConfigSave}
+                readOnly={false}
+                existingAttachmentUrls={currentEvent.attachmentUrls || []}
+                existingAttachmentFilenames={currentEvent.attachmentFilenames || []}
+                hideLayoutTypeControls={true}
+              />
+            )}
           </div>
 
           {/* Right Column - Recommendations and Forecasts */}
