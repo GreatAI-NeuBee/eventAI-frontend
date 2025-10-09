@@ -234,4 +234,12 @@ export const eventAPI = {
       headers: { 'Content-Type': 'application/json' }
     });
   },
+
+  // Generate post-mortem report
+  generatePostMortemReport: (eventId: string) => {
+    console.log('📄 Using real API for generatePostMortemReport:', `${apiClient.defaults.baseURL}/forecast/${eventId}/postmortem`);
+    return apiClient.post(`/forecast/${eventId}/postmortem`, {}, {
+      headers: { 'Content-Type': 'application/json' }
+    });
+  },
 };
