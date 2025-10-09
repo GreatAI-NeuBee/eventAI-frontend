@@ -10,6 +10,8 @@ import LiveTrafficForecast from '../components/dashboard/LiveTrafficForecast';
 import ParkingForecast from '../components/dashboard/ParkingForecast';
 import VenueLayoutEditor, { VenueLayoutEditorData } from '../components/venue/VenueLayoutEditor';
 import PopularityInsights from '../components/event/PopularityInsights';
+import CongestionMap, { LatLng, CongestionSegment } from '../components/CongestionMap';
+import ErrorBoundary from '../components/common/ErrorBoundary';
 import { useEventStore } from '../store/eventStore';
 import { useAuth } from '../contexts/AuthContext';
 import type { EventData } from '../types/simulation';
@@ -267,11 +269,35 @@ const EventDetails: React.FC = () => {
   const [isLoadingEventDetails, setIsLoadingEventDetails] = useState(true);
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
   
+  // Traffic congestion state
+  const [congestionData, setCongestionData] = useState<CongestionSegment[]>([]);
+  const [routeInfo, setRouteInfo] = useState<{
+    distance: string;
+    duration: string;
+  } | null>(null);
+  
   // Ref to track if simulation monitoring is already started for this event
   const monitoringEventId = useRef<string | null>(null);
   
   // Helper for section header colors
   const getSectionHeaderColor = () => (isDarkBackground || isRainBackground) ? 'text-white' : 'text-gray-900';
+
+  // Traffic congestion handlers
+  const handleRouteChanged = (route: google.maps.DirectionsResult) => {
+    if (route.routes && route.routes.length > 0) {
+      const routeData = route.routes[0];
+      const leg = routeData.legs[0];
+      
+      setRouteInfo({
+        distance: leg.distance?.text || '0 km',
+        duration: leg.duration?.text || '0 min'
+      });
+    }
+  };
+
+  const handleCongestionData = (segments: CongestionSegment[]) => {
+    setCongestionData(segments);
+  };
 
 
   const {
@@ -796,6 +822,109 @@ const EventDetails: React.FC = () => {
 
         <WeatherCard />
       </div>
+
+      {/* Minimal Traffic Map */}
+      <GlassCard className="mb-4" intensity="light" blur="sm">
+        <div className="p-3">
+          <div className="flex items-center justify-between mb-2">
+             <h4 className={`text-sm font-medium ${getSectionHeaderColor()}`}>
+               🚦 Venue Traffic
+             </h4>
+            {routeInfo && (
+              <div className="flex gap-1 text-xs">
+                <span className={`px-1.5 py-0.5 rounded text-xs ${(isDarkBackground || isRainBackground) ? 'bg-blue-500/20 text-blue-200' : 'bg-blue-50 text-blue-700'}`}>
+                  {routeInfo.distance}
+                </span>
+                <span className={`px-1.5 py-0.5 rounded text-xs ${(isDarkBackground || isRainBackground) ? 'bg-green-500/20 text-green-200' : 'bg-green-50 text-green-700'}`}>
+                  {routeInfo.duration}
+                </span>
+              </div>
+            )}
+          </div>
+          
+           <div className="space-y-4">
+             {/* Full Width Map */}
+              <div className="rounded overflow-hidden border border-gray-200">
+                <ErrorBoundary>
+                  <CongestionMap
+                    origin={{ 
+                      lat: (currentEvent.venue?.lat || 3.1390) - 0.001, 
+                      lng: (currentEvent.venue?.lng || 101.6869) - 0.001 
+                    }}
+                    destination={{ 
+                      lat: (currentEvent.venue?.lat || 3.1390) + 0.001, 
+                      lng: (currentEvent.venue?.lng || 101.6869) + 0.001 
+                    }}
+                    waypoints={[
+                      { 
+                        lat: currentEvent.venue?.lat || 3.1390, 
+                        lng: currentEvent.venue?.lng || 101.6869 
+                      }
+                    ]}
+                    height={400}
+                    venueCenter={{ lat: currentEvent.venue?.lat || 3.1390, lng: currentEvent.venue?.lng || 101.6869 }}
+                    zoomLevel={16}
+                    onRouteChanged={handleRouteChanged}
+                    onCongestionData={handleCongestionData}
+                  />
+                </ErrorBoundary>
+              </div>
+            
+             {/* Traffic Stats Below Map */}
+             <div className="grid grid-cols-3 gap-3">
+              {congestionData.length > 0 ? (
+                <>
+                  <div className="text-center p-3 bg-green-50 rounded-lg">
+                    <div className="flex items-center justify-center space-x-2 mb-1">
+                      <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                      <span className="text-sm font-medium text-green-700">Good Flow</span>
+                    </div>
+                    <div className="text-lg font-bold text-green-600">
+                      {(() => {
+                        const total = congestionData.length;
+                        const green = congestionData.filter(s => s.color === '#4CAF50').length;
+                        return Math.round((green / total) * 100);
+                      })()}%
+                    </div>
+                  </div>
+                  <div className="text-center p-3 bg-orange-50 rounded-lg">
+                    <div className="flex items-center justify-center space-x-2 mb-1">
+                      <div className="w-3 h-3 bg-orange-500 rounded-full"></div>
+                      <span className="text-sm font-medium text-orange-700">Moderate</span>
+                    </div>
+                    <div className="text-lg font-bold text-orange-600">
+                      {(() => {
+                        const total = congestionData.length;
+                        const orange = congestionData.filter(s => s.color === '#FF9800').length;
+                        return Math.round((orange / total) * 100);
+                      })()}%
+                    </div>
+                  </div>
+                  <div className="text-center p-3 bg-red-50 rounded-lg">
+                    <div className="flex items-center justify-center space-x-2 mb-1">
+                      <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+                      <span className="text-sm font-medium text-red-700">Heavy</span>
+                    </div>
+                    <div className="text-lg font-bold text-red-600">
+                      {(() => {
+                        const total = congestionData.length;
+                        const red = congestionData.filter(s => s.color === '#F44336').length;
+                        return Math.round((red / total) * 100);
+                      })()}%
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="text-center">
+                  <p className={`text-xs ${(isDarkBackground || isRainBackground) ? 'text-white/60' : 'text-gray-400'}`}>
+                    Drag to see data
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </GlassCard>
 
       {/* Show venue layout configuration when no forecast is available */}
       {(!forecastResult || Object.keys(forecastResult).length === 0) && !isForecastLoading && (

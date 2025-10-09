@@ -150,9 +150,21 @@ const LiveTrafficForecast: React.FC<LiveTrafficForecastProps> = ({
           hasTrafficData: !!leg.duration_in_traffic
         });
         
-        const currentSpeed = leg.duration.value / (leg.distance.value / 1000) * 3.6; // Convert to km/h
-        const freeFlowSpeed = leg.duration_in_traffic?.value ? 
-          (leg.duration_in_traffic.value / (leg.distance.value / 1000) * 3.6) : currentSpeed * 1.2;
+        // Calculate realistic speeds from Google Maps data
+        const distanceKm = leg.distance.value / 1000; // Convert meters to km
+        const durationHours = leg.duration.value / 3600; // Convert seconds to hours
+        const currentSpeed = distanceKm / durationHours; // km/h
+        
+        const freeFlowDurationHours = leg.duration_in_traffic?.value ? 
+          (leg.duration_in_traffic.value / 3600) : durationHours;
+        const freeFlowSpeed = distanceKm / freeFlowDurationHours; // km/h
+        
+        console.log(`📊 Real traffic calculation:`, {
+          distance: `${distanceKm.toFixed(2)} km`,
+          duration: `${durationHours.toFixed(2)} hours`,
+          currentSpeed: `${currentSpeed.toFixed(1)} km/h`,
+          freeFlowSpeed: `${freeFlowSpeed.toFixed(1)} km/h`
+        });
         
         const realTimeData = {
           flowSegmentData: {
@@ -263,12 +275,18 @@ const LiveTrafficForecast: React.FC<LiveTrafficForecastProps> = ({
           </defs>
           <rect width="1000" height="300" fill="url(#grid)" />
           
-          {/* Enhanced Y-axis labels */}
-          <text x="15" y="25" className="fill-gray-600 text-sm font-medium">500</text>
-          <text x="15" y="85" className="fill-gray-600 text-sm font-medium">400</text>
-          <text x="15" y="145" className="fill-gray-600 text-sm font-medium">300</text>
-          <text x="15" y="205" className="fill-gray-600 text-sm font-medium">200</text>
-          <text x="15" y="265" className="fill-gray-600 text-sm font-medium">100</text>
+          {/* Y-axis labels for realistic traffic speeds */}
+          <text x="15" y="25" className="fill-gray-600 text-sm font-medium">100</text>
+          <text x="15" y="85" className="fill-gray-600 text-sm font-medium">80</text>
+          <text x="15" y="145" className="fill-gray-600 text-sm font-medium">60</text>
+          <text x="15" y="205" className="fill-gray-600 text-sm font-medium">40</text>
+          <text x="15" y="265" className="fill-gray-600 text-sm font-medium">20</text>
+          <text x="15" y="285" className="fill-gray-600 text-sm font-medium">0</text>
+          
+          {/* Y-axis label */}
+          <text x="25" y="150" className="fill-gray-600 text-sm font-medium" transform="rotate(-90, 25, 150)">
+            Speed (km/h)
+          </text>
           
           {/* Real-time traffic data visualization */}
           {isLoading ? (
@@ -289,16 +307,12 @@ const LiveTrafficForecast: React.FC<LiveTrafficForecastProps> = ({
                 const freeFlowSpeed = realTimeData.flowSegmentData.freeFlowSpeed;
                 const confidence = realTimeData.flowSegmentData.confidence;
                 
-                // Generate event-specific traffic data based on event time range
+                // Generate traffic data for the event time frame
                 let times = [];
                 let trafficData = [];
                 
                 if (eventTimeRange?.start && eventTimeRange?.end) {
-                  // Use actual event time range
-                  const startTime = eventTimeRange.start;
-                  const endTime = eventTimeRange.end;
-                  
-                  console.log(`📅 Creating traffic forecast for event time: ${startTime} to ${endTime}`);
+                  console.log(`📅 Creating traffic forecast for event time: ${eventTimeRange.start} to ${eventTimeRange.end}`);
                   
                   // Parse start and end times
                   const parseTime = (timeString) => {
@@ -309,12 +323,12 @@ const LiveTrafficForecast: React.FC<LiveTrafficForecastProps> = ({
                     return hour * 60 + minute; // Convert to minutes
                   };
                   
-                  const startMinutes = parseTime(startTime);
-                  const endMinutes = parseTime(endTime);
+                  const startMinutes = parseTime(eventTimeRange.start);
+                  const endMinutes = parseTime(eventTimeRange.end);
                   
                   // Generate data points for the event duration
                   const eventDuration = endMinutes - startMinutes;
-                  const numPoints = Math.max(5, Math.min(10, Math.floor(eventDuration / 15))); // 5-10 points, every 15 mins
+                  const numPoints = Math.max(5, Math.min(10, Math.floor(eventDuration / 5))); // 5-10 points, every 5 mins
                   
                   for (let i = 0; i < numPoints; i++) {
                     const minutesFromStart = (eventDuration / (numPoints - 1)) * i;
@@ -324,29 +338,32 @@ const LiveTrafficForecast: React.FC<LiveTrafficForecastProps> = ({
                     
                     const timeString = `${hour > 12 ? hour - 12 : hour === 0 ? 12 : hour}:${minute.toString().padStart(2, '0')} ${hour >= 12 ? 'PM' : 'AM'}`;
                     
-                    // Create realistic traffic patterns for the event time
+                    // Use real Google Maps data as base, with realistic variations
                     let speed = currentSpeed;
-                    const progress = i / (numPoints - 1); // 0 to 1
                     
-                    // Add some variation based on time of day and event progress
+                    // Add realistic traffic patterns based on time of day
                     if (hour >= 7 && hour <= 9) {
-                      // Morning rush hour
-                      speed = currentSpeed * (0.6 + Math.random() * 0.3);
+                      // Morning rush hour - slower traffic
+                      speed = currentSpeed * (0.6 + (Math.random() * 0.2));
                     } else if (hour >= 17 && hour <= 19) {
-                      // Evening rush hour
-                      speed = currentSpeed * (0.5 + Math.random() * 0.4);
+                      // Evening rush hour - slower traffic
+                      speed = currentSpeed * (0.5 + (Math.random() * 0.3));
+                    } else if (hour >= 11 && hour <= 14) {
+                      // Midday - normal to good traffic
+                      speed = currentSpeed * (0.8 + (Math.random() * 0.2));
                     } else {
-                      // Normal traffic
-                      speed = currentSpeed * (0.7 + Math.random() * 0.3);
+                      // Other times - normal traffic
+                      speed = currentSpeed * (0.7 + (Math.random() * 0.3));
                     }
                     
-                    // Add some variation during the event (e.g., arrival vs departure)
-                    if (progress < 0.3) {
-                      // Early in event - arrival traffic
-                      speed *= 0.8 + Math.random() * 0.2;
-                    } else if (progress > 0.7) {
-                      // Late in event - departure traffic
-                      speed *= 0.7 + Math.random() * 0.3;
+                    // Add some variation during the event
+                    const progress = i / (numPoints - 1);
+                    if (progress < 0.2) {
+                      // Early arrival - might be slower
+                      speed *= 0.9 + (Math.random() * 0.1);
+                    } else if (progress > 0.8) {
+                      // Late departure - might be slower
+                      speed *= 0.8 + (Math.random() * 0.2);
                     }
                     
                     times.push(timeString);
@@ -354,32 +371,20 @@ const LiveTrafficForecast: React.FC<LiveTrafficForecastProps> = ({
                       time: timeString,
                       speed: Math.round(speed),
                       x: 100 + (i * (800 / (numPoints - 1))),
-                      y: 250 - ((speed / 500) * 200)
+                      y: 250 - ((speed / 100) * 200) // Scale to 0-100 km/h range
                     });
                   }
+                  
+                  console.log(`📊 Generated ${trafficData.length} traffic data points for event time frame`);
                 } else {
-                  // Fallback to generic day forecast if no event time
-                  times = ['6 AM', '8 AM', '10 AM', '12 PM', '2 PM', '4 PM', '6 PM', '8 PM', '10 PM'];
-                  trafficData = times.map((time, index) => {
-                    let speed = currentSpeed;
-                    
-                    if (index <= 2) {
-                      speed = currentSpeed * (0.6 + Math.random() * 0.3);
-                    } else if (index <= 4) {
-                      speed = currentSpeed * (0.8 + Math.random() * 0.2);
-                    } else if (index <= 6) {
-                      speed = currentSpeed * (0.5 + Math.random() * 0.4);
-                    } else {
-                      speed = currentSpeed * (0.7 + Math.random() * 0.3);
-                    }
-                    
-                    return {
-                      time,
-                      speed: Math.round(speed),
-                      x: 100 + (index * 100),
-                      y: 250 - ((speed / 500) * 200)
-                    };
-                  });
+                  // Fallback to current time only if no event time
+                  times = ['Current'];
+                  trafficData = [{
+                    time: 'Current',
+                    speed: Math.round(currentSpeed),
+                    x: 500,
+                    y: 250 - ((currentSpeed / 100) * 200) // Scale to 0-100 km/h range
+                  }];
                 }
                 
                 // Create the traffic line path
@@ -442,13 +447,25 @@ const LiveTrafficForecast: React.FC<LiveTrafficForecastProps> = ({
                       </text>
                     ))}
                     
+                    {/* Event time range label */}
+                    {eventTimeRange?.start && eventTimeRange?.end && (
+                      <text
+                        x="500"
+                        y="315"
+                        className="fill-blue-600 text-sm font-medium"
+                        textAnchor="middle"
+                      >
+                        Event Time: {eventTimeRange.start} - {eventTimeRange.end}
+                      </text>
+                    )}
+                    
                     {/* Real-time data overlay */}
                     <rect x="50" y="20" width="300" height="80" fill="rgba(255, 255, 255, 0.9)" rx="8" stroke="#3b82f6" strokeWidth="1"/>
                     <text x="200" y="40" className="fill-blue-600 text-sm font-bold" textAnchor="middle">
-                      Live Traffic Data
+                      Real Traffic Data
                     </text>
                     <text x="200" y="60" className="fill-blue-600 text-xs" textAnchor="middle">
-                      Current: {currentSpeed} km/h | Free Flow: {freeFlowSpeed} km/h
+                      Current: {Math.round(currentSpeed)} km/h | Free Flow: {Math.round(freeFlowSpeed)} km/h
                     </text>
                     <text x="200" y="80" className="fill-orange-600 text-xs" textAnchor="middle">
                       Confidence: {Math.round(confidence * 100)}%
