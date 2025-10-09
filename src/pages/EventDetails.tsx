@@ -1,13 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState, useContext } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { AlertTriangle, TrendingUp, Calendar, MapPin, Play, FileDown } from 'lucide-react';
+import { AlertTriangle, TrendingUp, Calendar, MapPin, Play, FileDown, Phone, Train } from 'lucide-react';
 import GlassCard from '../components/common/GlassCard';
 import Button from '../components/common/Button';
 import Spinner from '../components/common/Spinner';
 import WeatherBackground, { WeatherContext } from '../components/common/WeatherBackground';
 import VenueMap from '../components/dashboard/VenueMap';
 import LiveTrafficForecast from '../components/dashboard/LiveTrafficForecast';
-import ParkingForecast from '../components/dashboard/ParkingForecast';
 import VenueLayoutEditor, { VenueLayoutEditorData } from '../components/venue/VenueLayoutEditor';
 import PopularityInsights from '../components/event/PopularityInsights';
 import { useEventStore } from '../store/eventStore';
@@ -292,6 +291,186 @@ const NearbyEventsCard: React.FC<{
       </div>
 
      
+    </GlassCard>
+  );
+};
+
+// Combined Component for Nearby Transit Stations and Contact RapidKL using Google Maps API
+const TransitInformationCard: React.FC<{ venueLocation: { lat: number; lng: number; name?: string; address?: string } }> = ({ venueLocation }) => {
+  const { isDarkBackground, isRainBackground } = useContext(WeatherContext);
+  const [stations, setStations] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  
+  const getTextColor = () => (isDarkBackground || isRainBackground) ? 'text-white' : 'text-gray-900';
+  const getSecondaryTextColor = () => (isDarkBackground || isRainBackground) ? 'text-white/80' : 'text-gray-600';
+  const getCardBg = () => (isDarkBackground || isRainBackground) ? 'bg-purple-500/10 border-purple-300/30' : 'bg-purple-50 border-purple-200';
+
+  const fetchNearbyTransitStations = async () => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const service = new google.maps.places.PlacesService(
+        document.createElement('div')
+      );
+
+      const request = {
+        location: new google.maps.LatLng(venueLocation.lat, venueLocation.lng),
+        radius: 2000, // 2km radius
+        type: 'transit_station',
+      };
+
+      service.nearbySearch(request, (results, status) => {
+        if (status === google.maps.places.PlacesServiceStatus.OK && results) {
+          console.log('🚇 Found transit stations:', results.length);
+          // Sort by distance and take top 5
+          const sortedStations = results
+            .slice(0, 5)
+            .map((place: any) => ({
+              name: place.name,
+              address: place.vicinity,
+              distance: place.geometry?.location
+                ? google.maps.geometry.spherical.computeDistanceBetween(
+                    new google.maps.LatLng(venueLocation.lat, venueLocation.lng),
+                    place.geometry.location
+                  )
+                : 0,
+              types: place.types,
+              rating: place.rating,
+            }));
+          setStations(sortedStations);
+          setLoading(false);
+        } else {
+          console.warn('No transit stations found or API error:', status);
+          setError('No transit stations found nearby');
+          setLoading(false);
+        }
+      });
+    } catch (err) {
+      console.error('Error fetching transit stations:', err);
+      setError('Failed to load transit stations');
+      setLoading(false);
+    }
+  };
+
+  const formatDistance = (meters: number) => {
+    if (meters < 1000) {
+      return `${Math.round(meters)}m`;
+    }
+    return `${(meters / 1000).toFixed(1)}km`;
+  };
+
+  useEffect(() => {
+    if (venueLocation.lat && venueLocation.lng && window.google?.maps) {
+      fetchNearbyTransitStations();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [venueLocation.lat, venueLocation.lng]);
+
+  const handleContactRapidKL = () => {
+    window.open('https://www.myrapid.com.my/contact-us', '_blank');
+  };
+
+  if (!window.google?.maps) {
+    return null;
+  }
+
+  return (
+    <GlassCard intensity="medium" blur="md">
+      <h3 className={`text-lg font-semibold mb-4 ${getTextColor()}`}>
+        🚇 Public Transit Information
+      </h3>
+
+      {/* Nearby Stations Section */}
+      <div className="mb-6">
+        <h4 className={`text-sm font-semibold ${getTextColor()} mb-3`}>
+          Nearby Stations
+        </h4>
+
+        {loading && (
+          <div className="flex items-center justify-center py-6">
+            <Spinner size="sm" />
+            <span className={`ml-3 text-sm ${getSecondaryTextColor()}`}>Finding nearby stations...</span>
+          </div>
+        )}
+
+        {error && !loading && (
+          <div className={`p-3 ${getCardBg()} border rounded-lg text-center`}>
+            <p className={`text-sm ${getSecondaryTextColor()}`}>{error}</p>
+          </div>
+        )}
+
+        {!loading && !error && stations.length > 0 && (
+          <div className="space-y-2">
+            {stations.slice(0, 3).map((station, idx) => (
+              <div
+                key={idx}
+                className={`p-3 ${getCardBg()} border rounded-lg backdrop-blur-sm`}
+              >
+                <div className="flex items-start">
+                  <Train className={`h-4 w-4 ${(isDarkBackground || isRainBackground) ? 'text-purple-300' : 'text-purple-600'} mt-0.5 mr-2 flex-shrink-0`} />
+                  <div className="flex-1">
+                    <div className="flex items-start justify-between">
+                      <h5 className={`text-sm font-semibold ${getTextColor()}`}>
+                        {station.name}
+                      </h5>
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${
+                        (isDarkBackground || isRainBackground)
+                          ? 'bg-purple-400/20 text-purple-200'
+                          : 'bg-purple-100 text-purple-700'
+                      }`}>
+                        {formatDistance(station.distance)}
+                      </span>
+                    </div>
+                    {station.address && (
+                      <p className={`text-xs ${getSecondaryTextColor()} mt-1`}>
+                        {station.address}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {!loading && !error && stations.length === 0 && (
+          <div className={`p-3 ${getCardBg()} border rounded-lg text-center`}>
+            <p className={`text-sm ${getSecondaryTextColor()}`}>
+              No transit stations found within 2km
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* Contact RapidKL Section */}
+      <div className={`p-3 ${getCardBg()} border rounded-lg`}>
+        <div className="flex items-start">
+          <Phone className={`w-4 h-4 ${(isDarkBackground || isRainBackground) ? 'text-blue-300' : 'text-blue-600'} mt-0.5 mr-2 flex-shrink-0`} />
+          <div className="flex-1">
+            <h5 className={`text-sm font-semibold ${getTextColor()} mb-1`}>
+              Request Enhanced Services
+            </h5>
+            <p className={`text-xs ${getSecondaryTextColor()} mb-2`}>
+              Contact Rapid KL for increased frequency or special event transit services.
+            </p>
+            <Button
+              onClick={handleContactRapidKL}
+              variant="outline"
+              size="sm"
+              className={`text-xs ${
+                (isDarkBackground || isRainBackground)
+                  ? 'text-blue-300 border-blue-300/40 hover:bg-blue-500/20'
+                  : 'text-blue-600 border-blue-300 hover:bg-blue-100'
+              }`}
+            >
+              <Phone className="h-3 w-3 mr-1" />
+              Contact Rapid KL
+            </Button>
+          </div>
+        </div>
+      </div>
     </GlassCard>
   );
 };
@@ -1146,6 +1325,11 @@ const EventDetails: React.FC = () => {
                 venueLocation={currentEvent.venueLocation}
               />
             </GlassCard>
+
+            {/* Public Transit Information */}
+            {currentEvent.venueLocation && (
+              <TransitInformationCard venueLocation={currentEvent.venueLocation} />
+            )}
           </div>
 
           {/* Right Column - Recommendations and Forecasts */}
@@ -1246,11 +1430,6 @@ const EventDetails: React.FC = () => {
                   })
                 }}
               />
-            )}
-
-            {/* Parking Forecast */}
-            {currentEvent.venueLocation && (
-              <ParkingForecast venueLocation={currentEvent.venueLocation} />
             )}
           </div>
         </div>
