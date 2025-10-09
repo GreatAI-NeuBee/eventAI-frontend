@@ -1289,6 +1289,7 @@ const EventDetails: React.FC = () => {
               readOnly={false}
               existingAttachmentUrls={currentEvent.attachmentUrls || []}
               existingAttachmentFilenames={currentEvent.attachmentFilenames || []}
+              hideLayoutTypeControls={true}
             />
           )}
 
