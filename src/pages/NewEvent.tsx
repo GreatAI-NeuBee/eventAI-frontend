@@ -169,6 +169,11 @@ const NewEvent: React.FC = () => {
         ? formData.featuredGuest 
         : formData.exhibitionName;
 
+      // Map frontend event type to backend expected values
+      // Frontend: 'concert' or 'exhibition'
+      // Backend expects: 'concert' or 'event'
+      const backendEventType = formData.eventType === 'concert' ? 'concert' : 'event';
+
       const submitData: any = {
         name: formData.name,
         dateOfEventStart: startISO,
@@ -176,7 +181,7 @@ const NewEvent: React.FC = () => {
         venue: formData.venue,
         description: formData.description,
         popularity: {
-          type: formData.eventType,
+          type: backendEventType,
           feat: featValue || undefined,
           location: formData.location,
         },

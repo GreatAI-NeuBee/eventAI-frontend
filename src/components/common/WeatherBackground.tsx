@@ -71,6 +71,11 @@ const WeatherBackground: React.FC<WeatherBackgroundProps> = ({
     
     const condition = weatherData.current.condition.toLowerCase();
     
+    // If weather is not available, default to clear
+    if (condition.includes('not available')) {
+      return 'clear';
+    }
+    
     if (condition.includes('storm') || condition.includes('thunder')) {
       return 'storm';
     } else if (condition.includes('rain') || condition.includes('drizzle')) {

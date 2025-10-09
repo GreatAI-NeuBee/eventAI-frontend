@@ -114,6 +114,9 @@ const WeatherCard: React.FC = () => {
     }
   };
   
+  // Check if weather is not available
+  const isWeatherNotAvailable = weatherData?.current.condition.toLowerCase().includes('not available');
+  
   return (
     <GlassCard intensity="medium" blur="md">
       <div className="flex items-center">
@@ -122,16 +125,148 @@ const WeatherCard: React.FC = () => {
         </div>
         <div className="ml-4">
           <p className={`text-sm font-medium ${getSecondaryTextColor()}`}>Weather</p>
-          <div className="flex items-baseline gap-2">
-            <p className={`text-lg font-semibold ${getTextColor()}`}>
-              {weatherData ? `${weatherData.current.temperature}°C` : 'N/A'}
+          {isWeatherNotAvailable ? (
+            <p className={`text-sm ${getSecondaryTextColor()}`}>
+              Temporarily not available
             </p>
-            {weatherData && (
-              <p className={`text-xs ${getSecondaryTextColor()} capitalize`}>
-                {weatherData.current.condition}
+          ) : (
+            <div className="flex items-baseline gap-2">
+              <p className={`text-lg font-semibold ${getTextColor()}`}>
+                {weatherData ? `${weatherData.current.temperature}°C` : 'N/A'}
               </p>
-            )}
-          </div>
+              {weatherData && (
+                <p className={`text-xs ${getSecondaryTextColor()} capitalize`}>
+                  {weatherData.current.condition}
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </GlassCard>
+  );
+};
+
+// Component for weather recommendations based on weather conditions
+const WeatherRecommendations: React.FC = () => {
+  const { isDarkBackground, isRainBackground, weatherCondition, weatherData } = useContext(WeatherContext);
+  
+  const getTextColor = () => (isDarkBackground || isRainBackground) ? 'text-white' : 'text-gray-900';
+  
+  // Get weather-specific recommendations
+  const getWeatherRecommendations = () => {
+    // Check if weather is not available
+    const isWeatherNotAvailable = weatherData?.current.condition.toLowerCase().includes('not available');
+    
+    if (isWeatherNotAvailable) {
+      return null; // Don't show recommendations if weather is not available
+    }
+
+    switch (weatherCondition) {
+      case 'clear':
+      case 'sunny':
+        return {
+          icon: '☀️',
+          title: 'Sunny Weather Preparations',
+          color: (isDarkBackground || isRainBackground) 
+            ? { bg: 'bg-yellow-500/20', border: 'border-yellow-300/40', text: 'text-yellow-100' }
+            : { bg: 'bg-yellow-50', border: 'border-yellow-300', text: 'text-yellow-900' },
+          recommendations: [
+            '• Set up water stations or arrange merchants/stalls to sell drinking water',
+            '• Provide shaded areas or distribute sunscreen samples',
+            '• Consider selling branded hats or caps as merchandise',
+            '• Monitor for heat-related emergencies, have medical staff ready',
+          ]
+        };
+      
+      case 'rain':
+        return {
+          icon: '🌧️',
+          title: 'Rainy Weather Preparations',
+          color: (isDarkBackground || isRainBackground) 
+            ? { bg: 'bg-blue-500/20', border: 'border-blue-300/40', text: 'text-blue-100' }
+            : { bg: 'bg-blue-50', border: 'border-blue-300', text: 'text-blue-900' },
+          recommendations: [
+            '• Prepare and distribute raincoats or ponchos for attendees',
+            '• Place anti-slip mats at entrances and high-traffic areas',
+            '• Alert attendees to wear appropriate footwear',
+            '• Protect electrical equipment and ensure proper drainage',
+          ]
+        };
+      
+      case 'storm':
+        return {
+          icon: '⛈️',
+          title: 'Storm Weather Preparations - High Alert',
+          color: (isDarkBackground || isRainBackground) 
+            ? { bg: 'bg-red-500/20', border: 'border-red-300/40', text: 'text-red-100' }
+            : { bg: 'bg-red-50', border: 'border-red-300', text: 'text-red-900' },
+          recommendations: [
+            '• Consider postponing or rescheduling the event if conditions are severe',
+            '• Identify and clearly mark emergency shelter locations',
+            '• Increase security and emergency response personnel',
+            '• Prepare backup power systems and secure outdoor equipment',
+            '• Have emergency medical services on standby',
+            '• Send weather warnings and safety instructions to all attendees'
+          ]
+        };
+      
+      case 'cloudy':
+        return {
+          icon: '☁️',
+          title: 'Cloudy Weather Preparations',
+          color: (isDarkBackground || isRainBackground) 
+            ? { bg: 'bg-gray-500/20', border: 'border-gray-300/40', text: 'text-gray-100' }
+            : { bg: 'bg-gray-50', border: 'border-gray-300', text: 'text-gray-900' },
+          recommendations: [
+            '• Have raincoats/umbrellas available as weather may change',
+            '• Monitor weather updates throughout the event',
+            '• Prepare temporary shelter areas in case of rain',
+            '• Ensure adequate lighting as it may be darker than usual',
+          ]
+        };
+      
+      case 'snow':
+        return {
+          icon: '❄️',
+          title: 'Snow Weather Preparations',
+          color: (isDarkBackground || isRainBackground) 
+            ? { bg: 'bg-cyan-500/20', border: 'border-cyan-300/40', text: 'text-cyan-100' }
+            : { bg: 'bg-cyan-50', border: 'border-cyan-300', text: 'text-cyan-900' },
+          recommendations: [
+            '• Provide heating areas and warm beverage stations',
+            '• Clear walkways and apply salt/sand to prevent slipping',
+            '• Arrange transportation assistance for attendees',
+            '• Monitor for ice formation and weather deterioration',
+            '• Send cold weather safety tips to attendees',
+            '• Prepare for cold-related medical emergencies'
+          ]
+        };
+      
+      default:
+        return null;
+    }
+  };
+
+  const weatherRecs = getWeatherRecommendations();
+  
+  if (!weatherRecs) return null;
+
+  return (
+    <GlassCard intensity="medium" blur="md" className="mb-6">
+      <div>
+        <h3 className={`text-lg font-semibold mb-3 ${getTextColor()} flex items-center gap-2`}>
+          <span className="text-2xl">{weatherRecs.icon}</span>
+          {weatherRecs.title}
+        </h3>
+        <div className={`p-4 ${weatherRecs.color.bg} ${weatherRecs.color.border} border rounded-lg backdrop-blur-sm`}>
+          <ul className="space-y-2">
+            {weatherRecs.recommendations.map((rec, index) => (
+              <li key={index} className={`text-sm ${weatherRecs.color.text}`}>
+                {rec}
+              </li>
+            ))}
+          </ul>
         </div>
       </div>
     </GlassCard>
@@ -852,6 +987,9 @@ const EventDetails: React.FC = () => {
 
           {/* Right Column - Recommendations and Forecasts */}
           <div className="space-y-6">
+            {/* Weather-based Recommendations */}
+            <WeatherRecommendations />
+            
             <GlassCard intensity="medium" blur="md">
               <h3 className={`text-lg font-semibold mb-4 ${getSectionHeaderColor()}`}>AI Recommendations</h3>
               <div className="space-y-3">
