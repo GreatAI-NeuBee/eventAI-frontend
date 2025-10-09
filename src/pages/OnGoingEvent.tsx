@@ -475,7 +475,7 @@ const OngoingEvent: React.FC = () => {
 
   const activeEvent: any = eventDetails || currentEvent || { name: "Event", capacity: 0, date: new Date().toISOString(), venue: "" };
 
-  // Prepare comparison chart data for EACH GATE (adapted to new backend structure)
+  // Prepare comparison chart data for EACH GATE (using A, B, C, D structure)
   const gateComparisonCharts = useMemo(() => {
     if (!predictResult) {
       console.log('⚠️ Cannot create comparison charts - missing predict_result');
@@ -491,40 +491,32 @@ const OngoingEvent: React.FC = () => {
 
     const charts: any = {};
     
-    // UPDATED STRUCTURE: Check for gate_* keys with timeFrames (preferred)
-    const predictGateKeys = Object.keys(predictResult).filter(key => key.startsWith('gate_'));
+    // NEW STRUCTURE: Gates are labeled as A, B, C, D directly
+    const predictGateKeys = Object.keys(predictResult).filter(key => 
+      ['A', 'B', 'C', 'D'].includes(key) && predictResult[key]?.timeFrames
+    );
     
     if (predictGateKeys.length === 0) {
-      console.warn('⚠️ No gate_* keys found in predict_result');
+      console.warn('⚠️ No gate keys (A, B, C, D) found in predict_result');
       return null;
     }
 
-    console.log('📊 Processing', predictGateKeys.length, 'gates with time-series data');
+    console.log('📊 Processing', predictGateKeys.length, 'gates with time-series data:', predictGateKeys);
 
-    // Process each gate using gate_* keys
-    predictGateKeys.forEach((predictGateKey, index) => {
-      const gateNumber = predictGateKey.replace('gate_', ''); // "1", "2", "3"
-      const gateName = `Gate ${gateNumber}`;
-      const gateData = predictResult[predictGateKey];
+    // Process each gate (A, B, C, D)
+    predictGateKeys.forEach((gateKey) => {
+      const gateName = `Gate ${gateKey}`;
+      const gateData = predictResult[gateKey];
       
-      // Get zone name from predictions array if available
-      const predictionMeta = predictResult.predictions?.find((p: any) => p.gate_id === predictGateKey);
-      const zone = predictionMeta?.zone || predictionMeta?.metadata?.zone || `Zone ${String.fromCharCode(65 + index)}`;
-
-      console.log(`📊 Processing ${gateName} (${zone})`);
+      console.log(`📊 Processing ${gateName}`, gateData);
 
       // Get forecast time frames for this gate (if forecast_result exists)
       let forecastTimeFrames: any[] = [];
-      if (forecastResult && forecastResult.forecast) {
-        forecastTimeFrames = 
-          forecastResult.forecast[gateNumber]?.timeFrames ||
-          forecastResult.forecast[gateNumber.toUpperCase()]?.timeFrames ||
-          forecastResult.forecast[predictGateKey]?.timeFrames ||
-          forecastResult.forecast[gateName]?.timeFrames ||
-          [];
+      if (forecastResult && forecastResult.forecast && forecastResult.forecast[gateKey]) {
+        forecastTimeFrames = forecastResult.forecast[gateKey].timeFrames || [];
       }
 
-      // Get predict time frames from the gate_* key
+      // Get predict time frames from the gate key
       const predictTimeFrames = gateData.timeFrames || [];
 
       console.log(`📊 ${gateName} - Forecast frames:`, forecastTimeFrames.length, 'Predict frames:', predictTimeFrames.length);
@@ -535,57 +527,88 @@ const OngoingEvent: React.FC = () => {
         return;
       }
 
-      // Create data array with forecast + current live point
-      const allTimeFrames: any[] = [];
+      // Create an object to merge forecast and predict data by timestamp
+      type TimeFrame = { timestamp: string; rawTimestamp: string; forecasted: number | null; actual: number | null };
+      const timeFrameMap: Record<string, TimeFrame> = {};
 
       // Add all forecast data points (ensure non-negative values)
       // Convert UTC to Malaysia/Kuala Lumpur timezone (UTC+8)
       forecastTimeFrames.forEach((f: any) => {
         const forecastValue = f.predicted ?? f.congestion ?? f.density ?? 0;
-        const utcTimestamp = f.timestamp.endsWith('Z') ? f.timestamp : `${f.timestamp}Z`;
-        allTimeFrames.push({
-          timestamp: new Date(utcTimestamp).toLocaleTimeString('en-MY', { 
-            hour: '2-digit', 
-            minute: '2-digit',
-            timeZone: 'Asia/Kuala_Lumpur'
-          }),
-          rawTimestamp: utcTimestamp,
-          forecasted: Math.max(0, forecastValue), // Ensure non-negative
-          actual: null,
+        // Handle both ISO format and space-separated format
+        const timestamp = f.timestamp.includes('T') ? f.timestamp : f.timestamp.replace(' ', 'T');
+        const utcTimestamp = timestamp.endsWith('Z') ? timestamp : `${timestamp}Z`;
+        const displayTime = new Date(utcTimestamp).toLocaleTimeString('en-MY', { 
+          hour: '2-digit', 
+          minute: '2-digit',
+          timeZone: 'Asia/Kuala_Lumpur'
         });
+        
+        const key = new Date(utcTimestamp).getTime().toString();
+        if (!timeFrameMap[key]) {
+          timeFrameMap[key] = {
+            timestamp: displayTime,
+            rawTimestamp: utcTimestamp,
+            forecasted: Math.max(0, forecastValue),
+            actual: null,
+          };
+        } else {
+          timeFrameMap[key].forecasted = Math.max(0, forecastValue);
+        }
       });
 
       // Add all predict/live time-series data points (ensure non-negative)
       // Convert UTC to Malaysia/Kuala Lumpur timezone (UTC+8)
       predictTimeFrames.forEach((p: any) => {
         const actualValue = p.actual ?? p.predicted ?? p.congestion ?? p.density ?? 0;
-        const utcTimestamp = p.timestamp.endsWith('Z') ? p.timestamp : `${p.timestamp}Z`;
-        allTimeFrames.push({
-          timestamp: new Date(utcTimestamp).toLocaleTimeString('en-MY', { 
-            hour: '2-digit', 
-            minute: '2-digit',
-            timeZone: 'Asia/Kuala_Lumpur'
-          }),
-          rawTimestamp: utcTimestamp,
-          forecasted: null,
-          actual: Math.max(0, actualValue), // Ensure non-negative
+        // Handle both ISO format and space-separated format
+        const timestamp = p.timestamp.includes('T') ? p.timestamp : p.timestamp.replace(' ', 'T');
+        const utcTimestamp = timestamp.endsWith('Z') ? timestamp : `${timestamp}Z`;
+        const displayTime = new Date(utcTimestamp).toLocaleTimeString('en-MY', { 
+          hour: '2-digit', 
+          minute: '2-digit',
+          timeZone: 'Asia/Kuala_Lumpur'
         });
+        
+        const key = new Date(utcTimestamp).getTime().toString();
+        if (!timeFrameMap[key]) {
+          timeFrameMap[key] = {
+            timestamp: displayTime,
+            rawTimestamp: utcTimestamp,
+            forecasted: null,
+            actual: Math.max(0, actualValue),
+          };
+        } else {
+          timeFrameMap[key].actual = Math.max(0, actualValue);
+        }
       });
 
-      // Sort by timestamp
-      allTimeFrames.sort((a, b) => {
-        const timeA = new Date(a.rawTimestamp).getTime();
-        const timeB = new Date(b.rawTimestamp).getTime();
-        return timeA - timeB;
-      });
+      // Sort by timestamp and convert to array
+      const allTimeFrames = Object.entries(timeFrameMap)
+        .sort((a, b) => {
+          const timeA = new Date(a[1].rawTimestamp).getTime();
+          const timeB = new Date(b[1].rawTimestamp).getTime();
+          return timeA - timeB;
+        })
+        .map(([_key, frame]) => frame);
 
-      const capacity = gateData.capacity || predictionMeta?.total_capacity || predictionMeta?.metadata?.total_capacity || 100;
+      const capacity = gateData.capacity || 1100;
+      
+      // Get latest actual count for current status
+      const latestPredict = predictTimeFrames[predictTimeFrames.length - 1];
+      const currentCount = latestPredict?.actual ?? 0;
+      const currentRisk = latestPredict?.riskScore ?? 0;
+      const riskLevel = currentRisk >= 0.7 ? 'High' : currentRisk >= 0.4 ? 'Medium' : 'Low';
 
       charts[gateName] = {
         capacity: capacity,
-        zone: zone,
-        gateId: predictGateKey,
-        currentData: predictionMeta || { current_people_count: 0, risk_level: 'Low' }, // Store full prediction data for incidents
+        zone: `Zone ${gateKey}`,
+        gateId: gateKey,
+        currentData: { 
+          current_people_count: currentCount, 
+          risk_level: riskLevel,
+          risk_score: currentRisk,
+        },
         labels: allTimeFrames.map((d: any) => d.timestamp),
         datasets: [
           {
@@ -623,68 +646,39 @@ const OngoingEvent: React.FC = () => {
     return Object.keys(charts).length > 0 ? charts : null;
   }, [forecastResult, predictResult]);
 
-  // 🚨 Incident Analysis: Extract and organize incidents by gate (adapted to new structure)
+  // 🚨 Incident Analysis: Extract and organize incidents by gate (A, B, C, D structure)
   const incidentAnalysis = useMemo(() => {
-    if (!predictResult || !predictResult.predictions) return null;
+    if (!predictResult) return null;
 
     const gateData: any = {};
 
-    // Process each gate prediction (new structure)
-    predictResult.predictions.forEach((prediction: any, index: number) => {
-      const gateId = prediction.gate_id;
-      const gateNumber = gateId.replace('gate_', '');
-      const gateName = `Gate ${gateNumber}`;
-      const zone = prediction.zone || prediction.metadata?.zone || `Zone ${String.fromCharCode(65 + index)}`;
+    // Process each gate (A, B, C, D)
+    const gateKeys = Object.keys(predictResult).filter(key => 
+      ['A', 'B', 'C', 'D'].includes(key) && predictResult[key]?.timeFrames
+    );
+
+    if (gateKeys.length === 0) return null;
+
+    gateKeys.forEach((gateKey) => {
+      const gateName = `Gate ${gateKey}`;
+      const gateInfo = predictResult[gateKey];
+      const zone = `Zone ${gateKey}`;
 
       // Initialize gate data
       gateData[gateName] = {
-        capacity: prediction.total_capacity || prediction.metadata?.total_capacity || 100,
+        capacity: gateInfo.capacity || 1100,
         zone: zone,
         timeFrames: []
       };
 
-      // Current snapshot (convert UTC to Malaysia/Kuala Lumpur timezone)
-      // Ensure timestamp has 'Z' suffix for UTC, or add it if missing
-      const currentUtcTimestamp = prediction.timestamp.endsWith('Z') ? prediction.timestamp : `${prediction.timestamp}Z`;
-      const currentTimestamp = new Date(currentUtcTimestamp).toLocaleString('en-MY', {
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        timeZone: 'Asia/Kuala_Lumpur'
-      });
-
-      // Filter current incidents (skip low probability)
-      const currentIncidents = prediction.forecast_next_5_min?.possible_incidents?.filter((incident: any) => 
-        incident.incident_id !== 0 && 
-        incident.incident_name !== "No incidents" && 
-        incident.probability > 0.05
-      ) || [];
-
-      // Add current timeframe (ensure non-negative counts)
-      gateData[gateName].timeFrames.push({
-        timestamp: currentTimestamp,
-        rawTimestamp: currentUtcTimestamp,
-        riskLevel: prediction.risk_level,
-        riskScore: prediction.risk_score,
-        congestionLevel: prediction.predicted_congestion_level,
-        actualCount: Math.max(0, prediction.current_people_count ?? 0),
-        incidents: currentIncidents.sort((a: any, b: any) => b.probability - a.probability),
-        hasIncidents: currentIncidents.length > 0
-      });
-
-      // Add forecast next 5 min as a future timeframe if available
-      if (prediction.forecast_next_5_min) {
-        const nextIncidents = prediction.forecast_next_5_min.possible_incidents?.filter((incident: any) => 
-          incident.incident_id !== 0 && 
-          incident.incident_name !== "No incidents" && 
-          incident.probability > 0.05
-        ) || [];
-
-        // Calculate next timestamp (5 minutes from now, convert to Malaysia/Kuala Lumpur timezone)
-        // Use the UTC timestamp to ensure correct calculation
-        const nextTime = new Date(new Date(currentUtcTimestamp).getTime() + 5 * 60 * 1000);
-        const nextTimestamp = nextTime.toLocaleString('en-MY', {
+      // Process all time frames for this gate
+      const timeFrames = gateInfo.timeFrames || [];
+      
+      timeFrames.forEach((frame: any) => {
+        // Handle both ISO format and space-separated format
+        const timestamp = frame.timestamp.includes('T') ? frame.timestamp : frame.timestamp.replace(' ', 'T');
+        const utcTimestamp = timestamp.endsWith('Z') ? timestamp : `${timestamp}Z`;
+        const displayTimestamp = new Date(utcTimestamp).toLocaleString('en-MY', {
           month: 'short',
           day: 'numeric',
           hour: '2-digit',
@@ -692,17 +686,33 @@ const OngoingEvent: React.FC = () => {
           timeZone: 'Asia/Kuala_Lumpur'
         });
 
+        // Filter incidents (skip low probability and "No incidents")
+        const incidents = frame.possibleIncidents?.filter((incident: any) => 
+          incident.incident_id !== 0 && 
+          incident.incident_name !== "No incidents" && 
+          incident.probability > 0.05
+        ) || [];
+
+        // Determine risk level based on risk score
+        const riskScore = frame.riskScore ?? 0;
+        const riskLevel = riskScore >= 0.7 ? 'High' : riskScore >= 0.4 ? 'Medium' : 'Low';
+        
+        // Determine congestion level based on actual vs capacity
+        const actualCount = frame.actual ?? 0;
+        const congestionPercent = (actualCount / gateInfo.capacity) * 100;
+        const congestionLevel = congestionPercent >= 80 ? 'High' : congestionPercent >= 50 ? 'Medium' : 'Low';
+
         gateData[gateName].timeFrames.push({
-          timestamp: `${nextTimestamp} (forecast)`,
-          rawTimestamp: nextTime.toISOString(),
-          riskLevel: prediction.forecast_next_5_min.risk_level,
-          riskScore: prediction.forecast_next_5_min.risk_score,
-          congestionLevel: prediction.forecast_next_5_min.predicted_congestion_level,
-          actualCount: Math.max(0, prediction.forecast_next_5_min.predicted_people_count ?? 0),
-          incidents: nextIncidents.sort((a: any, b: any) => b.probability - a.probability),
-          hasIncidents: nextIncidents.length > 0
+          timestamp: displayTimestamp,
+          rawTimestamp: utcTimestamp,
+          riskLevel: riskLevel,
+          riskScore: riskScore,
+          congestionLevel: congestionLevel,
+          actualCount: Math.max(0, actualCount),
+          incidents: incidents.sort((a: any, b: any) => b.probability - a.probability),
+          hasIncidents: incidents.length > 0
         });
-      }
+      });
 
       // Sort time frames by timestamp (newest first)
       gateData[gateName].timeFrames.sort((a: any, b: any) => 
