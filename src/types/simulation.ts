@@ -109,6 +109,7 @@ interface EventData {
   popularityContent?: PopularityContent; // AI-analyzed popularity and crowd insights
   predict_result?: any; // Live prediction data from the backend
   forecast_result?: any; // Forecast prediction data from the backend
+  nearby_result?: any; // Nearby events from SerpAPI (stored by backend)
 }
 
 export type { SimulationResult, EventData, PopularityContent };

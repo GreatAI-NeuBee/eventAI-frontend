@@ -147,6 +147,155 @@ const WeatherCard: React.FC = () => {
   );
 };
 
+// Component for nearby events display from backend
+const NearbyEventsCard: React.FC<{ 
+  nearbyEventData: any; 
+}> = ({ nearbyEventData }) => {
+  const { isDarkBackground, isRainBackground } = useContext(WeatherContext);
+  
+  // Log whenever component renders with new data
+  console.log('🎨 [NearbyEventsCard] Rendering with:', {
+    hasData: !!nearbyEventData,
+    totalResults: nearbyEventData?.summary?.total_results || 0,
+    recommendedCount: nearbyEventData?.summary?.recommended_results?.length || 0,
+    hasRelevantResults: nearbyEventData?.summary?.has_relevant_results,
+    nearbyEventData: nearbyEventData,
+  });
+  
+  const getTextColor = () => (isDarkBackground || isRainBackground) ? 'text-white' : 'text-gray-900';
+  const getSecondaryTextColor = () => (isDarkBackground || isRainBackground) ? 'text-white/80' : 'text-gray-600';
+  const getCardBg = () => (isDarkBackground || isRainBackground) ? 'bg-blue-500/10 border-blue-300/30' : 'bg-blue-50 border-blue-200';
+  const getLinkColor = () => (isDarkBackground || isRainBackground) ? 'text-blue-300 hover:text-blue-200' : 'text-blue-600 hover:text-blue-800';
+  const getRelevanceBadgeColor = (score: number) => {
+    if (score >= 0.7) {
+      return (isDarkBackground || isRainBackground) 
+        ? 'bg-green-500/30 text-green-100 border-green-300/40' 
+        : 'bg-green-100 text-green-800 border-green-300';
+    } else if (score >= 0.5) {
+      return (isDarkBackground || isRainBackground)
+        ? 'bg-yellow-500/30 text-yellow-100 border-yellow-300/40'
+        : 'bg-yellow-100 text-yellow-800 border-yellow-300';
+    }
+    return (isDarkBackground || isRainBackground)
+      ? 'bg-gray-500/30 text-gray-100 border-gray-300/40'
+      : 'bg-gray-100 text-gray-800 border-gray-300';
+  };
+  
+  // Get top 3 most relevant results - prefer recommended_results, fallback to all results sorted by relevance
+  const getTopResults = () => {
+    if (nearbyEventData?.summary?.recommended_results && nearbyEventData.summary.recommended_results.length > 0) {
+      return nearbyEventData.summary.recommended_results.slice(0, 3);
+    }
+    
+    if (nearbyEventData?.results && nearbyEventData.results.length > 0) {
+      return [...nearbyEventData.results]
+        .sort((a: any, b: any) => (b.relevance_score || 0) - (a.relevance_score || 0))
+        .slice(0, 3);
+    }
+    
+    return [];
+  };
+  
+  const topResults = getTopResults();
+  
+  // Don't show if no relevant results
+  if (!nearbyEventData || topResults.length === 0) {
+    return null; // Don't show empty card
+  }
+
+  return (
+    <GlassCard intensity="medium" blur="md">
+      <h3 className={`text-lg font-semibold mb-4 ${getTextColor()}`}>
+        🔍 Nearby Events Discovery
+        {nearbyEventData.summary?.total_results && (
+          <span className={`ml-2 text-xs font-normal ${getSecondaryTextColor()}`}>
+            (Top {topResults.length} of {nearbyEventData.summary.total_results.toLocaleString()})
+          </span>
+        )}
+      </h3>
+      
+      <div className="space-y-3">
+        {/* Display top 3 most relevant results */}
+        {topResults.map((result: any, idx: number) => (
+          <a
+            key={idx}
+            href={result.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={`block p-4 ${getCardBg()} border rounded-lg backdrop-blur-sm hover:shadow-md transition-all group`}
+          >
+            {/* Header with source and relevance */}
+            <div className="flex items-start justify-between mb-2">
+              <div className="flex items-center gap-2 flex-1">
+                <span className={`text-xs font-medium ${getSecondaryTextColor()}`}>
+                  {result.source || 'Unknown Source'}
+                </span>
+                {result.date && (
+                  <>
+                    <span className={`text-xs ${getSecondaryTextColor()}`}>•</span>
+                    <span className={`text-xs ${getSecondaryTextColor()}`}>{result.date}</span>
+                  </>
+                )}
+              </div>
+              {result.relevance_score !== undefined && (
+                <span className={`text-xs px-2 py-0.5 rounded-full border ${getRelevanceBadgeColor(result.relevance_score)}`}>
+                  {Math.round(result.relevance_score * 100)}% match
+                </span>
+              )}
+            </div>
+
+            {/* Title */}
+            <h4 className={`text-sm font-semibold ${getLinkColor()} mb-2 group-hover:underline line-clamp-2`}>
+              {result.title}
+            </h4>
+
+            {/* Description with highlighted keywords */}
+            {result.description && (
+              <p className={`text-sm ${getSecondaryTextColor()} line-clamp-3 mb-2`}>
+                {result.description}
+              </p>
+            )}
+
+            {/* Matched keywords */}
+            {result.matched_keywords && result.matched_keywords.length > 0 && (
+              <div className="flex flex-wrap gap-1 mt-2">
+                {result.matched_keywords.slice(0, 4).map((keyword: string, i: number) => (
+                  <span 
+                    key={i}
+                    className={`text-xs px-2 py-0.5 rounded-full ${
+                      (isDarkBackground || isRainBackground)
+                        ? 'bg-blue-400/20 text-blue-200'
+                        : 'bg-blue-100 text-blue-700'
+                    }`}
+                  >
+                    {keyword}
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {/* High relevance badge */}
+            {result.is_highly_relevant && (
+              <div className="mt-2 flex items-center gap-1">
+                <span className="text-xs">✨</span>
+                <span className={`text-xs font-medium ${
+                  (isDarkBackground || isRainBackground)
+                    ? 'text-green-300'
+                    : 'text-green-700'
+                }`}>
+                  Highly Relevant
+                </span>
+              </div>
+            )}
+          </a>
+        ))}
+      </div>
+
+     
+    </GlassCard>
+  );
+};
+
 // Component for weather recommendations based on weather conditions
 const WeatherRecommendations: React.FC = () => {
   const { isDarkBackground, isRainBackground, weatherCondition, weatherData } = useContext(WeatherContext);
@@ -524,6 +673,14 @@ const EventDetails: React.FC = () => {
         // Handle the backend response structure
         const eventData = response.data.data || response.data;
 
+        // Debug: Check for nearby_event data
+        console.log('📍 [EventDetails] Checking for nearby_event data:', {
+          has_nearby_event: !!eventData.nearby_event,
+          has_nearby_result: !!eventData.nearby_result,
+          nearby_event_keys: eventData.nearby_event ? Object.keys(eventData.nearby_event) : [],
+          nearby_event_data: eventData.nearby_event,
+        });
+
         const transformedEvent: EventData = {
           id: eventData.eventId || eventData.id,
           name: eventData.name,
@@ -546,7 +703,13 @@ const EventDetails: React.FC = () => {
           attachmentUrls: eventData.attachmentUrls || [],
           attachmentFilenames: eventData.attachmentFilenames || [],
           popularityContent: eventData.popularityContent || eventData.popularity_content || eventData.popularityExtent || undefined,
+          nearby_result: eventData.nearby_event || eventData.nearby_result || eventData.nearbyResult || eventData.nearbyEvent || undefined,
         };
+        
+        console.log('📍 [EventDetails] Transformed event nearby_result:', {
+          has_nearby_result: !!transformedEvent.nearby_result,
+          nearby_result_summary: transformedEvent.nearby_result?.summary,
+        });
         
         setCurrentEvent(transformedEvent);
 
@@ -989,6 +1152,20 @@ const EventDetails: React.FC = () => {
           <div className="space-y-6">
             {/* Weather-based Recommendations */}
             <WeatherRecommendations />
+
+            {/* Nearby Events Discovery - Show only if data exists from backend */}
+            {(() => {
+              console.log('📍 [EventDetails] Nearby Events rendering check:', {
+                has_nearby_result: !!currentEvent.nearby_result,
+                nearby_result_keys: currentEvent.nearby_result ? Object.keys(currentEvent.nearby_result) : [],
+                has_forecast: !!forecastResult,
+              });
+              return currentEvent.nearby_result ? (
+                <NearbyEventsCard 
+                  nearbyEventData={currentEvent.nearby_result}
+                />
+              ) : null;
+            })()}
             
             <GlassCard intensity="medium" blur="md">
               <h3 className={`text-lg font-semibold mb-4 ${getSectionHeaderColor()}`}>AI Recommendations</h3>

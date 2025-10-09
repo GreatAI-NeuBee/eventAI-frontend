@@ -477,12 +477,13 @@ const OngoingEvent: React.FC = () => {
 
   // Prepare comparison chart data for EACH GATE (adapted to new backend structure)
   const gateComparisonCharts = useMemo(() => {
-    if (!forecastResult || !predictResult) {
-      console.log('⚠️ Cannot create comparison charts - missing data:', { 
-        hasForecast: !!forecastResult, 
-        hasPredict: !!predictResult 
-      });
+    if (!predictResult) {
+      console.log('⚠️ Cannot create comparison charts - missing predict_result');
       return null;
+    }
+    
+    if (!forecastResult) {
+      console.log('ℹ️ No forecast_result available - will show only live data');
     }
 
     console.log('🔍 Full Predict Result:', predictResult);
@@ -512,9 +513,9 @@ const OngoingEvent: React.FC = () => {
 
       console.log(`📊 Processing ${gateName} (${zone})`);
 
-      // Get forecast time frames for this gate
+      // Get forecast time frames for this gate (if forecast_result exists)
       let forecastTimeFrames: any[] = [];
-      if (forecastResult.forecast) {
+      if (forecastResult && forecastResult.forecast) {
         forecastTimeFrames = 
           forecastResult.forecast[gateNumber]?.timeFrames ||
           forecastResult.forecast[gateNumber.toUpperCase()]?.timeFrames ||
@@ -528,7 +529,8 @@ const OngoingEvent: React.FC = () => {
 
       console.log(`📊 ${gateName} - Forecast frames:`, forecastTimeFrames.length, 'Predict frames:', predictTimeFrames.length);
 
-      if (forecastTimeFrames.length === 0 && predictTimeFrames.length === 0) {
+      // Skip only if there's no predict data (forecast is optional)
+      if (predictTimeFrames.length === 0 && forecastTimeFrames.length === 0) {
         console.warn(`⚠️ No data for ${gateName}`);
         return;
       }
@@ -887,7 +889,7 @@ const OngoingEvent: React.FC = () => {
   const headerSections = plan?.zones?.length ?? 0;
   const headerToilets = plan?.toiletsList?.length ?? 0;
 
-  // Check if predict_result is null (live model not available)
+  // Check if predict_result is null (live model data not available)
   if (!predictResult && !isLoadingEvent) {
     return (
       <div className="max-w-7xl mx-auto p-6">
@@ -908,11 +910,11 @@ const OngoingEvent: React.FC = () => {
           <div className="text-center py-12">
             <Calendar className="h-16 w-16 text-amber-600 mx-auto mb-4" />
             <h2 className="text-2xl font-semibold text-gray-900 mb-3">
-              Live Model Only Available on Event Day
+              Live Prediction Data Not Available
             </h2>
             <p className="text-gray-700 mb-6 max-w-2xl mx-auto">
-              The live prediction model will be activated on the day of the event. 
-              Real-time crowd density predictions and monitoring will be available once the event begins.
+              The live prediction model data is not yet available for this event. 
+              Real-time crowd density predictions and monitoring will appear here once predictions are generated.
             </p>
             <div className="flex items-center justify-center gap-8 text-sm text-gray-600">
               <div className="flex flex-col items-center">
@@ -1099,7 +1101,7 @@ const OngoingEvent: React.FC = () => {
       )}
 
       {/* Incident Predictions - Organized by Gate */}
-      {incidentAnalysis && incidentAnalysis.totals.all > 0 && (
+      {incidentAnalysis && (
         <Card className="bg-gradient-to-b from-white to-amber-50">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-2">
@@ -1122,6 +1124,17 @@ const OngoingEvent: React.FC = () => {
             </div>
           </div>
 
+          {/* No incidents message */}
+          {incidentAnalysis.totals.all === 0 ? (
+            <div className="p-8 bg-green-50 border-2 border-green-200 rounded-lg text-center">
+              <CheckCircle2 className="h-12 w-12 text-green-600 mx-auto mb-3" />
+              <h3 className="text-lg font-semibold text-green-900 mb-2">No Incidents Predicted</h3>
+              <p className="text-sm text-green-700">
+                All gates are operating normally with no predicted incidents at this time.
+              </p>
+            </div>
+          ) : (
+            <>
           {/* Gates Tabs/Sections */}
           {incidentAnalysis.gates.map((gateName: string) => {
             const gateInfo = incidentAnalysis.byGate[gateName];
@@ -1322,6 +1335,8 @@ const OngoingEvent: React.FC = () => {
               Probabilities above 50% require immediate attention and proactive measures.
             </p>
           </div>
+            </>
+          )}
         </Card>
       )}
 
