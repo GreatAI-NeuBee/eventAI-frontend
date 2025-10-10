@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { FileText, AlertTriangle, Users, QrCode, ArrowDownToLine, X } from 'lucide-react';
+import { FileText, AlertTriangle, Users, QrCode, ArrowDownToLine, X, Phone } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useSearchParams } from 'react-router-dom';
 import { eventAPI } from '../api/apiClient';
@@ -328,6 +328,7 @@ const UserEventView: React.FC = () => {
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isEmergencyCallActive, setIsEmergencyCallActive] = useState(false);
 
   // Helper random int
   const rand = (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min;
@@ -425,6 +426,54 @@ const UserEventView: React.FC = () => {
         femaleWaiting,
       } as CongestionArea;
     });
+  };
+
+  // Emergency call function
+  const handleEmergencyCall = async () => {
+    if (!event) {
+      alert('Event data not available. Please try again later.');
+      return;
+    }
+
+    try {
+      setIsEmergencyCallActive(true);
+      
+      console.log('🚨 Emergency call initiated for:', event.eventName);
+
+      // Prepare event details for the webhook
+      const eventName = encodeURIComponent(event.eventName);
+      const eventLocation = encodeURIComponent(event.venue);
+      const webhookUrl = `https://eventbuddy-api.munymunyhom.tech/n8n/webhook/emergency-help?event_name=${eventName}&event_location=${eventLocation}`;
+
+      console.log('📞 Calling emergency webhook:', webhookUrl);
+
+      const response = await fetch(webhookUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          eventId: eventId,
+          eventName: event.eventName,
+          eventLocation: event.venue,
+          timestamp: new Date().toISOString(),
+          userAgent: navigator.userAgent,
+        }),
+      });
+
+      if (response.ok) {
+        console.log('✅ Emergency call webhook triggered successfully');
+        alert('🚨 Emergency call initiated! Help is on the way. Please stay calm and follow any instructions from event staff.');
+      } else {
+        throw new Error(`Webhook call failed with status: ${response.status}`);
+      }
+
+    } catch (error) {
+      console.error('❌ Emergency call failed:', error);
+      alert('⚠️ Unable to initiate emergency call. Please contact event staff directly or call local emergency services.');
+    } finally {
+      setIsEmergencyCallActive(false);
+    }
   };
 
   useEffect(() => {
@@ -549,9 +598,28 @@ const UserEventView: React.FC = () => {
             )}
           </div>
           
-          {/* Notification Bell Button */}
+          {/* Action Buttons */}
           {eventId && (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
+              {/* Emergency Call Button */}
+              <motion.button
+                onClick={handleEmergencyCall}
+                disabled={isEmergencyCallActive}
+                whileHover={{ scale: isEmergencyCallActive ? 1 : 1.05 }}
+                whileTap={{ scale: isEmergencyCallActive ? 1 : 0.95 }}
+                className={`
+                  flex items-center gap-2 px-4 py-2 rounded-lg font-semibold text-sm transition-all duration-200
+                  ${isEmergencyCallActive 
+                    ? 'bg-red-300 text-red-700 cursor-not-allowed' 
+                    : 'bg-red-600 hover:bg-red-700 text-white shadow-lg hover:shadow-xl'
+                  }
+                `}
+              >
+                <Phone className={`h-4 w-4 ${isEmergencyCallActive ? 'animate-pulse' : ''}`} />
+                {isEmergencyCallActive ? 'Calling...' : 'Emergency Help'}
+              </motion.button>
+
+              {/* Notification Bell Button */}
               <NotificationBellButton 
                 eventId={eventId}
                 onSubscribed={() => {
