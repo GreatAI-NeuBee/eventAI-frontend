@@ -176,19 +176,14 @@ const OngoingEvent: React.FC = () => {
 
   const activeEvent: any = eventDetails || currentEvent || { name: "Event", capacity: 0, date: new Date().toISOString(), venue: "" };
 
-  // Prepare comparison chart data for EACH GATE (using A, B, C, D structure)
+  // Prepare chart data for EACH GATE showing only live predictions (using A, B, C, D structure)
   const gateComparisonCharts = useMemo(() => {
     if (!predictResult) {
-      console.log('⚠️ Cannot create comparison charts - missing predict_result');
+      console.log('⚠️ Cannot create charts - missing predict_result');
       return null;
-    }
-    
-    if (!forecastResult) {
-      console.log('ℹ️ No forecast_result available - will show only live data');
     }
 
     console.log('🔍 Full Predict Result:', predictResult);
-    console.log('🔍 Full Forecast Result:', forecastResult);
 
     const charts: any = {};
     
@@ -211,56 +206,20 @@ const OngoingEvent: React.FC = () => {
       
       console.log(`📊 Processing ${gateName}`, gateData);
 
-      // Get forecast time frames for this gate (if forecast_result exists)
-      let forecastTimeFrames: any[] = [];
-      if (forecastResult && forecastResult.forecast && forecastResult.forecast[gateKey]) {
-        forecastTimeFrames = forecastResult.forecast[gateKey].timeFrames || [];
-      }
-
       // Get predict time frames from the gate key
       const predictTimeFrames = gateData.timeFrames || [];
 
-      console.log(`📊 ${gateName} - Forecast frames:`, forecastTimeFrames.length, 'Predict frames:', predictTimeFrames.length);
+      console.log(`📊 ${gateName} - Predict frames:`, predictTimeFrames.length);
 
-      // Skip only if there's no predict data (forecast is optional)
-      if (predictTimeFrames.length === 0 && forecastTimeFrames.length === 0) {
+      // Skip if there's no predict data
+      if (predictTimeFrames.length === 0) {
         console.warn(`⚠️ No data for ${gateName}`);
         return;
       }
 
-      // Create an object to merge forecast and predict data by timestamp
-      type TimeFrame = { timestamp: string; rawTimestamp: string; forecasted: number | null; actual: number | null };
-      const timeFrameMap: Record<string, TimeFrame> = {};
-
-      // Add all forecast data points (ensure non-negative values)
+      // Process predict/live time-series data points (ensure non-negative)
       // Convert UTC to Malaysia/Kuala Lumpur timezone (UTC+8)
-      forecastTimeFrames.forEach((f: any) => {
-        const forecastValue = f.predicted ?? f.congestion ?? f.density ?? 0;
-        // Handle both ISO format and space-separated format
-        const timestamp = f.timestamp.includes('T') ? f.timestamp : f.timestamp.replace(' ', 'T');
-        const utcTimestamp = timestamp.endsWith('Z') ? timestamp : `${timestamp}Z`;
-        const displayTime = new Date(utcTimestamp).toLocaleTimeString('en-MY', { 
-            hour: '2-digit', 
-            minute: '2-digit',
-            timeZone: 'Asia/Kuala_Lumpur'
-        });
-        
-        const key = new Date(utcTimestamp).getTime().toString();
-        if (!timeFrameMap[key]) {
-          timeFrameMap[key] = {
-            timestamp: displayTime,
-          rawTimestamp: utcTimestamp,
-            forecasted: Math.max(0, forecastValue),
-          actual: null,
-          };
-        } else {
-          timeFrameMap[key].forecasted = Math.max(0, forecastValue);
-        }
-      });
-
-      // Add all predict/live time-series data points (ensure non-negative)
-      // Convert UTC to Malaysia/Kuala Lumpur timezone (UTC+8)
-      predictTimeFrames.forEach((p: any) => {
+      const timeFrames = predictTimeFrames.map((p: any) => {
         const actualValue = p.actual ?? p.predicted ?? p.congestion ?? p.density ?? 0;
         // Handle both ISO format and space-separated format
         const timestamp = p.timestamp.includes('T') ? p.timestamp : p.timestamp.replace(' ', 'T');
@@ -271,27 +230,19 @@ const OngoingEvent: React.FC = () => {
             timeZone: 'Asia/Kuala_Lumpur'
         });
         
-        const key = new Date(utcTimestamp).getTime().toString();
-        if (!timeFrameMap[key]) {
-          timeFrameMap[key] = {
-            timestamp: displayTime,
+        return {
+          timestamp: displayTime,
           rawTimestamp: utcTimestamp,
-          forecasted: null,
-            actual: Math.max(0, actualValue),
-          };
-        } else {
-          timeFrameMap[key].actual = Math.max(0, actualValue);
-        }
+          actual: Math.max(0, actualValue),
+        };
       });
 
-      // Sort by timestamp and convert to array
-      const allTimeFrames = Object.entries(timeFrameMap)
-        .sort((a, b) => {
-          const timeA = new Date(a[1].rawTimestamp).getTime();
-          const timeB = new Date(b[1].rawTimestamp).getTime();
+      // Sort by timestamp
+      timeFrames.sort((a: any, b: any) => {
+        const timeA = new Date(a.rawTimestamp).getTime();
+        const timeB = new Date(b.rawTimestamp).getTime();
         return timeA - timeB;
-        })
-        .map(([_key, frame]) => frame);
+      });
 
       const capacity = gateData.capacity || 1100;
       
@@ -310,42 +261,36 @@ const OngoingEvent: React.FC = () => {
           risk_level: riskLevel,
           risk_score: currentRisk,
         },
-        labels: allTimeFrames.map((d: any) => d.timestamp),
+        labels: timeFrames.map((d: any) => d.timestamp),
         datasets: [
           {
-            label: 'Forecasted',
-            data: allTimeFrames.map((d: any) => d.forecasted),
-            borderColor: 'rgb(66, 133, 244)',
-            backgroundColor: 'rgba(66, 133, 244, 0.1)',
-            borderWidth: 2,
-            tension: 0.4,
-            fill: true,
-            pointRadius: 3,
-            pointHoverRadius: 5,
-            borderDash: [],
-          },
-          {
-            label: 'Live (Real-time)',
-            data: allTimeFrames.map((d: any) => d.actual),
+            label: 'Live Crowd Density',
+            data: timeFrames.map((d: any) => d.actual),
             borderColor: 'rgb(234, 67, 53)',
-            backgroundColor: 'rgba(234, 67, 53, 0.1)',
-            borderWidth: 2,
+            backgroundColor: 'rgba(234, 67, 53, 0.15)',
+            borderWidth: 2.5,
             tension: 0.4,
             fill: true,
-            pointRadius: 4,
-            pointHoverRadius: 6,
+            pointRadius: 1.5,
+            pointHoverRadius: 5,
+            pointBackgroundColor: 'rgb(234, 67, 53)',
+            pointBorderColor: '#fff',
+            pointBorderWidth: 1,
+            pointHoverBackgroundColor: 'rgb(234, 67, 53)',
+            pointHoverBorderColor: '#fff',
+            pointHoverBorderWidth: 2,
             spanGaps: true,
             borderDash: [],
           },
         ],
       };
 
-      console.log(`✅ ${gateName} chart created with ${allTimeFrames.length} data points`);
+      console.log(`✅ ${gateName} chart created with ${timeFrames.length} data points`);
     });
 
     console.log('📊 Total charts created:', Object.keys(charts).length);
     return Object.keys(charts).length > 0 ? charts : null;
-  }, [forecastResult, predictResult]);
+  }, [predictResult]);
 
   // 🚨 Incident Analysis: Extract and organize incidents by gate (A, B, C, D structure)
   const incidentAnalysis = useMemo(() => {
@@ -446,46 +391,33 @@ const OngoingEvent: React.FC = () => {
     };
   }, [predictResult]);
 
-  // 📊 Deviation Metrics for each gate (adapted to new structure)
-  const gateDeviationMetrics = useMemo(() => {
+  // 📊 Live Status Metrics for each gate
+  const gateStatusMetrics = useMemo(() => {
     if (!gateComparisonCharts || !predictResult) return null;
 
     const metrics: any = {};
 
     Object.entries(gateComparisonCharts).forEach(([gateName, chartData]: [string, any]) => {
-      const datasets = chartData.datasets;
-      if (!datasets || datasets.length < 2) return;
-
-      const forecastData = datasets[0].data;
-      const actualData = datasets[1].data;
       const currentData = chartData.currentData;
+      const datasets = chartData.datasets;
+      const liveData = datasets[0]?.data || [];
 
-      let totalDeviation = 0;
-      let validPoints = 0;
+      // Calculate average crowd density over all time frames
+      const validData = liveData.filter((d: any) => d !== null && d !== undefined);
+      const avgDensity = validData.length > 0 
+        ? validData.reduce((sum: number, val: number) => sum + val, 0) / validData.length 
+        : 0;
 
-      forecastData.forEach((forecast: any, index: number) => {
-        const actual = actualData[index];
-        if (forecast !== null && actual !== null && forecast !== 0) {
-          const deviation = ((actual - forecast) / forecast) * 100;
-          totalDeviation += Math.abs(deviation);
-          validPoints++;
-        }
-      });
-
-      if (validPoints > 0) {
-        const avgDeviation = totalDeviation / validPoints;
-        const accuracy = Math.max(0, 100 - avgDeviation);
+      // Calculate peak crowd density
+      const peakDensity = Math.max(...validData, 0);
 
         metrics[gateName] = {
-          avgDeviation: avgDeviation.toFixed(1),
-          accuracy: accuracy.toFixed(1),
-          validPoints,
+        avgDensity: avgDensity.toFixed(0),
+        peakDensity: peakDensity.toFixed(0),
+        dataPoints: validData.length,
           currentRisk: currentData?.risk_level || 'Unknown',
           currentCount: currentData?.current_people_count || 0,
-          trend: currentData?.trend_analysis?.current_trend || 'stable',
-          trendStrength: currentData?.trend_analysis?.trend_strength || 'moderate',
         };
-      }
     });
 
     return Object.keys(metrics).length > 0 ? metrics : null;
@@ -508,7 +440,7 @@ const OngoingEvent: React.FC = () => {
       },
       title: {
         display: true,
-        text: 'Forecast vs Live Prediction Comparison',
+        text: 'Live Crowd Density Monitoring',
         font: {
           size: 16,
           weight: 'bold' as const,
@@ -522,18 +454,6 @@ const OngoingEvent: React.FC = () => {
           label: function(context: any) {
             const value = context.parsed.y;
             return value !== null ? `${context.dataset.label}: ${Math.round(value)} people` : '';
-          },
-          afterLabel: function(context: any) {
-            if (context.datasetIndex === 0 && context.parsed.y !== null) {
-              const actualDataset = context.chart.data.datasets[1];
-              const actualValue = actualDataset.data[context.dataIndex];
-              if (actualValue !== null && actualValue !== undefined) {
-                const deviation = actualValue as number - context.parsed.y;
-                const deviationPercent = (deviation / context.parsed.y * 100);
-                return `Difference: ${deviation >= 0 ? '+' : ''}${Math.round(deviation)} people (${deviationPercent >= 0 ? '+' : ''}${deviationPercent.toFixed(1)}%)`;
-              }
-            }
-            return '';
           }
         }
       }
@@ -691,29 +611,25 @@ const OngoingEvent: React.FC = () => {
         </div>
       </div>
 
-      {/* Comparison Charts by Gate */}
+      {/* Live Prediction Charts by Gate */}
       {gateComparisonCharts && Object.keys(gateComparisonCharts).length > 0 && (
         <div className="space-y-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <TrendingUp className="h-5 w-5 text-blue-600" />
-              <h2 className="text-2xl font-semibold text-gray-900">Forecast vs Live Prediction by Gate</h2>
+              <TrendingUp className="h-5 w-5 text-red-600" />
+              <h2 className="text-2xl font-semibold text-gray-900">Live Crowd Density by Gate</h2>
             </div>
             <div className="flex items-center gap-2 text-sm">
               <span className="flex items-center gap-1">
-                <span className="w-3 h-3 rounded-full bg-blue-500"></span>
-                <span className="text-gray-600">Forecast</span>
-              </span>
-              <span className="flex items-center gap-1">
                 <span className="w-3 h-3 rounded-full bg-red-500"></span>
-                <span className="text-gray-600">Live</span>
+                <span className="text-gray-600">Live Predictions</span>
               </span>
             </div>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {Object.entries(gateComparisonCharts).map(([gateName, chartData]: [string, any]) => {
-              const metrics = gateDeviationMetrics?.[gateName];
+              const metrics = gateStatusMetrics?.[gateName];
               const currentData = chartData.currentData;
               
               // Risk level badge color
@@ -763,40 +679,40 @@ const OngoingEvent: React.FC = () => {
                     />
                   </div>
                   
-                  {/* Deviation Metrics & Live Status for this gate */}
+                  {/* Live Status Metrics for this gate */}
                   {metrics && (
                     <div className="mt-4 space-y-2">
-                      <div className="p-3 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
+                      <div className="p-3 bg-gradient-to-r from-red-50 to-pink-50 rounded-lg border border-red-200">
                         <div className="flex items-center justify-between">
                           <div>
-                            <p className="text-xs font-semibold text-gray-900 mb-1">Accuracy Analysis</p>
+                            <p className="text-xs font-semibold text-gray-900 mb-1">Crowd Density Statistics</p>
                             <p className="text-xs text-gray-600">
-                              Based on {metrics.validPoints} comparison points
+                              Based on {metrics.dataPoints} live data points
                             </p>
                           </div>
                           <div className="flex items-center gap-4">
                             <div className="text-center">
-                              <p className="text-lg font-bold text-green-600">{metrics.accuracy}%</p>
-                              <p className="text-xs text-gray-600">Accuracy</p>
+                              <p className="text-lg font-bold text-blue-600">{metrics.avgDensity}</p>
+                              <p className="text-xs text-gray-600">Avg People</p>
                             </div>
                             <div className="text-center">
-                              <p className="text-lg font-bold text-blue-600">±{metrics.avgDeviation}%</p>
-                              <p className="text-xs text-gray-600">Deviation</p>
+                              <p className="text-lg font-bold text-red-600">{metrics.peakDensity}</p>
+                              <p className="text-xs text-gray-600">Peak</p>
                             </div>
                           </div>
                         </div>
                       </div>
                       
-                      {/* Live Trend Indicator */}
+                      {/* Current Status Indicator */}
                       <div className="flex items-center justify-between p-2 bg-gray-50 rounded border border-gray-200 text-xs">
-                        <span className="text-gray-600">Trend:</span>
+                        <span className="text-gray-600">Current Status:</span>
                         <span className={`font-medium ${
-                          metrics.trend === 'rising' ? 'text-red-600' :
-                          metrics.trend === 'falling' ? 'text-green-600' :
-                          'text-gray-700'
+                          metrics.currentRisk === 'High' ? 'text-red-600' :
+                          metrics.currentRisk === 'Medium' ? 'text-yellow-600' :
+                          'text-green-600'
                         }`}>
-                          {metrics.trend === 'rising' ? '📈' : metrics.trend === 'falling' ? '📉' : '➡️'} 
-                          {' '}{metrics.trend} ({metrics.trendStrength})
+                          {metrics.currentRisk === 'High' ? '🔴' : metrics.currentRisk === 'Medium' ? '🟡' : '🟢'} 
+                          {' '}{metrics.currentCount} people • {metrics.currentRisk} Risk
                         </span>
                       </div>
                     </div>
@@ -806,11 +722,11 @@ const OngoingEvent: React.FC = () => {
             })}
           </div>
 
-          <div className="p-3 bg-blue-50 rounded-lg">
+          <div className="p-3 bg-red-50 rounded-lg">
             <p className="text-sm text-gray-700">
-              <span className="font-semibold">💡 Insight:</span> Each chart compares forecasted crowd density 
-              predictions (blue) with real-time live predictions (red) for individual gates. Significant deviations may indicate unexpected crowd 
-              patterns or changes in event conditions at specific entry points.
+              <span className="font-semibold">💡 Insight:</span> Each chart displays real-time live crowd density 
+              predictions for individual gates. Monitor the trends and current risk levels to identify potential 
+              congestion issues and take proactive measures at specific entry points.
             </p>
           </div>
         </div>
