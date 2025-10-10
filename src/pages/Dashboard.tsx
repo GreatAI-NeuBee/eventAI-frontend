@@ -27,6 +27,7 @@ const Dashboard: React.FC = () => {
   const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
   
+  
   const {
     events,
     setEvents,
@@ -259,6 +260,7 @@ const Dashboard: React.FC = () => {
     }
   };
 
+
   const getStatusBadge = (status: EventData['status']) => {
     const statusConfig: Record<EventData['status'], { color: string; label: string }> = {
       draft: { 
@@ -350,6 +352,7 @@ const Dashboard: React.FC = () => {
             Create New Event
           </Button>
         </div>
+
 
       {/* Fallback Data Warning */}
       {usingFallbackData && (
@@ -638,6 +641,7 @@ const Dashboard: React.FC = () => {
           </Card>
         </>
       )}
+
 
       {/* Stats */}
       {/* {events.length > 0 && (

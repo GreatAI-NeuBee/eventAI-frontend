@@ -11,6 +11,7 @@ import OnGoingEvent from './pages/OnGoingEvent';
 import User from './pages/User';
 import WeatherTest from './pages/WeatherTest';
 import QRCodeAttachments from './pages/QRCodeAttachments';
+import CongestionDashboard from './pages/CongestionDashboard';
 
 // Import API testing utilities (available in browser console)
 import './utils/apiTest';
@@ -65,6 +66,9 @@ function App() {
           } />
           <Route path="/weather-test" element={
             <WeatherTest />
+          } />
+          <Route path="/congestion-dashboard" element={
+            <CongestionDashboard />
           } />
           
           {/* Redirect old routes to dashboard */}
