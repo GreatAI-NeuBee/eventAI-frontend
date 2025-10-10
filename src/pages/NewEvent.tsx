@@ -24,8 +24,9 @@ const NewEvent: React.FC = () => {
     endTime: '',
     venue: '',
     description: '',
-    eventType: 'event' as 'concert' | 'event',
+    eventType: 'exhibition' as 'concert' | 'exhibition',
     featuredGuest: '',
+    exhibitionName: '',
     location: '',
   });
 
@@ -119,6 +120,11 @@ const NewEvent: React.FC = () => {
       newErrors.featuredGuest = 'Featured guest is required for concerts';
     }
 
+    // Validate exhibition name for exhibitions
+    if (formData.eventType === 'exhibition' && !formData.exhibitionName.trim()) {
+      newErrors.exhibitionName = 'Exhibition name is required for exhibitions';
+    }
+
     // Venue layout validation (optional but if provided should have at least 1 section)
     if (venueLayoutJson && venueLayoutJson.sections === 0) {
       newErrors.venueLayout = 'Venue layout must have at least one section';
@@ -158,6 +164,16 @@ const NewEvent: React.FC = () => {
       const startISO = new Date(`${formData.eventDate}T${formData.startTime}:00`).toISOString();
       const endISO = new Date(`${formData.eventDate}T${formData.endTime}:00`).toISOString();
 
+      // Determine the 'feat' value based on event type
+      const featValue = formData.eventType === 'concert' 
+        ? formData.featuredGuest 
+        : formData.exhibitionName;
+
+      // Map frontend event type to backend expected values
+      // Frontend: 'concert' or 'exhibition'
+      // Backend expects: 'concert' or 'event'
+      const backendEventType = formData.eventType === 'concert' ? 'concert' : 'event';
+
       const submitData: any = {
         name: formData.name,
         dateOfEventStart: startISO,
@@ -165,8 +181,8 @@ const NewEvent: React.FC = () => {
         venue: formData.venue,
         description: formData.description,
         popularity: {
-          type: formData.eventType,
-          feat: formData.featuredGuest || undefined,
+          type: backendEventType,
+          feat: featValue || undefined,
           location: formData.location,
         },
         userEmail: user?.email,
@@ -352,12 +368,12 @@ const NewEvent: React.FC = () => {
                 <input
                   type="radio"
                   name="eventType"
-                  value="event"
-                  checked={formData.eventType === 'event'}
+                  value="exhibition"
+                  checked={formData.eventType === 'exhibition'}
                   onChange={handleInputChange}
                   className="w-4 h-4 text-blue-600 focus:ring-blue-500 border-gray-300"
                 />
-                <span className="ml-2 text-sm text-gray-700">Event</span>
+                <span className="ml-2 text-sm text-gray-700">Exhibition</span>
               </label>
               <label className="flex items-center cursor-pointer">
                 <input
@@ -372,6 +388,21 @@ const NewEvent: React.FC = () => {
               </label>
             </div>
           </div>
+
+          {/* Exhibition Name - Only show for exhibitions */}
+          {formData.eventType === 'exhibition' && (
+            <div className="mt-6">
+              <Input
+                label="Exhibition Name"
+                name="exhibitionName"
+                value={formData.exhibitionName}
+                onChange={handleInputChange}
+                placeholder="e.g., Art Expo 2024, Tech Innovation Fair"
+                error={errors.exhibitionName}
+                required
+              />
+            </div>
+          )}
 
           {/* Featured Guest - Only show for concerts */}
           {formData.eventType === 'concert' && (

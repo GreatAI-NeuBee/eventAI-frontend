@@ -76,11 +76,22 @@ const fetchRealWeatherData = async (venueLocation: VenueLocation, eventDate: str
     console.log('🌤️ Current date:', currentDate.toISOString());
     console.log('🌤️ Days difference:', daysDifference);
     
-    // Only use mock data for events more than 5 days in the future
-    // For current day, yesterday, or near future, always try real API first
+    // Only provide weather data for events within 5 days
+    // For events more than 5 days away, return "not available" message
     if (daysDifference > 5) {
-      console.log('🌤️ Event is more than 5 days away, using enhanced mock data');
-      return generateEventSpecificWeatherData(venueLocation, eventDate);
+      console.log('🌤️ Event is more than 5 days away, weather forecast temporarily not available');
+      return {
+        location: venueLocation.name || venueLocation.address || 'Event Venue',
+        current: {
+          temperature: 0,
+          condition: 'Weather forecast temporarily not available for events more than 5 days away',
+          windSpeed: 0,
+          humidity: 0,
+          icon: 'cloud'
+        },
+        forecast: [],
+        hourly: []
+      };
     }
     
     console.log('🌤️ Event is within 5 days, attempting real API call');
@@ -283,9 +294,20 @@ const fetchRealWeatherData = async (venueLocation: VenueLocation, eventDate: str
     
   } catch (error) {
     console.error('Error fetching real weather data:', error);
-    // Fallback to mock data if OpenWeatherMap API fails
-    console.log('🌤️ OpenWeatherMap API failed, using fallback mock data');
-    return generateEventSpecificWeatherData(venueLocation, eventDate);
+    // Return "not available" message if API fails
+    console.log('🌤️ OpenWeatherMap API failed, weather data temporarily not available');
+    return {
+      location: venueLocation.name || venueLocation.address || 'Event Venue',
+      current: {
+        temperature: 0,
+        condition: 'Weather forecast temporarily not available',
+        windSpeed: 0,
+        humidity: 0,
+        icon: 'cloud'
+      },
+      forecast: [],
+      hourly: []
+    };
   }
 };
 
@@ -309,104 +331,6 @@ const getWeatherIconFromCondition = (condition: string): string => {
   } else {
     return 'sun'; // Default to sun for unknown conditions
   }
-};
-
-
-// Generate event-specific weather data for events beyond 5-day forecast
-const generateEventSpecificWeatherData = (venueLocation: VenueLocation, eventDate: string): WeatherData => {
-  const eventDateTime = new Date(eventDate);
-  const currentDate = new Date();
-  const daysDifference = Math.ceil((eventDateTime.getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24));
-  const eventHour = eventDateTime.getHours();
-  const eventMonth = eventDateTime.getMonth();
-  
-  // Generate weather based on location and season
-  const isTropical = venueLocation.lat > 0 && venueLocation.lat < 10;
-  const baseTemp = isTropical ? 28 + (Math.sin(eventMonth * 0.5) * 3) : 20 + (venueLocation.lat * 0.5) + (Math.sin(eventMonth * 0.5) * 10);
-  
-  // Event-specific weather patterns
-  const isAfternoon = eventHour >= 12 && eventHour <= 18;
-  const isEvening = eventHour >= 18 && eventHour <= 22;
-  const isMorning = eventHour >= 6 && eventHour <= 12;
-  
-  // Weather conditions based on time of day and season
-  let conditions;
-  if (isTropical) {
-    if (isAfternoon) {
-      conditions = Math.random() > 0.4 ? 'Heavy rain' : 'Partly cloudy';
-    } else if (isEvening) {
-      conditions = Math.random() > 0.6 ? 'Clear' : 'Partly cloudy';
-    } else if (isMorning) {
-      conditions = Math.random() > 0.7 ? 'Clear' : 'Partly cloudy';
-    } else {
-      conditions = Math.random() > 0.8 ? 'Clear' : 'Partly cloudy';
-    }
-  } else {
-    if (isAfternoon) {
-      conditions = Math.random() > 0.5 ? 'Sunny' : 'Partly cloudy';
-    } else if (isEvening) {
-      conditions = Math.random() > 0.6 ? 'Clear' : 'Cloudy';
-    } else if (isMorning) {
-      conditions = Math.random() > 0.7 ? 'Sunny' : 'Partly cloudy';
-    } else {
-      conditions = Math.random() > 0.8 ? 'Clear' : 'Cloudy';
-    }
-  }
-  
-  const eventTemp = Math.round(baseTemp + (Math.random() - 0.5) * 4);
-  
-  // Generate forecast around the event
-  const forecast = [
-    { 
-      day: daysDifference > 1 ? 'Before Event' : 'Event Day', 
-      condition: daysDifference > 1 ? (isTropical ? 'Heavy rain' : 'Partly cloudy') : conditions, 
-      temperature: Math.round(eventTemp + (Math.random() - 0.5) * 2), 
-      icon: isTropical ? 'cloud-rain' : 'cloud'
-    },
-    { 
-      day: 'Event Day', 
-      condition: conditions, 
-      temperature: eventTemp, 
-      icon: conditions.toLowerCase().includes('rain') ? 'cloud-rain' : 
-            conditions.toLowerCase().includes('storm') ? 'storm' : 
-            conditions.toLowerCase().includes('cloud') ? 'cloud' : 'sun'
-    },
-    { 
-      day: 'After Event', 
-      condition: isTropical ? (Math.random() > 0.3 ? 'Heavy rain' : 'Partly cloudy') : (Math.random() > 0.5 ? 'Sunny' : 'Cloudy'), 
-      temperature: Math.round(eventTemp + (Math.random() - 0.5) * 3), 
-      icon: isTropical ? 'cloud-rain' : 'sun'
-    }
-  ];
-  
-  // Generate hourly forecast around event time
-  const hourly = Array.from({ length: 8 }, (_, i) => {
-    const hourOffset = i - 4; // 4 hours before to 4 hours after event
-    const hourTemp = Math.round(eventTemp + Math.sin((eventHour + hourOffset - 12) * 0.3) * 3 + (Math.random() - 0.5) * 2);
-    const displayHour = (eventHour + hourOffset + 24) % 24;
-    const isEventTime = hourOffset === 0;
-    
-    return {
-      time: `${displayHour.toString().padStart(2, '0')}:00`,
-      temperature: hourTemp,
-      isCurrent: isEventTime
-    };
-  });
-  
-  return {
-    location: venueLocation.name || venueLocation.address || 'Event Venue',
-    current: {
-      temperature: eventTemp,
-      condition: conditions,
-      windSpeed: Math.round((Math.random() * 3 + 2) * 10) / 10,
-      humidity: Math.round(Math.random() * 20 + (isTropical ? 70 : 50)),
-      icon: conditions.toLowerCase().includes('rain') ? 'cloud-rain' : 
-            conditions.toLowerCase().includes('storm') ? 'storm' : 
-            conditions.toLowerCase().includes('cloud') ? 'cloud' : 'sun'
-    },
-    forecast: forecast,
-    hourly: hourly
-  };
 };
 
 

@@ -71,6 +71,11 @@ const WeatherBackground: React.FC<WeatherBackgroundProps> = ({
     
     const condition = weatherData.current.condition.toLowerCase();
     
+    // If weather is not available, default to clear
+    if (condition.includes('not available')) {
+      return 'clear';
+    }
+    
     if (condition.includes('storm') || condition.includes('thunder')) {
       return 'storm';
     } else if (condition.includes('rain') || condition.includes('drizzle')) {
@@ -136,9 +141,20 @@ const WeatherBackground: React.FC<WeatherBackgroundProps> = ({
         const playPromise = video.play();
         if (playPromise !== undefined) {
           playPromise.catch(error => {
-            console.log('Rain video autoplay prevented:', error);
-            // Try to play again after a short delay
-            setTimeout(() => video.play(), 100);
+            // Silently handle autoplay errors (browser security)
+            // Only log if it's not an abort error (which happens during re-renders)
+            if (error.name !== 'AbortError') {
+              console.log('Rain video autoplay prevented:', error.name);
+            }
+            // Try to play again after a short delay if not aborted
+            if (error.name !== 'AbortError') {
+              setTimeout(() => {
+                if (video && !video.paused) return;
+                video.play().catch(() => {
+                  // Silently ignore subsequent failures
+                });
+              }, 100);
+            }
           });
         }
       }
