@@ -41,14 +41,11 @@ export type FloorZonePolygon = {
   congestion: number; // 0..100
 };
 
-// ==== Colors ====
-const COLORS = { red: "#DA5C53", blue: "#4AA3BA", green: "#A8E4B1" };
-
 /* =======================
    Live Page
    ======================= */
 const OngoingEvent: React.FC = () => {
-  const { currentEvent, simulationResult, isLoading } = useEventStore();
+  const { currentEvent, isLoading } = useEventStore();
   const location = useLocation();
   const navigate = useNavigate();
   const { eventId: paramId } = useParams();
@@ -106,28 +103,6 @@ const OngoingEvent: React.FC = () => {
     fetchEventDetails();
   }, [eventId]);
 
-  // Build zones for SVG from the plan (merge live congestion by id if available)
-  const zones: FloorZonePolygon[] = useMemo(() => {
-    // Prioritize predict_result zones if available (live event data)
-    const predictZones = predictResult?.zones || predictResult?.hotspots || [];
-    if (predictZones.length > 0) {
-      return predictZones.map((z: any, index: number) => ({
-        id: z.id || `zone-${index}`,
-        name: z.name || `Zone ${index + 1}`,
-        layer: z.layer || 1,
-        section: z.section || index + 1,
-        points: z.points || [],
-        congestion: z.congestion || z.density || 0,
-      }));
-    }
-
-    // Fallback to simulationResult
-    const apiZones = (simulationResult as any)?.zones as FloorZonePolygon[] | undefined;
-    if (apiZones?.length) return apiZones;
-
-    return [];
-  }, [simulationResult, predictResult]);
-
   // Auto-refresh every 5 minutes (as per documentation)
   useEffect(() => {
     const interval = setInterval(() => {
@@ -161,7 +136,7 @@ const OngoingEvent: React.FC = () => {
     } catch (error) {
       console.error('Error manually refreshing event data:', error);
     } finally {
-      setIsRefreshing(false);
+    setIsRefreshing(false);
     }
   };
 
@@ -198,15 +173,6 @@ const OngoingEvent: React.FC = () => {
       setIsGeneratingPostMortem(false);
     }
   };
-
-  const avgCongestion = useMemo(
-    () => (zones.length ? Math.round(zones.reduce((s, z) => s + z.congestion, 0) / zones.length) : 0),
-    [zones]
-  );
-  const maxZone = useMemo(
-    () => (zones.length ? zones.reduce((p, z) => (z.congestion > p.congestion ? z : p), zones[0]) : null),
-    [zones]
-  );
 
   const activeEvent: any = eventDetails || currentEvent || { name: "Event", capacity: 0, date: new Date().toISOString(), venue: "" };
 
@@ -274,18 +240,18 @@ const OngoingEvent: React.FC = () => {
         const timestamp = f.timestamp.includes('T') ? f.timestamp : f.timestamp.replace(' ', 'T');
         const utcTimestamp = timestamp.endsWith('Z') ? timestamp : `${timestamp}Z`;
         const displayTime = new Date(utcTimestamp).toLocaleTimeString('en-MY', { 
-          hour: '2-digit', 
-          minute: '2-digit',
-          timeZone: 'Asia/Kuala_Lumpur'
+            hour: '2-digit', 
+            minute: '2-digit',
+            timeZone: 'Asia/Kuala_Lumpur'
         });
         
         const key = new Date(utcTimestamp).getTime().toString();
         if (!timeFrameMap[key]) {
           timeFrameMap[key] = {
             timestamp: displayTime,
-            rawTimestamp: utcTimestamp,
+          rawTimestamp: utcTimestamp,
             forecasted: Math.max(0, forecastValue),
-            actual: null,
+          actual: null,
           };
         } else {
           timeFrameMap[key].forecasted = Math.max(0, forecastValue);
@@ -300,17 +266,17 @@ const OngoingEvent: React.FC = () => {
         const timestamp = p.timestamp.includes('T') ? p.timestamp : p.timestamp.replace(' ', 'T');
         const utcTimestamp = timestamp.endsWith('Z') ? timestamp : `${timestamp}Z`;
         const displayTime = new Date(utcTimestamp).toLocaleTimeString('en-MY', { 
-          hour: '2-digit', 
-          minute: '2-digit',
-          timeZone: 'Asia/Kuala_Lumpur'
+            hour: '2-digit', 
+            minute: '2-digit',
+            timeZone: 'Asia/Kuala_Lumpur'
         });
         
         const key = new Date(utcTimestamp).getTime().toString();
         if (!timeFrameMap[key]) {
           timeFrameMap[key] = {
             timestamp: displayTime,
-            rawTimestamp: utcTimestamp,
-            forecasted: null,
+          rawTimestamp: utcTimestamp,
+          forecasted: null,
             actual: Math.max(0, actualValue),
           };
         } else {
@@ -323,7 +289,7 @@ const OngoingEvent: React.FC = () => {
         .sort((a, b) => {
           const timeA = new Date(a[1].rawTimestamp).getTime();
           const timeB = new Date(b[1].rawTimestamp).getTime();
-          return timeA - timeB;
+        return timeA - timeB;
         })
         .map(([_key, frame]) => frame);
 
@@ -414,19 +380,19 @@ const OngoingEvent: React.FC = () => {
         const timestamp = frame.timestamp.includes('T') ? frame.timestamp : frame.timestamp.replace(' ', 'T');
         const utcTimestamp = timestamp.endsWith('Z') ? timestamp : `${timestamp}Z`;
         const displayTimestamp = new Date(utcTimestamp).toLocaleString('en-MY', {
-          month: 'short',
-          day: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit',
-          timeZone: 'Asia/Kuala_Lumpur'
-        });
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        timeZone: 'Asia/Kuala_Lumpur'
+      });
 
         // Filter incidents (skip low probability and "No incidents")
         const incidents = frame.possibleIncidents?.filter((incident: any) => 
-          incident.incident_id !== 0 && 
-          incident.incident_name !== "No incidents" && 
-          incident.probability > 0.05
-        ) || [];
+        incident.incident_id !== 0 && 
+        incident.incident_name !== "No incidents" && 
+        incident.probability > 0.05
+      ) || [];
 
         // Determine risk level based on risk score
         const riskScore = frame.riskScore ?? 0;
@@ -978,21 +944,18 @@ const OngoingEvent: React.FC = () => {
                 {isExpanded && (
                   <div className="mt-4 space-y-4 pl-4">
                   {(() => {
-                    // Filter out Low Risk frames with no incidents
+                    // Filter to only show frames that have incidents
                     const displayFrames = gateInfo.timeFrames?.filter((frame: any) => {
-                      // Skip Low Risk frames with no incidents
-                      if (frame.riskLevel === 'Low' && !frame.hasIncidents) {
-                        return false;
-                      }
-                      return true;
+                      // Only show frames with incidents
+                      return frame.hasIncidents && frame.incidents && frame.incidents.length > 0;
                     }) || [];
 
                     if (displayFrames.length === 0) {
                       return (
                         <div className="p-4 bg-green-50 border border-green-200 rounded-lg text-center">
                           <CheckCircle2 className="h-8 w-8 text-green-600 mx-auto mb-2" />
-                          <p className="text-sm font-medium text-green-900">No significant incidents for this gate</p>
-                          <p className="text-xs text-green-700 mt-1">All periods showing low risk with no incidents</p>
+                          <p className="text-sm font-medium text-green-900">No incidents predicted for this gate</p>
+                          <p className="text-xs text-green-700 mt-1">All time periods are clear with no predicted incidents</p>
                         </div>
                       );
                     }
@@ -1037,7 +1000,6 @@ const OngoingEvent: React.FC = () => {
                         </div>
 
                         {/* Incidents List */}
-                        {frame.incidents && frame.incidents.length > 0 ? (
                           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
                             {frame.incidents.map((incident: any, incidentIdx: number) => (
                             <div 
@@ -1064,11 +1026,6 @@ const OngoingEvent: React.FC = () => {
                             </div>
                             ))}
                           </div>
-                        ) : (
-                          <div className="p-3 bg-green-50 border border-green-200 rounded text-center">
-                            <p className="text-xs font-medium text-green-900">✓ No incidents predicted for this time period</p>
-                          </div>
-                        )}
                       </div>
                     );
                     });
