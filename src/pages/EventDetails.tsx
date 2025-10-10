@@ -1476,22 +1476,26 @@ const EventDetails: React.FC = () => {
                         <ErrorBoundary>
                           <CongestionMap
                             origin={{ 
-                              lat: (currentEvent.venueLocation?.lat || 3.1390) - 0.001, 
-                              lng: (currentEvent.venueLocation?.lng || 101.6869) - 0.001 
+                              lat: (currentEvent.venueLocation?.lat || 3.1390) - 0.005, 
+                              lng: (currentEvent.venueLocation?.lng || 101.6869) - 0.005 
                             }}
                             destination={{ 
-                              lat: (currentEvent.venueLocation?.lat || 3.1390) + 0.001, 
-                              lng: (currentEvent.venueLocation?.lng || 101.6869) + 0.001 
+                              lat: (currentEvent.venueLocation?.lat || 3.1390) + 0.005, 
+                              lng: (currentEvent.venueLocation?.lng || 101.6869) + 0.005 
                             }}
                             waypoints={[
                               { 
-                                lat: currentEvent.venueLocation?.lat || 3.1390, 
-                                lng: currentEvent.venueLocation?.lng || 101.6869 
+                                lat: (currentEvent.venueLocation?.lat || 3.1390) - 0.002, 
+                                lng: (currentEvent.venueLocation?.lng || 101.6869) + 0.002 
+                              },
+                              { 
+                                lat: (currentEvent.venueLocation?.lat || 3.1390) + 0.002, 
+                                lng: (currentEvent.venueLocation?.lng || 101.6869) - 0.002 
                               }
                             ]}
                             height={400}
                             venueCenter={{ lat: currentEvent.venueLocation?.lat || 3.1390, lng: currentEvent.venueLocation?.lng || 101.6869 }}
-                            zoomLevel={16}
+                            zoomLevel={14}
                             onRouteChanged={handleRouteChanged}
                             onCongestionData={handleCongestionData}
                           />

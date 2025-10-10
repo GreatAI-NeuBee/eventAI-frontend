@@ -46,13 +46,32 @@ const EnhancedTrafficForecast: React.FC<EnhancedTrafficForecastProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+  const [cachedEnhancedData, setCachedEnhancedData] = useState<any>(null);
+  const [isApiCallInProgress, setIsApiCallInProgress] = useState(false);
 
   const fetchEnhancedTrafficData = useCallback(async () => {
-    if (loading) {
+    if (loading || isApiCallInProgress) {
       console.log('⏳ Enhanced traffic forecast already loading, skipping duplicate request');
       return;
     }
     
+    // Check if we have cached data
+    if (cachedEnhancedData) {
+      const cacheAge = Date.now() - cachedEnhancedData.timestamp;
+      const fiveMinutes = 5 * 60 * 1000;
+      
+      if (cacheAge < fiveMinutes) {
+        console.log('📊 Using cached enhanced traffic data');
+        setTrafficData(cachedEnhancedData.trafficData);
+        setTransitData(cachedEnhancedData.transitData);
+        setLastUpdated(new Date());
+        return;
+      } else {
+        console.log('📊 Cache expired, fetching fresh enhanced traffic data');
+      }
+    }
+    
+    setIsApiCallInProgress(true);
     setLoading(true);
     setError(null);
 
@@ -113,15 +132,18 @@ const EnhancedTrafficForecast: React.FC<EnhancedTrafficForecastProps> = ({
           
           const eventTimestamp = Math.floor(eventDateTime.getTime() / 1000);
           
-          // Use Vite proxy to avoid CORS issues
-          console.log(`🔗 Making Google Maps API call via Vite proxy for ${route.name} at event time: ${eventDateTime.toLocaleString()}`);
+          // Use CORS proxy to avoid browser CORS restrictions
+          console.log(`🔗 Making Google Maps API call via CORS proxy for ${route.name} at event time: ${eventDateTime.toLocaleString()}`);
           
-          // Use Vite proxy - /google maps to https://maps.googleapis.com
-          const proxyUrl = `/google/maps/api/directions/json?origin=${route.origin}&destination=${route.destination}&departure_time=${eventTimestamp}&traffic_model=best_guess&key=${googleApiKey}`;
+          // Build the Google Maps API URL
+          const googleApiUrl = `https://maps.googleapis.com/maps/api/directions/json?origin=${route.origin}&destination=${route.destination}&departure_time=${eventTimestamp}&traffic_model=best_guess&key=${googleApiKey}`;
           
-          console.log(`🔗 Making request to: ${proxyUrl}`);
+          // Use CORS proxy to bypass browser CORS restrictions
+          const corsProxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(googleApiUrl)}`;
           
-          const response = await fetch(proxyUrl, {
+          console.log(`🔗 Making request via CORS proxy: ${corsProxyUrl.substring(0, 100)}...`);
+          
+          const response = await fetch(corsProxyUrl, {
             method: 'GET',
             headers: {
               'Accept': 'application/json'
@@ -169,7 +191,7 @@ const EnhancedTrafficForecast: React.FC<EnhancedTrafficForecastProps> = ({
           }
 
           // Small delay between requests
-          await new Promise(resolve => setTimeout(resolve, 1000));
+          await new Promise(resolve => setTimeout(resolve, 2000));
 
         } catch (error) {
           console.error(`❌ Failed to fetch real traffic data for ${route.name}:`, error);
@@ -184,6 +206,13 @@ const EnhancedTrafficForecast: React.FC<EnhancedTrafficForecastProps> = ({
       setTransitData(transitResults);
       setLastUpdated(new Date());
 
+      // Cache the enhanced traffic data
+      setCachedEnhancedData({
+        trafficData: trafficResults,
+        transitData: transitResults,
+        timestamp: Date.now()
+      });
+
       console.log('✅ Enhanced traffic forecast completed:', {
         trafficRoutes: trafficResults.length,
         transitServices: transitResults.length
@@ -194,8 +223,9 @@ const EnhancedTrafficForecast: React.FC<EnhancedTrafficForecastProps> = ({
       setError('Failed to load traffic forecast data');
     } finally {
       setLoading(false);
+      setIsApiCallInProgress(false);
     }
-  }, [venueLocation]);
+  }, [venueLocation, cachedEnhancedData, isApiCallInProgress]);
 
   // Auto-fetch traffic data when component mounts
   useEffect(() => {
