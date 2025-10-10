@@ -119,9 +119,13 @@ const NewEvent: React.FC = () => {
       newErrors.featuredGuest = 'Featured guest is required for concerts';
     }
 
-    // Venue layout validation (optional but if provided should have at least 1 section)
-    if (venueLayoutJson && venueLayoutJson.sections === 0) {
-      newErrors.venueLayout = 'Venue layout must have at least one section';
+    // Venue layout validation (optional but if provided should have at least 1 section and 1 exit)
+    if (venueLayoutJson) {
+      if (venueLayoutJson.sections === 0) {
+        newErrors.venueLayout = 'Venue layout must have at least one section';
+      } else if (!venueLayoutJson.exitsList || venueLayoutJson.exitsList.length === 0) {
+        newErrors.venueLayout = 'Venue layout must have at least one exit for crowd management';
+      }
     }
 
     if (!venueLocation) {
@@ -166,17 +170,44 @@ const NewEvent: React.FC = () => {
         description: formData.description,
         popularity: {
           type: formData.eventType,
-          feat: formData.featuredGuest || undefined,
+          feat: formData.featuredGuest || null,
           location: formData.location,
         },
         userEmail: user?.email,
-        venueLocation: venueLocation || undefined,
-        venueLayout: venueLayoutJson || undefined,
+        venueLocation: venueLocation || null,
+        venueLayout: venueLayoutJson || null,
       };
+
+      // Remove undefined values to avoid server validation issues
+      Object.keys(submitData).forEach(key => {
+        if (submitData[key] === undefined) {
+          delete submitData[key];
+        }
+      });
+
+      // Clean up popularity object
+      if (submitData.popularity) {
+        Object.keys(submitData.popularity).forEach(key => {
+          if (submitData.popularity[key] === undefined) {
+            delete submitData.popularity[key];
+          }
+        });
+      }
 
       console.log('🚀 Submitting event data to API...');
       console.log('📝 JSON payload:', submitData);
       console.log('🎭 Popularity data:', submitData.popularity);
+      console.log('👤 User data:', { user: user?.email, backendUser: backendUser?.email });
+      console.log('🔐 Auth token:', localStorage.getItem('authToken'));
+      
+      // Additional validation before sending
+      if (!submitData.name || !submitData.dateOfEventStart || !submitData.dateOfEventEnd) {
+        throw new Error('Missing required fields: name, dateOfEventStart, or dateOfEventEnd');
+      }
+      
+      if (!submitData.userEmail) {
+        throw new Error('User email is required');
+      }
       
       const response = await eventAPI.createEvent(submitData);
       const backendEvent = response.data?.data || response.data;
@@ -213,7 +244,21 @@ const NewEvent: React.FC = () => {
       console.error('Error status:', error.response?.status);
 
       let errorMessage = 'Failed to create event';
-      if (error.response?.status === 404) {
+      
+      // Handle specific error cases
+      if (error.response?.status === 400) {
+        // Bad request - show specific validation errors
+        const errorData = error.response?.data;
+        if (errorData?.error?.details) {
+          errorMessage = `Validation error: ${errorData.error.details}`;
+        } else if (errorData?.error?.message) {
+          errorMessage = `Server error: ${errorData.error.message}`;
+        } else if (errorData?.message) {
+          errorMessage = `Request error: ${errorData.message}`;
+        } else {
+          errorMessage = 'Invalid request data. Please check all required fields are filled correctly.';
+        }
+      } else if (error.response?.status === 404) {
         errorMessage = 'API endpoint not found. Please check if the server is running at https://eventbuddy-api.munymunyhom.tech';
       } else if (error.response?.status >= 500) {
         errorMessage = 'Server error occurred. Please try again later.';
@@ -222,6 +267,7 @@ const NewEvent: React.FC = () => {
       } else if (error.message) {
         errorMessage = error.message;
       }
+      
       setError(errorMessage);
     } finally {
       setLoading(false);

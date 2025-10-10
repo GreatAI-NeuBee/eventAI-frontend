@@ -683,6 +683,7 @@ const StadiumMapEditor: React.FC<{
 
   const canUndoFacility = facilityHistory.length > 0;
 
+
   // Helper functions for shape manipulation
   const getShapeBounds = (points: PctPoint[]) => {
     if (points.length === 0) return { x: 0, y: 0, width: 0, height: 0 };
@@ -805,9 +806,25 @@ const StadiumMapEditor: React.FC<{
     };
   }, [effectiveZones, effectiveExits, layers, layout, facilities]);
 
+  // Validation state
+  const [validationError, setValidationError] = React.useState<string | null>(null);
+
+  // Check if layout is valid (at least 1 exit required)
+  const isValidLayout = React.useMemo(() => {
+    if (effectiveExits.length === 0) {
+      setValidationError("At least 1 exit must be placed before saving the layout.");
+      return false;
+    }
+    setValidationError(null);
+    return true;
+  }, [effectiveExits.length]);
+
   React.useEffect(() => {
-    onChange?.(exportJSON);
-  }, [exportJSON, onChange]);
+    // Only call onChange if layout is valid
+    if (isValidLayout) {
+      onChange?.(exportJSON);
+    }
+  }, [exportJSON, onChange, isValidLayout]);
 
   // Keyboard shortcuts
   React.useEffect(() => {
@@ -1104,6 +1121,47 @@ const StadiumMapEditor: React.FC<{
       setSelectedShapeId(null);
     }
   };
+
+  // Keyboard event handling
+  React.useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Handle ActionRing keyboard shortcuts
+      if (ringOpen) {
+        if (event.key === 'Escape') {
+          onRingClose();
+          return;
+        }
+        if (event.key === '1') {
+          onFacilityPick('toilet');
+          return;
+        }
+        if (event.key === '2') {
+          onFacilityPick('snack');
+          return;
+        }
+        if (event.key === '3') {
+          onFacilityPick('souvenir');
+          return;
+        }
+      }
+
+      // Handle facility undo
+      if ((event.ctrlKey || event.metaKey) && event.key === 'z' && canUndoFacility) {
+        event.preventDefault();
+        undoLastFacilityAction();
+        return;
+      }
+
+      // Handle dialog close
+      if (event.key === 'Escape' && dialog.isOpen) {
+        closeDialog();
+        return;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [ringOpen, canUndoFacility, dialog.isOpen, onFacilityPick, onRingClose, undoLastFacilityAction, closeDialog]);
 
   // Render resize handles for selected shape
   const renderResizeHandles = (zone: EditorZone) => {
@@ -2072,13 +2130,34 @@ const StadiumMapEditor: React.FC<{
               <div className="font-medium">Layers:</div>
               <div>{exportJSON.layers}</div>
               <div className="font-medium">Exits:</div>
-              <div>{exits.length}</div>
+              <div className={`${exits.length === 0 ? 'text-red-600 font-bold' : ''}`}>
+                {exits.length}
+                {exits.length === 0 && ' (Required!)'}
+              </div>
               <div className="font-medium">Facilities:</div>
               <div>{facilities.length}</div>
             </div>
+            {!isValidLayout && (
+              <div className="mt-2 pt-2 border-t border-red-200">
+                <div className="text-red-600 font-medium text-center">⚠️ Invalid Layout</div>
+              </div>
+            )}
           </div>
         </div>
       </div>
+
+      {/* Validation Error Message */}
+      {validationError && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+          <div className="flex items-center gap-2">
+            <div className="text-red-600 text-lg">⚠️</div>
+            <div>
+              <h4 className="text-sm font-medium text-red-800">Layout Validation Error</h4>
+              <p className="text-sm text-red-700 mt-1">{validationError}</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {exits.length > 0 && (
         <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">

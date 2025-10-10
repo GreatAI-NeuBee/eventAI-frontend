@@ -297,11 +297,46 @@ const EventDetails: React.FC = () => {
       }
     }
 
-    // Toilets 1..2
-    if (venueLayout.toiletsList && Array.isArray(venueLayout.toiletsList)) {
+    // Facilities (toilets, snacks, souvenir shops) from facilitiesList
+    if (venueLayout.facilitiesList && Array.isArray(venueLayout.facilitiesList)) {
+      venueLayout.facilitiesList.forEach((facility: any, index: number) => {
+        const facilityType = facility.type || 'toilet';
+        const facilityLabel = facility.label || `${facilityType} ${index + 1}`;
+        
+        // Create gate name based on facility type
+        let gateName = '';
+        if (facilityType === 'toilet') {
+          gateName = `🚻 ${facilityLabel}`;
+        } else if (facilityType === 'snack') {
+          gateName = `🍔 ${facilityLabel}`;
+        } else if (facilityType === 'souvenir') {
+          gateName = `🧸 ${facilityLabel}`;
+        } else {
+          gateName = facilityLabel;
+        }
+        
+        gates.push(gateName);
+        
+        // Set capacity based on facility type
+        let capacity = 50; // default
+        if (facilityType === 'toilet') {
+          capacity = 30; // toilets have lower capacity
+        } else if (facilityType === 'snack') {
+          capacity = 40; // snack shops moderate capacity
+        } else if (facilityType === 'souvenir') {
+          capacity = 25; // souvenir shops lower capacity
+        }
+        
+        gates_crowd.push(capacity);
+      });
+    }
+    
+    // Fallback: Legacy toiletsList support (for backward compatibility)
+    if (venueLayout.toiletsList && Array.isArray(venueLayout.toiletsList) && 
+        (!venueLayout.facilitiesList || venueLayout.facilitiesList.length === 0)) {
       const toiletCount = Math.min(venueLayout.toiletsList.length, 2);
       for (let i = 1; i <= toiletCount; i++) {
-        gates.push(i.toString());
+        gates.push(`🚻 WC ${i}`);
         const capacity = venueLayout.toiletsList[i - 1]?.capacity ?? 50;
         gates_crowd.push(capacity);
       }
