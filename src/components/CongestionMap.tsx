@@ -42,6 +42,8 @@ const CongestionMap: React.FC<CongestionMapProps> = memo(({
   const [isLoading, setIsLoading] = useState(false);
   const [congestionSegments, setCongestionSegments] = useState<CongestionSegment[]>([]);
   const [routeLoaded, setRouteLoaded] = useState<boolean>(false);
+  const [cachedTrafficData, setCachedTrafficData] = useState<any>(null);
+  const [isApiCallInProgress, setIsApiCallInProgress] = useState(false);
   const mapRef = useRef<google.maps.Map | null>(null);
   const polylinesRef = useRef<google.maps.Polyline[]>([]);
   const loadingRef = useRef<boolean>(false);
@@ -62,6 +64,28 @@ const CongestionMap: React.FC<CongestionMapProps> = memo(({
     eventTime?: string
   ): Promise<CongestionSegment[]> => {
     try {
+      // Check if we have cached data for this venue and time
+      const cacheKey = `${venueLocation.lat},${venueLocation.lng}-${eventDate}-${eventTime}`;
+      if (cachedTrafficData && cachedTrafficData.cacheKey === cacheKey) {
+        const cacheAge = Date.now() - cachedTrafficData.timestamp;
+        const fiveMinutes = 5 * 60 * 1000;
+        
+        if (cacheAge < fiveMinutes) {
+          console.log('📊 Using cached traffic data for venue');
+          return cachedTrafficData.segments;
+        } else {
+          console.log('📊 Cache expired, fetching fresh traffic data');
+        }
+      }
+      
+      // Prevent multiple simultaneous API calls
+      if (isApiCallInProgress) {
+        console.log('🔄 Traffic API call already in progress, skipping...');
+        return cachedTrafficData?.segments || [];
+      }
+      
+      setIsApiCallInProgress(true);
+      
       console.log('🚦 Fetching predictive traffic data for venue:', venueLocation);
       console.log('📅 Event date:', eventDate);
       console.log('⏰ Event time:', eventTime);
@@ -94,33 +118,33 @@ const CongestionMap: React.FC<CongestionMapProps> = memo(({
       const routes = [
         {
           name: 'North Approach',
-          origin: `${venueLocation.lat + 0.01},${venueLocation.lng}`,
-          destination: `${venueLocation.lat - 0.01},${venueLocation.lng}`
+          origin: `${venueLocation.lat + 0.02},${venueLocation.lng}`,
+          destination: `${venueLocation.lat - 0.02},${venueLocation.lng}`
         },
         {
           name: 'South Approach', 
-          origin: `${venueLocation.lat - 0.01},${venueLocation.lng}`,
-          destination: `${venueLocation.lat + 0.01},${venueLocation.lng}`
+          origin: `${venueLocation.lat - 0.02},${venueLocation.lng}`,
+          destination: `${venueLocation.lat + 0.02},${venueLocation.lng}`
         },
         {
           name: 'East Approach',
-          origin: `${venueLocation.lat},${venueLocation.lng + 0.01}`,
-          destination: `${venueLocation.lat},${venueLocation.lng - 0.01}`
+          origin: `${venueLocation.lat},${venueLocation.lng + 0.02}`,
+          destination: `${venueLocation.lat},${venueLocation.lng - 0.02}`
         },
         {
           name: 'West Approach',
-          origin: `${venueLocation.lat},${venueLocation.lng - 0.01}`,
-          destination: `${venueLocation.lat},${venueLocation.lng + 0.01}`
+          origin: `${venueLocation.lat},${venueLocation.lng - 0.02}`,
+          destination: `${venueLocation.lat},${venueLocation.lng + 0.02}`
         },
         {
           name: 'Northeast Approach',
-          origin: `${venueLocation.lat + 0.007},${venueLocation.lng + 0.007}`,
-          destination: `${venueLocation.lat - 0.007},${venueLocation.lng - 0.007}`
+          origin: `${venueLocation.lat + 0.015},${venueLocation.lng + 0.015}`,
+          destination: `${venueLocation.lat - 0.015},${venueLocation.lng - 0.015}`
         },
         {
           name: 'Southwest Approach',
-          origin: `${venueLocation.lat - 0.007},${venueLocation.lng - 0.007}`,
-          destination: `${venueLocation.lat + 0.007},${venueLocation.lng + 0.007}`
+          origin: `${venueLocation.lat - 0.015},${venueLocation.lng - 0.015}`,
+          destination: `${venueLocation.lat + 0.015},${venueLocation.lng + 0.015}`
         }
       ];
       
@@ -197,13 +221,23 @@ const CongestionMap: React.FC<CongestionMapProps> = memo(({
       }
       
       console.log(`🚦 Generated ${segments.length} predictive traffic segments for event time`);
+      
+      // Cache the traffic data
+      setCachedTrafficData({
+        cacheKey,
+        segments,
+        timestamp: Date.now()
+      });
+      
       return segments;
       
     } catch (error) {
       console.error('❌ Error fetching predictive traffic data:', error);
       return [];
+    } finally {
+      setIsApiCallInProgress(false);
     }
-  }, []);
+  }, [cachedTrafficData, isApiCallInProgress]);
 
 
   // Fetch real congestion data using Google Maps API

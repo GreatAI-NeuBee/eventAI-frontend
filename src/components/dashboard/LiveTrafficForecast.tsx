@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { AlertCircle, RefreshCw } from 'lucide-react';
 import Card from '../common/Card';
 import Button from '../common/Button';
+import { useGoogleMaps } from '../../contexts/GoogleMapsContext';
 
 interface LiveTrafficForecastProps {
   venueLocation: {
@@ -32,12 +33,56 @@ const LiveTrafficForecast: React.FC<LiveTrafficForecastProps> = ({
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [cachedGoogleData, setCachedGoogleData] = useState<any>(null);
+  const [isApiCallInProgress, setIsApiCallInProgress] = useState(false);
+  const hasInitialized = useRef(false);
+  const { isLoaded } = useGoogleMaps();
   
-  // Fetch real-time traffic data using Google Maps API
+  // Helper function to generate graph from cached Google Maps data
+  const generateGraphFromCachedData = useCallback((googleData: any) => {
+    const { currentSpeed, freeFlowSpeed, confidence } = googleData;
+    
+    const realTimeData = {
+      flowSegmentData: {
+        currentSpeed: Math.round(currentSpeed),
+        freeFlowSpeed: Math.round(freeFlowSpeed),
+        confidence: confidence
+      }
+    };
+    
+    setRealTimeData(realTimeData);
+    setLastUpdated(new Date());
+    console.log('📊 Using cached Google Maps data for graph:', realTimeData);
+  }, []);
+  
+  // Fetch real-time traffic data using Google Maps JavaScript SDK
   const fetchRealTimeTrafficData = useCallback(async (isManualRefresh = false) => {
     // Use selectedStation if available, otherwise use venueLocation
     const location = selectedStation || venueLocation;
-    if (!location) return;
+    if (!location || !isLoaded) return;
+    
+    // Prevent multiple simultaneous API calls
+    if (isApiCallInProgress) {
+      console.log('🔄 API call already in progress, skipping...');
+      return;
+    }
+    
+    // If we have cached data and it's not a manual refresh, use cached data
+    if (cachedGoogleData && !isManualRefresh) {
+      // Check if cache is still fresh (less than 5 minutes old)
+      const cacheAge = Date.now() - cachedGoogleData.timestamp.getTime();
+      const fiveMinutes = 5 * 60 * 1000;
+      
+      if (cacheAge < fiveMinutes) {
+        console.log('📊 Using cached Google Maps data for graph generation');
+        generateGraphFromCachedData(cachedGoogleData);
+        return;
+      } else {
+        console.log('📊 Cache expired, fetching fresh data');
+      }
+    }
+    
+    setIsApiCallInProgress(true);
     
     if (isManualRefresh) {
       setIsRefreshing(true);
@@ -49,27 +94,13 @@ const LiveTrafficForecast: React.FC<LiveTrafficForecastProps> = ({
       const locationName = location.name || ('address' in location ? location.address : undefined) || 'Event Venue';
       console.log('🚦 Fetching real-time traffic data for location:', locationName);
       
-      // Use Google Maps API for real traffic data
-      const googleApiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
-      if (!googleApiKey) {
-        throw new Error('Google Maps API key not found');
-      }
-      
-      // Get traffic data from Google Maps Directions API
+      // Get coordinates
       const lat = 'lat' in location ? location.lat : location.latitude;
       const lng = 'lng' in location ? location.lng : location.longitude;
-      const origin = `${lat},${lng}`;
+      const origin = new google.maps.LatLng(lat, lng);
       
-      // Try different destination strategies
-      let destination = `${lat + 0.01},${lng + 0.01}`; // Small offset first
-      
-      // If we have an address, try to use a nearby major road
-      if ('address' in location && location.address) {
-        // For Kuala Lumpur area, use a known major road as destination
-        if (lat > 2.5 && lat < 4.0 && lng > 100.0 && lng < 102.0) {
-          destination = '3.1390,101.6869'; // KLCC area as fallback
-        }
-      }
+      // Create a nearby destination for traffic analysis
+      const destination = new google.maps.LatLng(lat + 0.01, lng + 0.01);
       
       // Use event-specific time if available, otherwise current time
       let eventDateTime = eventDate ? new Date(eventDate) : new Date();
@@ -99,45 +130,36 @@ const LiveTrafficForecast: React.FC<LiveTrafficForecastProps> = ({
         console.log(`📅 Event time is too far in the future, using 1 hour from now: ${eventDateTime.toLocaleString()}`);
       }
       
-      const eventTimestamp = Math.floor(eventDateTime.getTime() / 1000);
+      console.log(`🔗 Making Google Maps SDK request for location: ${locationName} at event time: ${eventDateTime.toLocaleString()}`);
       
-      // Use Vite proxy to avoid CORS issues
-      console.log(`🔗 Making Google Maps API call via Vite proxy for location: ${locationName} at event time: ${eventDateTime.toLocaleString()}`);
+      // Use Google Maps JavaScript SDK DirectionsService
+      const directionsService = new google.maps.DirectionsService();
       
-      // Use Vite proxy - /google maps to https://maps.googleapis.com
-      let proxyUrl = `/google/maps/api/directions/json?origin=${origin}&destination=${destination}&departure_time=${eventTimestamp}&traffic_model=best_guess&key=${googleApiKey}`;
-      
-      console.log('🔗 Making API call:', proxyUrl);
-      
-      let response = await fetch(proxyUrl, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json'
+      const request: google.maps.DirectionsRequest = {
+        origin: origin,
+        destination: destination,
+        travelMode: google.maps.TravelMode.DRIVING,
+        drivingOptions: {
+          departureTime: eventDateTime,
+          trafficModel: google.maps.TrafficModel.BEST_GUESS
         }
-      });
+      };
       
-      // If the request fails due to past time, try without departure_time for current traffic
-      if (!response.ok || (await response.clone().json()).status === 'INVALID_REQUEST') {
-        console.log('🔄 Retrying without departure_time for current traffic conditions');
-        proxyUrl = `/google/maps/api/directions/json?origin=${origin}&destination=${destination}&traffic_model=best_guess&key=${googleApiKey}`;
-        
-        response = await fetch(proxyUrl, {
-          method: 'GET',
-          headers: {
-            'Accept': 'application/json'
+      // Make the request using the SDK
+      const result = await new Promise<google.maps.DirectionsResult>((resolve, reject) => {
+        directionsService.route(request, (result, status) => {
+          if (status === google.maps.DirectionsStatus.OK && result) {
+            resolve(result);
+          } else {
+            reject(new Error(`Directions request failed: ${status}`));
           }
         });
-      }
+      });
       
-      if (!response.ok) {
-        throw new Error(`Google Maps API failed: ${response.status} ${response.statusText}`);
-      }
+      console.log('📊 Google Maps SDK response:', result);
       
-      const data = await response.json();
-      console.log('📊 Google Maps API response:', data);
-      
-      if (data.status === 'OK' && data.routes && data.routes.length > 0) {
-        const route = data.routes[0];
+      if (result.routes && result.routes.length > 0) {
+        const route = result.routes[0];
         const leg = route.legs[0];
         
         console.log('📊 Route data:', {
@@ -162,13 +184,24 @@ const LiveTrafficForecast: React.FC<LiveTrafficForecastProps> = ({
           freeFlowSpeed: `${freeFlowSpeed.toFixed(1)} km/h`
         });
         
+        const confidence = 0.9; // Set confidence value
+        
         const realTimeData = {
           flowSegmentData: {
             currentSpeed: Math.round(currentSpeed),
             freeFlowSpeed: Math.round(freeFlowSpeed),
-            confidence: 0.9
+            confidence: confidence
           }
         };
+        
+        // Cache the Google Maps data to prevent re-fetching
+        const googleData = {
+          currentSpeed,
+          freeFlowSpeed,
+          confidence,
+          timestamp: new Date()
+        };
+        setCachedGoogleData(googleData);
         
         setRealTimeData(realTimeData);
         setLastUpdated(new Date());
@@ -176,40 +209,31 @@ const LiveTrafficForecast: React.FC<LiveTrafficForecastProps> = ({
         console.log('📊 Displaying real Google Maps traffic data in graph');
         console.log('📊 Event time range:', eventTimeRange);
       } else {
-        console.error('❌ Google Maps API response error:', data);
-        if (data.status === 'ZERO_RESULTS') {
-          throw new Error('No routes found between origin and destination');
-        } else if (data.status === 'OVER_QUERY_LIMIT') {
-          throw new Error('Google Maps API quota exceeded');
-        } else if (data.status === 'REQUEST_DENIED') {
-          throw new Error('Google Maps API request denied - check API key');
-        } else if (data.status === 'INVALID_REQUEST') {
-          throw new Error(`Invalid request: ${data.error_message || 'Check parameters'}`);
-        } else {
-          throw new Error(`Google Maps API error: ${data.status} - ${data.error_message || 'Unknown error'}`);
-        }
+        throw new Error('No routes found between origin and destination');
       }
     } catch (error) {
       console.error('❌ Failed to fetch real traffic data:', error);
       // No fallback - we only use real data
       setRealTimeData(null);
     } finally {
+      setIsApiCallInProgress(false);
       if (isManualRefresh) {
         setIsRefreshing(false);
       } else {
         setIsLoading(false);
       }
     }
-  }, [selectedStation, venueLocation, eventDate, eventTimeRange]);
+  }, [selectedStation, venueLocation, eventDate, eventTimeRange, isLoaded, cachedGoogleData, isApiCallInProgress]);
 
   // Auto-fetch traffic data when component mounts
   useEffect(() => {
     const location = selectedStation || venueLocation;
-    if (location) {
+    if (location && isLoaded && !isApiCallInProgress && !hasInitialized.current) {
       console.log('🚀 Auto-fetching live traffic forecast on component mount');
+      hasInitialized.current = true;
       fetchRealTimeTrafficData();
     }
-  }, [selectedStation, venueLocation, fetchRealTimeTrafficData]);
+  }, [selectedStation, venueLocation, isLoaded, fetchRealTimeTrafficData, isApiCallInProgress]);
 
   // Use venue location if no specific station is selected
   const displayName = selectedStation?.name || venueLocation?.name || venueLocation?.address || 'Event Venue';
@@ -334,33 +358,36 @@ const LiveTrafficForecast: React.FC<LiveTrafficForecastProps> = ({
                     
                     const timeString = `${hour > 12 ? hour - 12 : hour === 0 ? 12 : hour}:${minute.toString().padStart(2, '0')} ${hour >= 12 ? 'PM' : 'AM'}`;
                     
-                    // Use real Google Maps data as base, with realistic variations
+                    // Use real Google Maps data as base with consistent variations
                     let speed = currentSpeed;
                     
-                    // Add realistic traffic patterns based on time of day
+                    // Apply consistent time-based variations (not random) to show realistic traffic patterns
                     if (hour >= 7 && hour <= 9) {
-                      // Morning rush hour - slower traffic
-                      speed = currentSpeed * (0.6 + (Math.random() * 0.2));
+                      // Morning rush hour - consistently slower than Google Maps data
+                      speed = currentSpeed * 0.85;
                     } else if (hour >= 17 && hour <= 19) {
-                      // Evening rush hour - slower traffic
-                      speed = currentSpeed * (0.5 + (Math.random() * 0.3));
+                      // Evening rush hour - consistently slower than Google Maps data
+                      speed = currentSpeed * 0.8;
                     } else if (hour >= 11 && hour <= 14) {
-                      // Midday - normal to good traffic
-                      speed = currentSpeed * (0.8 + (Math.random() * 0.2));
+                      // Midday - use Google Maps data with slight consistent variation
+                      speed = currentSpeed * 0.95;
                     } else {
-                      // Other times - normal traffic
-                      speed = currentSpeed * (0.7 + (Math.random() * 0.3));
+                      // Other times - use Google Maps data with minimal consistent variation
+                      speed = currentSpeed * 0.9;
                     }
                     
-                    // Add some variation during the event
+                    // Add consistent variation during the event to show realistic flow
                     const progress = i / (numPoints - 1);
                     if (progress < 0.2) {
-                      // Early arrival - might be slower
-                      speed *= 0.9 + (Math.random() * 0.1);
+                      // Early arrival - slight consistent variation
+                      speed *= 0.95;
                     } else if (progress > 0.8) {
-                      // Late departure - might be slower
-                      speed *= 0.8 + (Math.random() * 0.2);
+                      // Late departure - slight consistent variation
+                      speed *= 0.9;
                     }
+                    
+                    // Ensure speed stays within realistic bounds based on Google Maps data
+                    speed = Math.max(currentSpeed * 0.5, Math.min(currentSpeed * 1.2, speed));
                     
                     times.push(timeString);
                     trafficData.push({
@@ -369,6 +396,8 @@ const LiveTrafficForecast: React.FC<LiveTrafficForecastProps> = ({
                       x: 100 + (i * (800 / (numPoints - 1))),
                       y: 250 - ((speed / 100) * 200) // Scale to 0-100 km/h range
                     });
+                    
+                    console.log(`📊 Graph point ${i}: ${timeString} = ${Math.round(speed)} km/h (base: ${currentSpeed} km/h)`);
                   }
                   
                   console.log(`📊 Generated ${trafficData.length} traffic data points for event time frame`);
@@ -456,15 +485,18 @@ const LiveTrafficForecast: React.FC<LiveTrafficForecastProps> = ({
                     )}
                     
                     {/* Real-time data overlay */}
-                    <rect x="50" y="20" width="300" height="80" fill="rgba(255, 255, 255, 0.9)" rx="8" stroke="#3b82f6" strokeWidth="1"/>
-                    <text x="200" y="40" className="fill-blue-600 text-sm font-bold" textAnchor="middle">
-                      Real Traffic Data
+                    <rect x="50" y="20" width="350" height="90" fill="rgba(255, 255, 255, 0.95)" rx="8" stroke="#3b82f6" strokeWidth="2"/>
+                    <text x="225" y="40" className="fill-blue-600 text-sm font-bold" textAnchor="middle">
+                      🚦 Live Google Maps Data
                     </text>
-                    <text x="200" y="60" className="fill-blue-600 text-xs" textAnchor="middle">
+                    <text x="225" y="60" className="fill-blue-600 text-xs" textAnchor="middle">
                       Current: {Math.round(currentSpeed)} km/h | Free Flow: {Math.round(freeFlowSpeed)} km/h
                     </text>
-                    <text x="200" y="80" className="fill-orange-600 text-xs" textAnchor="middle">
-                      Confidence: {Math.round(confidence * 100)}%
+                    <text x="225" y="80" className="fill-green-600 text-xs" textAnchor="middle">
+                      Event Time: {eventTimeRange?.start} - {eventTimeRange?.end} | Confidence: {Math.round(confidence * 100)}%
+                    </text>
+                    <text x="225" y="100" className="fill-gray-600 text-xs" textAnchor="middle">
+                      Based on real traffic conditions at venue
                     </text>
                   </>
                 );

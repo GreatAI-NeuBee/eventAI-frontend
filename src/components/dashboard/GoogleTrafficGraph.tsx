@@ -285,16 +285,19 @@ const GoogleTrafficGraph: React.FC<GoogleTrafficGraphProps> = ({
           console.log(`🕐 Event Timestamp: ${eventTimestamp}`);
           console.log(`🕐 Event time range: ${eventTimeRange?.start} - ${eventTimeRange?.end}`);
           
-          // Use Vite proxy to avoid CORS issues
-          console.log(`🔗 Making Google Maps API call via Vite proxy for ${route.label} at event time: ${eventDateTime.toLocaleString()}`);
+          // Use CORS proxy to avoid browser CORS restrictions
+          console.log(`🔗 Making Google Maps API call via CORS proxy for ${route.label} at event time: ${eventDateTime.toLocaleString()}`);
           
-          // Use Vite proxy - /google maps to https://maps.googleapis.com
-          const proxyUrl = `/google/maps/api/directions/json?origin=${route.origin}&destination=${route.destination}&departure_time=${eventTimestamp}&traffic_model=best_guess&key=${googleApiKey}`;
-          console.log(`🔗 Full proxy URL: ${proxyUrl}`);
+          // Build the Google Maps API URL
+          const googleApiUrl = `https://maps.googleapis.com/maps/api/directions/json?origin=${route.origin}&destination=${route.destination}&departure_time=${eventTimestamp}&traffic_model=best_guess&key=${googleApiKey}`;
+          
+          // Use CORS proxy to bypass browser CORS restrictions
+          const corsProxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(googleApiUrl)}`;
+          console.log(`🔗 CORS proxy URL: ${corsProxyUrl.substring(0, 100)}...`);
           
           console.log(`🔍 Making API call for ${route.label}`);
           
-          const response = await fetch(proxyUrl, {
+          const response = await fetch(corsProxyUrl, {
             method: 'GET',
             headers: {
               'Accept': 'application/json'
