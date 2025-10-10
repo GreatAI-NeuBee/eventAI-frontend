@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState, useContext } from "react";
 import { WeatherContext } from "../components/common/WeatherBackground";
+import { X, Users, TrendingUp, TrendingDown, Clock } from "lucide-react";
 
 /* ========= Types ========= */
 type PctPoint = [number, number];
@@ -11,6 +12,7 @@ type StadiumMapJSON = {
   zones: { id: string; name: string; layer: number; points: PctPoint[] }[];
   exitsList?: { id: string; name: string; position: PctPoint; capacity?: number }[];
   toiletsList?: { id: string; position: PctPoint; label?: string; fixtures?: number }[];
+  facilitiesList?: { id: string; type: 'toilet' | 'snack' | 'souvenir'; position: PctPoint; label?: string }[];
   shape?: "circle" | "rect";
   rectBounds?: { x0: number; y0: number; x1: number; y1: number };
 };
@@ -52,6 +54,19 @@ type Walker = {
   heading?: number;
   turnRate?: number;
   wanderEndAt?: number;
+};
+
+// Facility detail types
+type FacilityDetail = {
+  id: string;
+  type: 'toilet' | 'snack' | 'souvenir';
+  label: string;
+  currentOccupancy: number;
+  maxCapacity: number;
+  peopleGoingIn: number;
+  peopleGoingOut: number;
+  avgWaitTime: number; // in minutes
+  lastUpdated: string;
 };
 
 type GraphNode = { id: string; x: number; y: number; r: number; theta: number; type: 'ring' | 'gate' };
@@ -572,8 +587,211 @@ function spawnExitWalkers(
   return out;
 }
 
+// Facility Detail Modal Component
+const FacilityDetailModal: React.FC<{
+  facility: FacilityDetail | null;
+  onClose: () => void;
+  isDarkBackground?: boolean;
+  isRainBackground?: boolean;
+}> = ({ facility, onClose, isDarkBackground, isRainBackground }) => {
+  if (!facility) return null;
+
+  const getTextColor = () => (isDarkBackground || isRainBackground) ? 'text-white' : 'text-gray-900';
+  const getSecondaryTextColor = () => (isDarkBackground || isRainBackground) ? 'text-white/80' : 'text-gray-600';
+  const getBgColor = () => (isDarkBackground || isRainBackground) ? 'bg-black/80' : 'bg-white/95';
+  const getBorderColor = () => (isDarkBackground || isRainBackground) ? 'border-white/20' : 'border-gray-200';
+
+  const getFacilityEmoji = () => {
+    switch (facility.type) {
+      case 'toilet': return '🚻';
+      case 'snack': return '🍔';
+      case 'souvenir': return '🧸';
+      default: return '🏢';
+    }
+  };
+
+  const getFacilityTypeName = () => {
+    switch (facility.type) {
+      case 'toilet': return 'Toilet';
+      case 'snack': return 'Snack Shop';
+      case 'souvenir': return 'Souvenir Shop';
+      default: return 'Facility';
+    }
+  };
+
+  const occupancyPercentage = (facility.currentOccupancy / facility.maxCapacity) * 100;
+  const getOccupancyColor = () => {
+    if (occupancyPercentage >= 80) return 'text-red-600';
+    if (occupancyPercentage >= 60) return 'text-yellow-600';
+    return 'text-green-600';
+  };
+
+  const getOccupancyBgColor = () => {
+    if (occupancyPercentage >= 80) return 'bg-red-50 border-red-200';
+    if (occupancyPercentage >= 60) return 'bg-yellow-50 border-yellow-200';
+    return 'bg-green-50 border-green-200';
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className={`${getBgColor()} ${getBorderColor()} border rounded-xl shadow-xl max-w-md w-full backdrop-blur-md`}>
+        {/* Header */}
+        <div className="flex items-center justify-between p-4 border-b border-gray-200/50">
+          <div className="flex items-center gap-3">
+            <span className="text-2xl">{getFacilityEmoji()}</span>
+            <div>
+              <h3 className={`text-lg font-semibold ${getTextColor()}`}>
+                {facility.label}
+              </h3>
+              <p className={`text-sm ${getSecondaryTextColor()}`}>
+                {getFacilityTypeName()}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className={`p-2 rounded-lg hover:bg-gray-100/50 transition-colors ${getSecondaryTextColor()}`}
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="p-4 space-y-4">
+          {/* Current Occupancy */}
+          <div className={`p-3 rounded-lg border ${getOccupancyBgColor()}`}>
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <Users className="h-4 w-4 text-gray-600" />
+                <span className="text-sm font-medium text-gray-700">Current Occupancy</span>
+              </div>
+              <span className={`text-lg font-bold ${getOccupancyColor()}`}>
+                {facility.currentOccupancy}/{facility.maxCapacity}
+              </span>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-2">
+              <div
+                className={`h-2 rounded-full transition-all duration-300 ${
+                  occupancyPercentage >= 80 ? 'bg-red-500' :
+                  occupancyPercentage >= 60 ? 'bg-yellow-500' : 'bg-green-500'
+                }`}
+                style={{ width: `${occupancyPercentage}%` }}
+              />
+            </div>
+            <p className="text-xs text-gray-500 mt-1">
+              {occupancyPercentage.toFixed(1)}% capacity
+            </p>
+          </div>
+
+          {/* Flow Metrics */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+              <div className="flex items-center gap-2 mb-1">
+                <TrendingUp className="h-4 w-4 text-blue-600" />
+                <span className="text-sm font-medium text-blue-800">Going In</span>
+              </div>
+              <p className="text-2xl font-bold text-blue-600">{facility.peopleGoingIn}</p>
+              <p className="text-xs text-blue-600">people/min</p>
+            </div>
+            
+            <div className="p-3 bg-orange-50 rounded-lg border border-orange-200">
+              <div className="flex items-center gap-2 mb-1">
+                <TrendingDown className="h-4 w-4 text-orange-600" />
+                <span className="text-sm font-medium text-orange-800">Going Out</span>
+              </div>
+              <p className="text-2xl font-bold text-orange-600">{facility.peopleGoingOut}</p>
+              <p className="text-xs text-orange-600">people/min</p>
+            </div>
+          </div>
+
+          {/* Wait Time */}
+          <div className="p-3 bg-purple-50 rounded-lg border border-purple-200">
+            <div className="flex items-center gap-2 mb-1">
+              <Clock className="h-4 w-4 text-purple-600" />
+              <span className="text-sm font-medium text-purple-800">Average Wait Time</span>
+            </div>
+            <p className="text-2xl font-bold text-purple-600">{facility.avgWaitTime}</p>
+            <p className="text-xs text-purple-600">minutes</p>
+          </div>
+
+          {/* Last Updated */}
+          <div className="text-center">
+            <p className="text-xs text-gray-500">
+              Last updated: {new Date(facility.lastUpdated).toLocaleTimeString()}
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 /* ========= Component ========= */
 export const VenueLayoutCard: React.FC<{ event: EventData | null }> = ({ event }) => {
+  // Facility detail state
+  const [selectedFacility, setSelectedFacility] = useState<FacilityDetail | null>(null);
+
+  // Generate dummy facility data
+  const generateFacilityDetail = (facility: any): FacilityDetail => {
+    const facilityType = facility.type || 'toilet';
+    
+    // Generate realistic dummy data based on facility type
+    let maxCapacity = 30;
+    let baseOccupancy = 0.3;
+    let baseFlowIn = 2;
+    let baseFlowOut = 2;
+    let baseWaitTime = 3;
+
+    switch (facilityType) {
+      case 'snack':
+        maxCapacity = 40;
+        baseOccupancy = 0.4;
+        baseFlowIn = 3;
+        baseFlowOut = 3;
+        baseWaitTime = 2;
+        break;
+      case 'souvenir':
+        maxCapacity = 25;
+        baseOccupancy = 0.2;
+        baseFlowIn = 1.5;
+        baseFlowOut = 1.5;
+        baseWaitTime = 1;
+        break;
+      case 'toilet':
+      default:
+        maxCapacity = 30;
+        baseOccupancy = 0.3;
+        baseFlowIn = 2;
+        baseFlowOut = 2;
+        baseWaitTime = 3;
+        break;
+    }
+
+    // Add some random variation to make it realistic
+    const occupancyVariation = 0.1;
+    const flowVariation = 0.5;
+    const waitVariation = 1;
+
+    const currentOccupancy = Math.floor(
+      maxCapacity * (baseOccupancy + (Math.random() - 0.5) * occupancyVariation)
+    );
+    const peopleGoingIn = Math.max(0, baseFlowIn + (Math.random() - 0.5) * flowVariation);
+    const peopleGoingOut = Math.max(0, baseFlowOut + (Math.random() - 0.5) * flowVariation);
+    const avgWaitTime = Math.max(0, baseWaitTime + (Math.random() - 0.5) * waitVariation);
+
+    return {
+      id: facility.id,
+      type: facilityType,
+      label: facility.label || `${facilityType} ${facility.id}`,
+      currentOccupancy: Math.min(currentOccupancy, maxCapacity),
+      maxCapacity,
+      peopleGoingIn: Math.round(peopleGoingIn * 10) / 10,
+      peopleGoingOut: Math.round(peopleGoingOut * 10) / 10,
+      avgWaitTime: Math.round(avgWaitTime * 10) / 10,
+      lastUpdated: new Date().toISOString(),
+    };
+  };
+
   const plan: StadiumMapJSON = useMemo(() => {
     if (!event?.venueLayout) return DUMMY_PLAN;
     if (typeof event.venueLayout === "string") {
@@ -641,9 +859,10 @@ export const VenueLayoutCard: React.FC<{ event: EventData | null }> = ({ event }
   const dotScale = useMemo(() => getDotScale(totalPeopleNow), [totalPeopleNow]);
 
   const toiletCongestions = useMemo(() => {
-    const toilets = plan.toiletsList ?? [];
-    return toilets.map((_, i) => [15,50,85][i % 3]);
-  }, [plan.toiletsList]);
+    // Use facilitiesList if available, otherwise fallback to toiletsList
+    const facilities = plan.facilitiesList ?? plan.toiletsList ?? [];
+    return facilities.map((_: any, i: number) => [15,50,85][i % 3]);
+  }, [plan.facilitiesList, plan.toiletsList]);
 
   const sectionsAgg = useMemo(() => sectionCongestion(zones, plan.sections), [zones, plan.sections]);
 
@@ -738,7 +957,7 @@ export const VenueLayoutCard: React.FC<{ event: EventData | null }> = ({ event }
           <span>{plan.layers} layers</span>
           <span>{plan.sections} sections</span>
           <span>{plan.exitsList?.length ?? plan.exits ?? 0} exits</span>
-          <span>{plan.toiletsList?.length ?? 0} toilets</span>
+          <span>{plan.facilitiesList?.length ?? plan.toiletsList?.length ?? 0} facilities</span>
           <button
             onClick={() => setPerformanceMode(!performanceMode)}
             className={`px-2 py-1 rounded text-xs border ${performanceMode ? 'bg-orange-100 text-orange-700 border-orange-200' : 'bg-gray-100 text-gray-700 border-gray-200'}`}
@@ -758,6 +977,7 @@ export const VenueLayoutCard: React.FC<{ event: EventData | null }> = ({ event }
           walkers={walkers}
           toiletCongestions={toiletCongestions}
           sectionAgg={sectionsAgg}
+          onFacilityClick={(facility) => setSelectedFacility(generateFacilityDetail(facility))}
         />
       </div>
 
@@ -801,6 +1021,14 @@ export const VenueLayoutCard: React.FC<{ event: EventData | null }> = ({ event }
           <span className="ml-auto text-gray-500">• 1 dot ≈ {dotScale.peoplePerDot.toLocaleString()} people</span>
         </div>
       </div>
+
+      {/* Facility Detail Modal */}
+      <FacilityDetailModal
+        facility={selectedFacility}
+        onClose={() => setSelectedFacility(null)}
+        isDarkBackground={isDarkBackground}
+        isRainBackground={isRainBackground}
+      />
     </div>
   );
 };
@@ -936,7 +1164,8 @@ const StadiumPlanSVG: React.FC<{
   walkers: Walker[];
   toiletCongestions: number[];
   sectionAgg: number[];
-}> = ({ plan, zones, phase, gateLoads, walkers, toiletCongestions, sectionAgg }) => {
+  onFacilityClick?: (facility: any) => void;
+}> = ({ plan, zones, phase, gateLoads, walkers, toiletCongestions, sectionAgg, onFacilityClick }) => {
   const geom = venueGeom(plan);
   const isCircle = geom.kind === "circle";
   const isExitPhase = phase === "exits";
@@ -1055,27 +1284,43 @@ const StadiumPlanSVG: React.FC<{
              );
            })}
 
-          {/* toilets */}
-          {(plan.toiletsList ?? []).map((t, i) => (
-            <g key={t.id}
-                 onMouseEnter={() => setHoverInfo({ name: t.label ?? t.id, congestion: toiletCongestions[i] ?? 0 })}
-                 onMouseMove={() => setHoverInfo({ name: t.label ?? t.id, congestion: toiletCongestions[i] ?? 0 })}
-               onMouseLeave={() => setHoverInfo(null)} style={{ cursor: "pointer" }}>
-                 <circle
-                   cx={t.position[0]}
-                   cy={t.position[1]}
-                r={2.0}
-                   fill="none"
-                   stroke={bandedColor(toiletCongestions[i])}
-                   strokeWidth={0.5}
-                   opacity={0.9}
-                 >
-                <animate attributeName="r" values="2;3;2" dur="2.6s" repeatCount="indefinite" />
-                <animate attributeName="stroke-opacity" values="0.6;1;0.6" dur="2.6s" repeatCount="indefinite" />
-                 </circle>
-                 <text x={t.position[0]} y={t.position[1]} fontSize={3} textAnchor="middle" dominantBaseline="central">🚻</text>
-               </g>
-          ))}
+          {/* facilities (toilets, snacks, souvenir shops) */}
+          {(plan.facilitiesList ?? plan.toiletsList ?? []).map((facility: any, i: number) => {
+            // Handle both new facilitiesList format and legacy toiletsList format
+            const facilityData = facility.type ? facility : { ...facility, type: 'toilet' };
+            const facilityType = facilityData.type || 'toilet';
+            
+            // Get appropriate emoji for facility type
+            let emoji = '🚻';
+            if (facilityType === 'snack') {
+              emoji = '🍔';
+            } else if (facilityType === 'souvenir') {
+              emoji = '🧸';
+            }
+            
+            return (
+              <g key={facility.id}
+                   onMouseEnter={() => setHoverInfo({ name: facility.label ?? facility.id, congestion: toiletCongestions[i] ?? 0 })}
+                   onMouseMove={() => setHoverInfo({ name: facility.label ?? facility.id, congestion: toiletCongestions[i] ?? 0 })}
+                   onMouseLeave={() => setHoverInfo(null)} 
+                   onClick={() => onFacilityClick?.(facility)}
+                   style={{ cursor: "pointer" }}>
+                   <circle
+                     cx={facility.position[0]}
+                     cy={facility.position[1]}
+                  r={2.0}
+                     fill="none"
+                     stroke={bandedColor(toiletCongestions[i])}
+                     strokeWidth={0.5}
+                     opacity={0.9}
+                   >
+                  <animate attributeName="r" values="2;3;2" dur="2.6s" repeatCount="indefinite" />
+                  <animate attributeName="stroke-opacity" values="0.6;1;0.6" dur="2.6s" repeatCount="indefinite" />
+                   </circle>
+                   <text x={facility.position[0]} y={facility.position[1]} fontSize={3} textAnchor="middle" dominantBaseline="central">{emoji}</text>
+                 </g>
+            );
+          })}
 
           {/* walkers */}
            <g>
