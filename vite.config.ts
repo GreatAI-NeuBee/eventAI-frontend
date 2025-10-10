@@ -12,7 +12,9 @@ export default defineConfig({
         target: 'https://maps.googleapis.com',
         changeOrigin: true,
         secure: true,
-        rewrite: p => p.replace(/^\/google/, '')
+        rewrite: p => p.replace(/^\/google/, ''),
+        timeout: 60000, // 60 seconds timeout
+        proxyTimeout: 60000
       }
     }
   },
