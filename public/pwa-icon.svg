@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="80" fill="#7c3aed"/>
+  <g fill="#ffffff">
+    <!-- Calendar/Event Icon -->
+    <rect x="140" y="120" width="232" height="200" rx="12" stroke="#ffffff" stroke-width="8" fill="none"/>
+    <line x1="140" y1="160" x2="372" y2="160" stroke="#ffffff" stroke-width="8"/>
+    <rect x="170" y="130" width="16" height="40" rx="4"/>
+    <rect x="326" y="130" width="16" height="40" rx="4"/>
+    
+    <!-- People/Crowd Icon -->
+    <circle cx="210" cy="220" r="18"/>
+    <circle cx="256" cy="220" r="18"/>
+    <circle cx="302" cy="220" r="18"/>
+    <path d="M 192 260 Q 192 245 210 245 Q 228 245 228 260 L 228 280 L 192 280 Z"/>
+    <path d="M 238 260 Q 238 245 256 245 Q 274 245 274 260 L 274 280 L 238 280 Z"/>
+    <path d="M 284 260 Q 284 245 302 245 Q 320 245 320 260 L 320 280 L 284 280 Z"/>
+    
+    <!-- Activity/Live indicator -->
+    <circle cx="360" cy="380" r="24" fill="#10b981"/>
+    <circle cx="360" cy="380" r="18" fill="#ffffff"/>
+    <circle cx="360" cy="380" r="12" fill="#10b981">
+      <animate attributeName="r" values="12;18;12" dur="2s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values="1;0.5;1" dur="2s" repeatCount="indefinite"/>
+    </circle>
+  </g>
+</svg>
+

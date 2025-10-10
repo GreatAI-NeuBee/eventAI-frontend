@@ -3,6 +3,8 @@ import { FileText, AlertTriangle, Users, QrCode, ArrowDownToLine, X } from 'luci
 import { motion } from 'framer-motion';
 import { useSearchParams } from 'react-router-dom';
 import { eventAPI } from '../api/apiClient';
+import PWAInstallBanner from '../components/common/PWAInstallBanner';
+import NotificationBellButton from '../components/common/NotificationBellButton';
 
 // ========== TYPES ==========
 interface EventData {
@@ -536,7 +538,7 @@ const UserEventView: React.FC = () => {
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50">
       {/* Header */}
       <header className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 py-6 flex flex-col sm:flex-row sm:justify-between sm:items-center">
+        <div className="max-w-7xl mx-auto px-4 py-6 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
           <div className="flex flex-col gap-3">
             <h1 className="text-2xl font-bold text-gray-900">{event.eventName}</h1>
             <p className="text-sm text-gray-600">{event.venue} • {event.date}</p>
@@ -546,6 +548,18 @@ const UserEventView: React.FC = () => {
               </p>
             )}
           </div>
+          
+          {/* Notification Bell Button */}
+          {eventId && (
+            <div className="flex items-center gap-2">
+              <NotificationBellButton 
+                eventId={eventId}
+                onSubscribed={() => {
+                  console.log('✅ User subscribed to notifications for event:', eventId);
+                }}
+              />
+            </div>
+          )}
         </div>
       </header>
 
@@ -568,6 +582,14 @@ const UserEventView: React.FC = () => {
       <footer className="text-center text-xs text-gray-500 py-6">
         Data auto-refreshes every 5 minutes • Stay alert and safe 💡
       </footer>
+
+      {/* PWA Install Banner */}
+      <PWAInstallBanner 
+        onRequestNotificationPermission={() => {
+          console.log('📱 User enabled notifications for event:', eventId);
+          // You can send the push subscription to your backend here
+        }}
+      />
     </div>
   );
 };
