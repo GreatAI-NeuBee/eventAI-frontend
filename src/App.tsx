@@ -9,10 +9,13 @@ import NewEvent from './pages/NewEvent';
 import EventDetails from './pages/EventDetails';
 import OnGoingEvent from './pages/OnGoingEvent';
 import User from './pages/User';
+import WeatherTest from './pages/WeatherTest';
 import QRCodeAttachments from './pages/QRCodeAttachments';
+import CongestionDashboard from './pages/CongestionDashboard';
 
 // Import API testing utilities (available in browser console)
 import './utils/apiTest';
+// import AdminQRCodeAttachments from './pages/AdminQRCodeAttachments';
 
 function App() {
   return (
@@ -23,6 +26,7 @@ function App() {
           {/* Public pages (no authentication required) */}
           <Route path="/" element={<Landing />} />
           <Route path="/qrCodeAttachments" element={<QRCodeAttachments />} />
+          {/* <Route path="/adminQRCodeAttachments" element={<AdminQRCodeAttachments />} /> */}
           
           {/* Protected Dashboard routes (with layout) */}
           <Route path="/dashboard" element={
@@ -59,6 +63,12 @@ function App() {
                 <User />
               </DashboardLayout>
             </ProtectedRoute>
+          } />
+          <Route path="/weather-test" element={
+            <WeatherTest />
+          } />
+          <Route path="/congestion-dashboard" element={
+            <CongestionDashboard />
           } />
           
           {/* Redirect old routes to dashboard */}

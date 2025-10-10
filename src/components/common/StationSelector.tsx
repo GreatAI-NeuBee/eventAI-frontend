@@ -1,6 +1,19 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ChevronDown, MapPin, Train, Bus } from 'lucide-react';
-import { Station, RapidKlAgency } from '../../api/rapidKlApi';
+// Removed RapidKL API import to prevent crashes
+
+// Local type definitions (replacing RapidKL API types)
+interface Station {
+  id: string;
+  name: string;
+  latitude: number;
+  longitude: number;
+  distance?: number;
+  lines?: string[];
+  agency?: string;
+}
+
+type RapidKlAgency = 'lrt' | 'mrt' | 'monorail' | 'brt' | 'bus';
 
 interface StationSelectorProps {
   stations: Station[];

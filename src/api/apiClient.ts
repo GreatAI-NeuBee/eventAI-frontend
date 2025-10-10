@@ -2,7 +2,7 @@ import axios from 'axios';
 import mockApiClient from './mockApiClient';
 
 // Configuration for mock mode - disable mock for specific endpoints
-const USE_MOCK_DATA = import.meta.env.VITE_USE_MOCK_DATA !== 'false'; // Default to true for demo
+const USE_MOCK_DATA = import.meta.env.VITE_USE_MOCK_DATA === 'true'; // Use mock data only when explicitly set to true
 const USE_MOCK_CREATE_EVENT = false; // Always use real API for event creation
 const USE_MOCK_EVENT_HISTORY = false; // Always use real API for event history
 const USE_MOCK_GET_EVENT = false; // Always use real API for getting event details
@@ -72,7 +72,15 @@ export const eventAPI = {
   },
   
   // Get event history
-  getEventHistory: async (userEmail?: string, page: number = 1, limit: number = 10) => {
+  getEventHistory: async (
+    userEmail?: string, 
+    page: number = 1, 
+    limit: number = 10,
+    search?: string,
+    sortBy?: string,
+    sortOrder?: 'asc' | 'desc',
+    upcoming?: boolean
+  ) => {
     if (USE_MOCK_EVENT_HISTORY) {
       console.log('🎭 Using mock data for getEventHistory');
       return mockApiClient.getEventHistory();
@@ -80,11 +88,25 @@ export const eventAPI = {
     
     try {
       console.log('🌐 Using real API for getEventHistory:', `${apiClient.defaults.baseURL}/events`);
-      // Add userEmail, page, and limit as query parameters
+      // Add query parameters
       const params: any = { page, limit };
       if (userEmail) {
         params.userEmail = userEmail;
       }
+      if (search) {
+        params.search = search;
+      }
+      if (sortBy) {
+        params.sortBy = sortBy;
+      }
+      if (sortOrder) {
+        params.sortOrder = sortOrder;
+      }
+      if (upcoming !== undefined) {
+        params.upcoming = upcoming;
+      }
+      
+      console.log('📊 Query params:', params);
       return await apiClient.get('/events', { params });
     } catch (error: any) {
       // If server returns 500 error, temporarily fallback to mock data
@@ -180,6 +202,12 @@ export const eventAPI = {
     });
   },
 
+  // Get live predictions for ongoing event
+  getPrediction: (eventId: string) => {
+    console.log('🌐 Using real API for getPrediction:', `${apiClient.defaults.baseURL}/prediction/${eventId}`);
+    return apiClient.post(`/prediction/${eventId}`);
+  },
+
   // Generate forecast report
   generateForecastReport: (eventId: string, reportData?: {
     aiPopularityAnalysis?: {
@@ -225,6 +253,14 @@ export const eventAPI = {
     console.log('📄 Using real API for generateForecastReport:', `${apiClient.defaults.baseURL}/forecast/${eventId}/report`);
     console.log('📊 Report data being sent:', reportData);
     return apiClient.post(`/forecast/${eventId}/report`, reportData || {}, {
+      headers: { 'Content-Type': 'application/json' }
+    });
+  },
+
+  // Generate post-mortem report
+  generatePostMortemReport: (eventId: string) => {
+    console.log('📄 Using real API for generatePostMortemReport:', `${apiClient.defaults.baseURL}/forecast/${eventId}/postmortem`);
+    return apiClient.post(`/forecast/${eventId}/postmortem`, {}, {
       headers: { 'Content-Type': 'application/json' }
     });
   },
