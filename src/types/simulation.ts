@@ -91,6 +91,8 @@ interface EventData {
   name: string;
   dateStart: string;
   dateEnd: string;
+  date_of_event_start?: string;
+  date_of_event_end?: string;
   venue: string;
   description?: string;
   venueLocation?: {
