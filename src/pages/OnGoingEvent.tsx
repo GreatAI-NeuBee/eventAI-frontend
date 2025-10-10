@@ -1,12 +1,13 @@
 import React, { useMemo, useState, useEffect } from "react";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { Activity, AlertTriangle, CheckCircle2, DoorOpen, RefreshCw, TrendingUp, Calendar, ChevronDown, ChevronUp, FileDown } from "lucide-react";
+import { Activity, AlertTriangle, CheckCircle2, DoorOpen, RefreshCw, TrendingUp, Calendar, ChevronDown, ChevronUp, FileDown, QrCode, X, Download } from "lucide-react";
 import Card from "../components/common/Card";
 import Button from "../components/common/Button";
 import Spinner from "../components/common/Spinner";
 import { useEventStore } from "../store/eventStore";
 import { eventAPI } from "../api/apiClient";
 import { Line } from 'react-chartjs-2';
+import { QRCodeSVG } from 'qrcode.react';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -57,6 +58,7 @@ const OngoingEvent: React.FC = () => {
   const [forecastResult, setForecastResult] = useState<any>(null);
   const [expandedGates, setExpandedGates] = useState<Set<string>>(new Set());
   const [isGeneratingPostMortem, setIsGeneratingPostMortem] = useState(false);
+  const [showQRModal, setShowQRModal] = useState(false);
 
   // Resolve eventId (fallback)
   const eventId =
@@ -172,6 +174,36 @@ const OngoingEvent: React.FC = () => {
     } finally {
       setIsGeneratingPostMortem(false);
     }
+  };
+
+  // Download QR code as image
+  const handleDownloadQR = () => {
+    const svg = document.getElementById('live-qr-code');
+    if (!svg) return;
+
+    const svgData = new XMLSerializer().serializeToString(svg);
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    const img = new Image();
+
+    img.onload = () => {
+      canvas.width = img.width;
+      canvas.height = img.height;
+      ctx?.drawImage(img, 0, 0);
+      
+      canvas.toBlob((blob) => {
+        if (blob) {
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = `event-qr-${eventId}.png`;
+          link.click();
+          URL.revokeObjectURL(url);
+        }
+      });
+    };
+
+    img.src = 'data:image/svg+xml;base64,' + btoa(svgData);
   };
 
   const activeEvent: any = eventDetails || currentEvent || { name: "Event", capacity: 0, date: new Date().toISOString(), venue: "" };
@@ -604,6 +636,15 @@ const OngoingEvent: React.FC = () => {
             <FileDown className={`h-4 w-4 ${isGeneratingPostMortem ? 'animate-pulse' : ''}`} />
             {isGeneratingPostMortem ? 'Generating...' : 'Export Post-Mortem Report'}
           </Button>
+          <Button
+            onClick={() => setShowQRModal(true)}
+            variant="secondary"
+            size="sm"
+            className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white"
+          >
+            <QrCode className="h-4 w-4" />
+            Generate Live QR
+          </Button>
           <div className="flex items-center gap-2 text-green-700">
             <CheckCircle2 className="h-5 w-5" />
             <span className="text-sm font-medium">Event in progress</span>
@@ -996,6 +1037,79 @@ const OngoingEvent: React.FC = () => {
           </div>
         </Card>
       </div> */}
+
+      {/* QR Code Modal */}
+      {showQRModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+          onClick={() => setShowQRModal(false)}
+        >
+          <div
+            className="relative bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Close Button */}
+            <button
+              onClick={() => setShowQRModal(false)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              <X className="h-6 w-6" />
+            </button>
+
+            {/* Header */}
+            <div className="text-center mb-6">
+              <div className="inline-flex items-center justify-center w-16 h-16 bg-purple-100 rounded-full mb-4">
+                <QrCode className="h-8 w-8 text-purple-600" />
+              </div>
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">Live Event QR Code</h2>
+              <p className="text-sm text-gray-600">
+                Scan this QR code to view live event updates and congestion information
+              </p>
+            </div>
+
+            {/* QR Code */}
+            <div className="flex justify-center mb-6 bg-white p-6 rounded-xl border-2 border-gray-200">
+              <QRCodeSVG
+                id="live-qr-code"
+                value={`${window.location.origin}/qrCodeAttachments?eventId=${eventId}`}
+                size={256}
+                level="H"
+                includeMargin={true}
+                bgColor="#ffffff"
+                fgColor="#000000"
+              />
+            </div>
+
+            {/* Event Info */}
+            <div className="bg-gradient-to-br from-purple-50 to-indigo-50 rounded-lg p-4 mb-6">
+              <h3 className="text-sm font-semibold text-gray-900 mb-2">Event Details</h3>
+              <div className="space-y-1 text-xs text-gray-700">
+                <p><span className="font-medium">Name:</span> {activeEvent?.name || 'Event'}</p>
+                <p><span className="font-medium">Venue:</span> {activeEvent?.venue || activeEvent?.venueLocation?.name || '—'}</p>
+                <p><span className="font-medium">Date:</span> {activeEvent?.dateStart ? new Date(activeEvent.dateStart).toLocaleDateString() : '—'}</p>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex gap-3">
+              <Button
+                onClick={handleDownloadQR}
+                variant="outline"
+                className="flex-1 flex items-center justify-center gap-2"
+              >
+                <Download className="h-4 w-4" />
+                Download QR
+              </Button>
+              <Button
+                onClick={() => setShowQRModal(false)}
+                className="flex-1 bg-purple-600 hover:bg-purple-700 text-white"
+              >
+                Close
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

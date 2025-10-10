@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { FileText, AlertTriangle, Users, QrCode, ArrowDownToLine, X } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { useSearchParams } from 'react-router-dom';
+import { eventAPI } from '../api/apiClient';
 
 // ========== TYPES ==========
 interface EventData {
@@ -316,9 +318,14 @@ const AttachmentsList: React.FC<{ attachments: Attachment[] }> = ({ attachments 
 
 // ========== MAIN ==========
 const UserEventView: React.FC = () => {
+  const [searchParams] = useSearchParams();
+  const eventId = searchParams.get('eventId');
+  
   const [event, setEvent] = useState<EventData | null>(null);
   const [congestion, setCongestion] = useState<CongestionArea[]>([]);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // Helper random int
   const rand = (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min;
@@ -419,15 +426,64 @@ const UserEventView: React.FC = () => {
   };
 
   useEffect(() => {
-    setEvent({
-      eventName: 'Annual Tech Conference 2025',
-      venue: 'Convention Center Hall A',
-      date: '2025-10-15',
-    });
+    const fetchEventData = async () => {
+      if (!eventId) {
+        setError('No event ID provided');
+        setIsLoading(false);
+        return;
+      }
 
-    // Initial data
+      try {
+        setIsLoading(true);
+        console.log('📥 QRCodeAttachments - Fetching event data for:', eventId);
+        
+        const response = await eventAPI.getEvent(eventId);
+        const eventData = response.data.data || response.data;
+        
+        console.log('📥 QRCodeAttachments - Event data received:', eventData);
+
+        // Set real event data from backend
+        setEvent({
+          eventName: eventData.name || 'Event',
+          venue: eventData.venue || eventData.venueLocation?.name || 'Venue',
+          date: eventData.date_of_event_start 
+            ? new Date(eventData.date_of_event_start).toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+              })
+            : new Date().toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+              }),
+        });
+
+        setError(null);
+      } catch (err: any) {
+        console.error('❌ Error fetching event data:', err);
+        setError(err.message || 'Failed to load event data');
+        // Set fallback data if fetch fails
+        setEvent({
+          eventName: 'Event (Offline Mode)',
+          venue: 'Venue Information Unavailable',
+          date: new Date().toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+          }),
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchEventData();
+
+    // Initial mock data for congestion
     setCongestion(generateCrowdData());
 
+    // Mock attachments data (kept as mock for now)
     setAttachments([
       {
         id: '1',
@@ -435,17 +491,46 @@ const UserEventView: React.FC = () => {
         type: 'pdf',
         size: '1.5 MB',
         url: 'https://example.com/files/event-guidelines.pdf',
-        uploadedAt: '2025-10-01 14:00',
+        uploadedAt: new Date().toLocaleDateString('en-US', { 
+          year: 'numeric', 
+          month: 'short', 
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        }),
       },
     ]);
 
-    // Auto-refresh every 5 minutes (simulated)
+    // Auto-refresh congestion data every 5 minutes (simulated)
     const interval = setInterval(() => setCongestion(generateCrowdData()), 300000); // 5 mins
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [eventId]);
 
-  if (!event) return <div className="text-center mt-10 text-gray-600">Loading event data...</div>;
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-purple-600 mx-auto mb-4"></div>
+          <p className="text-lg text-gray-700 font-medium">Loading event data...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state (but still show the page with fallback data)
+  if (!event) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 flex items-center justify-center">
+        <div className="text-center max-w-md mx-auto p-6">
+          <AlertTriangle className="h-16 w-16 text-amber-500 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Event Not Found</h2>
+          <p className="text-gray-600 mb-4">{error || 'Unable to load event data. Please check the QR code or try again later.'}</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50">
@@ -455,6 +540,11 @@ const UserEventView: React.FC = () => {
           <div className="flex flex-col gap-3">
             <h1 className="text-2xl font-bold text-gray-900">{event.eventName}</h1>
             <p className="text-sm text-gray-600">{event.venue} • {event.date}</p>
+            {error && (
+              <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded px-2 py-1 inline-block">
+                ⚠️ Some data may be limited or unavailable
+              </p>
+            )}
           </div>
         </div>
       </header>
