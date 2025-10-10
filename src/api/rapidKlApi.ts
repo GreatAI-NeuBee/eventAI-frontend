@@ -108,12 +108,12 @@ export const rapidKlAPI = {
               odometer: Math.random() * 1000,
               speed: Math.random() * 60 + 20 // 20-80 km/h
             },
-            current_status: ['INCOMING_AT', 'STOPPED_AT', 'IN_TRANSIT_TO'][Math.floor(Math.random() * 3)],
+            current_status: (['INCOMING_AT', 'STOPPED_AT', 'IN_TRANSIT_TO'] as const)[Math.floor(Math.random() * 3)],
             stop_id: `${agency}-station-${String(i + 1).padStart(3, '0')}`,
             current_stop_sequence: Math.floor(Math.random() * 10),
             timestamp: Math.floor(Date.now() / 1000),
-            congestion_level: ['RUNNING_SMOOTHLY', 'STOP_AND_GO', 'CONGESTION'][Math.floor(Math.random() * 3)],
-            occupancy_status: ['EMPTY', 'MANY_SEATS_AVAILABLE', 'FEW_SEATS_AVAILABLE', 'STANDING_ROOM_ONLY'][Math.floor(Math.random() * 4)]
+            congestion_level: (['RUNNING_SMOOTHLY', 'STOP_AND_GO', 'CONGESTION'] as const)[Math.floor(Math.random() * 3)],
+            occupancy_status: (['EMPTY', 'MANY_SEATS_AVAILABLE', 'FEW_SEATS_AVAILABLE', 'STANDING_ROOM_ONLY'] as const)[Math.floor(Math.random() * 4)]
           });
         }
         

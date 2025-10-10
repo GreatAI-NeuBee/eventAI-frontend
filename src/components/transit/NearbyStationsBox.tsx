@@ -3,6 +3,7 @@ import { MapPin, Train, Bus, Clock, Phone, ExternalLink } from 'lucide-react';
 import Card from '../common/Card';
 import Button from '../common/Button';
 import Spinner from '../common/Spinner';
+import type { Station, RapidKlAgency } from '../../api/rapidKlApi';
 // Removed RapidKL API import to prevent crashes
 
 interface NearbyStationsBoxProps {
@@ -26,7 +27,7 @@ const NearbyStationsBox: React.FC<NearbyStationsBoxProps> = ({
   const [error, setError] = useState<string | null>(null);
 
   // Mock data generation function (replacing RapidKL API)
-  const generateMockNearbyStations = (lat: number, lng: number) => {
+  const generateMockNearbyStations = (lat: number, lng: number): Station[] => {
     return [
       {
         id: 'klcc-lrt',
@@ -35,7 +36,7 @@ const NearbyStationsBox: React.FC<NearbyStationsBoxProps> = ({
         longitude: lng + (Math.random() - 0.5) * 0.01,
         distance: Math.random() * 500 + 100,
         lines: ['LRT'],
-        agency: 'lrt'
+        agency: 'lrt' as RapidKlAgency
       },
       {
         id: 'klcc-mrt',
@@ -44,7 +45,7 @@ const NearbyStationsBox: React.FC<NearbyStationsBoxProps> = ({
         longitude: lng + (Math.random() - 0.5) * 0.01,
         distance: Math.random() * 600 + 200,
         lines: ['MRT'],
-        agency: 'mrt'
+        agency: 'mrt' as RapidKlAgency
       },
       {
         id: 'bukit-bintang-monorail',
@@ -53,7 +54,7 @@ const NearbyStationsBox: React.FC<NearbyStationsBoxProps> = ({
         longitude: lng + (Math.random() - 0.5) * 0.01,
         distance: Math.random() * 800 + 300,
         lines: ['Monorail'],
-        agency: 'monorail'
+        agency: 'monorail' as RapidKlAgency
       }
     ];
   };

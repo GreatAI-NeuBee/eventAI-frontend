@@ -122,7 +122,7 @@ const StationSelector: React.FC<StationSelectorProps> = ({
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
             {value?.agency ? (
-              getAgencyIcon(value.agency)
+              getAgencyIcon(value.agency as RapidKlAgency)
             ) : (
               <MapPin className={`h-4 w-4 ${disabled ? 'text-gray-400' : 'text-gray-500'}`} />
             )}
@@ -163,10 +163,10 @@ const StationSelector: React.FC<StationSelectorProps> = ({
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-2">
-                    {station.agency && getAgencyIcon(station.agency)}
+                    {station.agency && getAgencyIcon(station.agency as RapidKlAgency)}
                     <span>{station.name}</span>
                     {station.agency && (
-                      <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium ${getAgencyColor(station.agency)}`}>
+                      <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium ${getAgencyColor(station.agency as RapidKlAgency)}`}>
                         {station.agency.toUpperCase()}
                       </span>
                     )}

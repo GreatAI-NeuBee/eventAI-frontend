@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef, memo } from 'react';
-import { GoogleMap, DirectionsRenderer, Marker, useJsApiLoader } from '@react-google-maps/api';
+import { GoogleMap, DirectionsRenderer, useJsApiLoader } from '@react-google-maps/api';
 
 export type LatLng = { lat: number; lng: number };
 
@@ -339,15 +339,8 @@ const CongestionMap: React.FC<CongestionMapProps> = memo(({
         setDirectionsResult(result);
         setRouteLoaded(true); // Mark route as loaded
         
-        // Remove the directions_changed listener to prevent API calls
-        if (directionsRenderer) {
-          try {
-            directionsRenderer.removeListener('directions_changed', handleDirectionsChanged);
-            console.log('Directions changed listener removed - no more API calls');
-          } catch (error) {
-            console.warn('Error removing directions changed listener:', error);
-          }
-        }
+        // Note: DirectionsRenderer doesn't support removeListener in React wrapper
+        // The component unmount will handle cleanup automatically
         
         // Force clear all existing polylines to remove old routes
         polylinesRef.current.forEach(polyline => {

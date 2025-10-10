@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import Card from '../common/Card';
 import Spinner from '../common/Spinner';
-import { TrendingUp, Clock, MapPin, AlertTriangle, Car, Train, Bus } from 'lucide-react';
+import { TrendingUp, Clock, AlertTriangle, Car, Train, Bus } from 'lucide-react';
 import { fixEventDate, debugEventDates } from '../../utils/fixEventDate';
 
 interface EnhancedTrafficForecastProps {
@@ -112,8 +112,6 @@ const EnhancedTrafficForecast: React.FC<EnhancedTrafficForecastProps> = ({
           }
           
           const eventTimestamp = Math.floor(eventDateTime.getTime() / 1000);
-          
-          const googleMapsUrl = `https://maps.googleapis.com/maps/api/directions/json?origin=${route.origin}&destination=${route.destination}&departure_time=${eventTimestamp}&traffic_model=best_guess&key=${googleApiKey}`;
           
           // Use Vite proxy to avoid CORS issues
           console.log(`🔗 Making Google Maps API call via Vite proxy for ${route.name} at event time: ${eventDateTime.toLocaleString()}`);

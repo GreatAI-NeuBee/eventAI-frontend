@@ -1,4 +1,4 @@
-import * as protobuf from 'protobufjs';
+// import * as protobuf from 'protobufjs'; // Unused for now
 
 // GTFS Realtime types
 interface VehiclePosition {
@@ -40,6 +40,17 @@ interface FeedMessage {
     id?: string;
     is_deleted?: boolean;
     vehicle?: VehiclePosition;
+    trip_update?: {
+      trip?: {
+        trip_id?: string;
+        route_id?: string;
+        direction_id?: number;
+        start_time?: string;
+        start_date?: string;
+      };
+      stop_time_update?: any[];
+      timestamp?: number;
+    };
   }>;
 }
 
@@ -190,7 +201,7 @@ export class PrasaranaAPI {
   /**
    * Parse protobuf data (simplified version)
    */
-  private parseProtobufData(data: Uint8Array): FeedMessage {
+  private parseProtobufData(_data: Uint8Array): FeedMessage {
     // Since we can't easily parse protobuf in the browser, we'll create realistic mock data
     // based on the actual API structure
     try {

@@ -46,7 +46,7 @@ const LiveTrafficForecast: React.FC<LiveTrafficForecastProps> = ({
     }
     
     try {
-      const locationName = location.name || location.address || 'Event Venue';
+      const locationName = location.name || ('address' in location ? location.address : undefined) || 'Event Venue';
       console.log('🚦 Fetching real-time traffic data for location:', locationName);
       
       // Use Google Maps API for real traffic data
@@ -56,17 +56,15 @@ const LiveTrafficForecast: React.FC<LiveTrafficForecastProps> = ({
       }
       
       // Get traffic data from Google Maps Directions API
-      const origin = `${location.lat || location.latitude},${location.lng || location.longitude}`;
-      
-      // Use a more realistic destination - try multiple fallback destinations
-      const lat = location.lat || location.latitude;
-      const lng = location.lng || location.longitude;
+      const lat = 'lat' in location ? location.lat : location.latitude;
+      const lng = 'lng' in location ? location.lng : location.longitude;
+      const origin = `${lat},${lng}`;
       
       // Try different destination strategies
       let destination = `${lat + 0.01},${lng + 0.01}`; // Small offset first
       
       // If we have an address, try to use a nearby major road
-      if (location.address) {
+      if ('address' in location && location.address) {
         // For Kuala Lumpur area, use a known major road as destination
         if (lat > 2.5 && lat < 4.0 && lng > 100.0 && lng < 102.0) {
           destination = '3.1390,101.6869'; // KLCC area as fallback
@@ -102,8 +100,6 @@ const LiveTrafficForecast: React.FC<LiveTrafficForecastProps> = ({
       }
       
       const eventTimestamp = Math.floor(eventDateTime.getTime() / 1000);
-      
-      const googleMapsUrl = `https://maps.googleapis.com/maps/api/directions/json?origin=${origin}&destination=${destination}&departure_time=${eventTimestamp}&traffic_model=best_guess&key=${googleApiKey}`;
       
       // Use Vite proxy to avoid CORS issues
       console.log(`🔗 Making Google Maps API call via Vite proxy for location: ${locationName} at event time: ${eventDateTime.toLocaleString()}`);
@@ -315,7 +311,7 @@ const LiveTrafficForecast: React.FC<LiveTrafficForecastProps> = ({
                   console.log(`📅 Creating traffic forecast for event time: ${eventTimeRange.start} to ${eventTimeRange.end}`);
                   
                   // Parse start and end times
-                  const parseTime = (timeString) => {
+                  const parseTime = (timeString: string): number => {
                     const [time, period] = timeString.split(' ');
                     let [hour, minute] = time.split(':').map(Number);
                     if (period === 'PM' && hour !== 12) hour += 12;

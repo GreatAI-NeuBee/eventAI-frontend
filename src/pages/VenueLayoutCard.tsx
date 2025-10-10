@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useRef, useState, useContext } from "react";
-import { DUMMY_FORECAST } from "../data/DUMMY_FORECAST";
 import { WeatherContext } from "../components/common/WeatherBackground";
 
 /* ========= Types ========= */
