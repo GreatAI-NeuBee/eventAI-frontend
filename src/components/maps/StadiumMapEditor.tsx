@@ -1997,7 +1997,7 @@ const StadiumMapEditor: React.FC<{
                       <defs>
                         <path id={pathId} d={d} />
                       </defs>
-                      <text fontSize={2.2} fill="#111827" fontWeight="bold" style={{ userSelect: "none" }}>
+                      <text fontSize={1.6} fill="#111827" fontWeight="bold" style={{ userSelect: "none" }}>
                         <textPath href={`#${pathId}`} startOffset="50%" textAnchor="middle">
                           {`S${z.sectionIndex ?? 1}`}
                         </textPath>
@@ -2029,7 +2029,7 @@ const StadiumMapEditor: React.FC<{
                       y={z.points.reduce((s, p) => s + p[1], 0) / z.points.length}
                       textAnchor="middle"
                       dominantBaseline="middle"
-                      fontSize={2.2}
+                      fontSize={1.6}
                       fill="#111827"
                       fontWeight="bold"
                       style={{ userSelect: "none" }}
