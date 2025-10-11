@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PWA Test - EventBuddy</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      max-width: 800px;
+      margin: 40px auto;
+      padding: 20px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+    .container {
+      background: white;
+      color: #333;
+      border-radius: 20px;
+      padding: 30px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+    h1 {
+      color: #7c3aed;
+      margin-top: 0;
+    }
+    .status {
+      padding: 15px;
+      margin: 15px 0;
+      border-radius: 10px;
+      border-left: 4px solid;
+    }
+    .success {
+      background: #d4edda;
+      border-color: #28a745;
+      color: #155724;
+    }
+    .error {
+      background: #f8d7da;
+      border-color: #dc3545;
+      color: #721c24;
+    }
+    .warning {
+      background: #fff3cd;
+      border-color: #ffc107;
+      color: #856404;
+    }
+    button {
+      background: #7c3aed;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 16px;
+      margin: 10px 5px;
+      transition: all 0.3s;
+    }
+    button:hover {
+      background: #6d28d9;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(124, 58, 237, 0.4);
+    }
+    button:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+      transform: none;
+    }
+    .test-section {
+      margin: 20px 0;
+      padding: 20px;
+      background: #f8f9fa;
+      border-radius: 10px;
+    }
+    .emoji {
+      font-size: 24px;
+      margin-right: 10px;
+    }
+    pre {
+      background: #1e1e1e;
+      color: #d4d4d4;
+      padding: 15px;
+      border-radius: 8px;
+      overflow-x: auto;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1><span class="emoji">📱</span>EventBuddy PWA Test</h1>
+    
+    <div class="test-section">
+      <h2>1. Service Worker Status</h2>
+      <div id="sw-status" class="status warning">Checking...</div>
+      <button onclick="checkServiceWorker()">🔄 Recheck</button>
+    </div>
+
+    <div class="test-section">
+      <h2>2. Install Status</h2>
+      <div id="install-status" class="status warning">Checking...</div>
+      <button id="install-btn" onclick="installApp()" disabled>⬇️ Install App</button>
+    </div>
+
+    <div class="test-section">
+      <h2>3. Notification Permission</h2>
+      <div id="notification-status" class="status warning">Checking...</div>
+      <button onclick="requestNotification()">🔔 Request Permission</button>
+      <button onclick="sendTestNotification()">✉️ Send Test</button>
+    </div>
+
+    <div class="test-section">
+      <h2>4. PWA Features</h2>
+      <div id="features-status"></div>
+    </div>
+
+    <div class="test-section">
+      <h2>5. Quick Links</h2>
+      <button onclick="location.href='/'">🏠 Home</button>
+      <button onclick="location.href='/qrCodeAttachments?eventId=demo'">📱 QR Page</button>
+      <button onclick="clearAndReset()">🗑️ Clear & Reset</button>
+    </div>
+  </div>
+
+  <script>
+    let deferredPrompt;
+
+    // Listen for install prompt
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      document.getElementById('install-btn').disabled = false;
+      updateInstallStatus('Ready to install! 🎉', 'success');
+    });
+
+    // Check service worker
+    function checkServiceWorker() {
+      const statusEl = document.getElementById('sw-status');
+      
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistration().then(registration => {
+          if (registration) {
+            statusEl.className = 'status success';
+            statusEl.innerHTML = `
+              <strong>✅ Service Worker Active</strong><br>
+              Scope: ${registration.scope}<br>
+              State: ${registration.active?.state || 'N/A'}
+            `;
+          } else {
+            statusEl.className = 'status warning';
+            statusEl.innerHTML = '⏳ Service Worker not registered yet. Refresh the page.';
+          }
+        });
+      } else {
+        statusEl.className = 'status error';
+        statusEl.innerHTML = '❌ Service Workers not supported in this browser';
+      }
+    }
+
+    // Check install status
+    function checkInstallStatus() {
+      const statusEl = document.getElementById('install-status');
+      const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
+      const isIOSApp = window.navigator.standalone === true;
+      
+      if (isStandalone || isIOSApp) {
+        statusEl.className = 'status success';
+        statusEl.innerHTML = '✅ App is installed and running in standalone mode!';
+        document.getElementById('install-btn').disabled = true;
+      } else {
+        statusEl.className = 'status warning';
+        statusEl.innerHTML = '📱 App is not installed. Click install button below.';
+      }
+    }
+
+    // Install app
+    async function installApp() {
+      if (!deferredPrompt) {
+        alert('Install prompt not available. Try accessing from mobile or check browser support.');
+        return;
+      }
+
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      
+      const statusEl = document.getElementById('install-status');
+      if (outcome === 'accepted') {
+        statusEl.className = 'status success';
+        statusEl.innerHTML = '✅ App installed successfully!';
+      } else {
+        statusEl.className = 'status warning';
+        statusEl.innerHTML = '❌ Installation cancelled';
+      }
+      
+      deferredPrompt = null;
+      document.getElementById('install-btn').disabled = true;
+    }
+
+    // Check notifications
+    function checkNotifications() {
+      const statusEl = document.getElementById('notification-status');
+      
+      if (!('Notification' in window)) {
+        statusEl.className = 'status error';
+        statusEl.innerHTML = '❌ Notifications not supported in this browser';
+        return;
+      }
+
+      const permission = Notification.permission;
+      if (permission === 'granted') {
+        statusEl.className = 'status success';
+        statusEl.innerHTML = '✅ Notification permission granted';
+      } else if (permission === 'denied') {
+        statusEl.className = 'status error';
+        statusEl.innerHTML = '❌ Notification permission denied';
+      } else {
+        statusEl.className = 'status warning';
+        statusEl.innerHTML = '⏳ Notification permission not requested yet';
+      }
+    }
+
+    // Request notification permission
+    async function requestNotification() {
+      if (!('Notification' in window)) {
+        alert('Notifications not supported');
+        return;
+      }
+
+      const permission = await Notification.requestPermission();
+      checkNotifications();
+      
+      if (permission === 'granted') {
+        alert('✅ Permission granted! You can now receive notifications.');
+      }
+    }
+
+    // Send test notification
+    function sendTestNotification() {
+      if (Notification.permission !== 'granted') {
+        alert('Please grant notification permission first!');
+        requestNotification();
+        return;
+      }
+
+      new Notification('🎉 EventBuddy Test Notification', {
+        body: 'This is a test notification from EventBuddy PWA!',
+        icon: '/pwa-192x192.png',
+        badge: '/pwa-64x64.png',
+        tag: 'test'
+      });
+    }
+
+    // Check PWA features
+    function checkFeatures() {
+      const featuresEl = document.getElementById('features-status');
+      const features = [
+        { name: 'Service Worker', supported: 'serviceWorker' in navigator },
+        { name: 'Notifications', supported: 'Notification' in window },
+        { name: 'Push Messages', supported: 'PushManager' in window },
+        { name: 'Background Sync', supported: 'sync' in ServiceWorkerRegistration.prototype },
+        { name: 'Web Share', supported: 'share' in navigator },
+        { name: 'Install Prompt', supported: true }
+      ];
+
+      featuresEl.innerHTML = features.map(f => `
+        <div style="margin: 5px 0;">
+          ${f.supported ? '✅' : '❌'} ${f.name}
+        </div>
+      `).join('');
+    }
+
+    // Clear and reset
+    function clearAndReset() {
+      if (!confirm('This will clear all app data and reload. Continue?')) return;
+      
+      localStorage.clear();
+      sessionStorage.clear();
+      
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(registrations => {
+          registrations.forEach(reg => reg.unregister());
+        });
+      }
+      
+      caches.keys().then(names => {
+        names.forEach(name => caches.delete(name));
+      });
+      
+      setTimeout(() => location.reload(), 1000);
+    }
+
+    // Update install status helper
+    function updateInstallStatus(message, type) {
+      const statusEl = document.getElementById('install-status');
+      statusEl.className = `status ${type}`;
+      statusEl.innerHTML = message;
+    }
+
+    // Initialize checks
+    window.addEventListener('load', () => {
+      checkServiceWorker();
+      checkInstallStatus();
+      checkNotifications();
+      checkFeatures();
+    });
+
+    // Listen for app installed
+    window.addEventListener('appinstalled', () => {
+      updateInstallStatus('✅ App installed successfully!', 'success');
+      deferredPrompt = null;
+    });
+  </script>
+</body>
+</html>
+

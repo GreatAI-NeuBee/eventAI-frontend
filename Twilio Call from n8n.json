@@ -1,0 +1,69 @@
+{
+  "name": "Twilio call",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "emergency-help",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        224
+      ],
+      "id": "65e6d7ef-e1fa-45d4-ad37-9d90571c82b3",
+      "name": "Webhook",
+      "webhookId": "9f1b9ccd-e581-4b90-a70a-1ff311a51d4c"
+    },
+    {
+      "parameters": {
+        "resource": "call",
+        "from": "+12183003293",
+        "to": "+601154298452",
+        "twiml": true,
+        "message": "<Response> <Connect> <Stream url=\"wss://092a73a1-1321-4037-a944-2773ef480092-00-3koqhpqk1tkk3.pike.replit.dev/media-stream\"/> </Connect> </Response>",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        208,
+        224
+      ],
+      "id": "83cc0d9c-a137-450e-a1dc-a27943fef60a",
+      "name": "Make a call1",
+      "credentials": {
+        "twilioApi": {
+          "id": "7abMVrEPvYDzzxfD",
+          "name": "Twilio account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Make a call1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "ef077671-e2f0-4606-99fb-98873fb471ee",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "8b35bffd46a5e645da5001ff28e7fb4452935ac7eadad95b15c68bb664d62ac2"
+  },
+  "id": "5YbYUt6ang9Z3ZO2",
+  "tags": []
+}

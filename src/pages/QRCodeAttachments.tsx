@@ -1,6 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { FileText, AlertTriangle, Users, QrCode, ArrowDownToLine, X } from 'lucide-react';
+import { FileText, AlertTriangle, Users, QrCode, ArrowDownToLine, X, Phone } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { useSearchParams } from 'react-router-dom';
+import { eventAPI } from '../api/apiClient';
+import PWAInstallBanner from '../components/common/PWAInstallBanner';
+import NotificationBellButton from '../components/common/NotificationBellButton';
 
 // ========== TYPES ==========
 interface EventData {
@@ -316,9 +320,15 @@ const AttachmentsList: React.FC<{ attachments: Attachment[] }> = ({ attachments 
 
 // ========== MAIN ==========
 const UserEventView: React.FC = () => {
+  const [searchParams] = useSearchParams();
+  const eventId = searchParams.get('eventId');
+  
   const [event, setEvent] = useState<EventData | null>(null);
   const [congestion, setCongestion] = useState<CongestionArea[]>([]);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isEmergencyCallActive, setIsEmergencyCallActive] = useState(false);
 
   // Helper random int
   const rand = (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min;
@@ -418,16 +428,113 @@ const UserEventView: React.FC = () => {
     });
   };
 
-  useEffect(() => {
-    setEvent({
-      eventName: 'Annual Tech Conference 2025',
-      venue: 'Convention Center Hall A',
-      date: '2025-10-15',
-    });
+  // Emergency call function
+  const handleEmergencyCall = async () => {
+    if (!event) {
+      alert('Event data not available. Please try again later.');
+      return;
+    }
 
-    // Initial data
+    try {
+      setIsEmergencyCallActive(true);
+      
+      console.log('🚨 Emergency call initiated for:', event.eventName);
+
+      // Prepare event details for the webhook
+      const eventName = encodeURIComponent(event.eventName);
+      const eventLocation = encodeURIComponent(event.venue);
+      const webhookUrl = `https://eventbuddy-api.munymunyhom.tech/n8n/webhook/emergency-help?event_name=${eventName}&event_location=${eventLocation}`;
+
+      console.log('📞 Calling emergency webhook:', webhookUrl);
+
+      const response = await fetch(webhookUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          eventId: eventId,
+          eventName: event.eventName,
+          eventLocation: event.venue,
+          timestamp: new Date().toISOString(),
+          userAgent: navigator.userAgent,
+        }),
+      });
+
+      if (response.ok) {
+        console.log('✅ Emergency call webhook triggered successfully');
+        alert('🚨 Emergency call initiated! Help is on the way. Please stay calm and follow any instructions from event staff.');
+      } else {
+        throw new Error(`Webhook call failed with status: ${response.status}`);
+      }
+
+    } catch (error) {
+      console.error('❌ Emergency call failed:', error);
+      alert('⚠️ Unable to initiate emergency call. Please contact event staff directly or call local emergency services.');
+    } finally {
+      setIsEmergencyCallActive(false);
+    }
+  };
+
+  useEffect(() => {
+    const fetchEventData = async () => {
+      if (!eventId) {
+        setError('No event ID provided');
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        setIsLoading(true);
+        console.log('📥 QRCodeAttachments - Fetching event data for:', eventId);
+        
+        const response = await eventAPI.getEvent(eventId);
+        const eventData = response.data.data || response.data;
+        
+        console.log('📥 QRCodeAttachments - Event data received:', eventData);
+
+        // Set real event data from backend
+        setEvent({
+          eventName: eventData.name || 'Event',
+          venue: eventData.venue || eventData.venueLocation?.name || 'Venue',
+          date: eventData.date_of_event_start 
+            ? new Date(eventData.date_of_event_start).toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+              })
+            : new Date().toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+              }),
+        });
+
+        setError(null);
+      } catch (err: any) {
+        console.error('❌ Error fetching event data:', err);
+        setError(err.message || 'Failed to load event data');
+        // Set fallback data if fetch fails
+        setEvent({
+          eventName: 'Event (Offline Mode)',
+          venue: 'Venue Information Unavailable',
+          date: new Date().toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+          }),
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchEventData();
+
+    // Initial mock data for congestion
     setCongestion(generateCrowdData());
 
+    // Mock attachments data (kept as mock for now)
     setAttachments([
       {
         id: '1',
@@ -435,27 +542,92 @@ const UserEventView: React.FC = () => {
         type: 'pdf',
         size: '1.5 MB',
         url: 'https://example.com/files/event-guidelines.pdf',
-        uploadedAt: '2025-10-01 14:00',
+        uploadedAt: new Date().toLocaleDateString('en-US', { 
+          year: 'numeric', 
+          month: 'short', 
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        }),
       },
     ]);
 
-    // Auto-refresh every 5 minutes (simulated)
+    // Auto-refresh congestion data every 5 minutes (simulated)
     const interval = setInterval(() => setCongestion(generateCrowdData()), 300000); // 5 mins
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [eventId]);
 
-  if (!event) return <div className="text-center mt-10 text-gray-600">Loading event data...</div>;
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-purple-600 mx-auto mb-4"></div>
+          <p className="text-lg text-gray-700 font-medium">Loading event data...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state (but still show the page with fallback data)
+  if (!event) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 flex items-center justify-center">
+        <div className="text-center max-w-md mx-auto p-6">
+          <AlertTriangle className="h-16 w-16 text-amber-500 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Event Not Found</h2>
+          <p className="text-gray-600 mb-4">{error || 'Unable to load event data. Please check the QR code or try again later.'}</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50">
       {/* Header */}
       <header className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 py-6 flex flex-col sm:flex-row sm:justify-between sm:items-center">
+        <div className="max-w-7xl mx-auto px-4 py-6 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
           <div className="flex flex-col gap-3">
             <h1 className="text-2xl font-bold text-gray-900">{event.eventName}</h1>
             <p className="text-sm text-gray-600">{event.venue} • {event.date}</p>
+            {error && (
+              <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded px-2 py-1 inline-block">
+                ⚠️ Some data may be limited or unavailable
+              </p>
+            )}
           </div>
+          
+          {/* Action Buttons */}
+          {eventId && (
+            <div className="flex items-center gap-3">
+              {/* Emergency Call Button */}
+              <motion.button
+                onClick={handleEmergencyCall}
+                disabled={isEmergencyCallActive}
+                whileHover={{ scale: isEmergencyCallActive ? 1 : 1.05 }}
+                whileTap={{ scale: isEmergencyCallActive ? 1 : 0.95 }}
+                className={`
+                  flex items-center gap-2 px-4 py-2 rounded-lg font-semibold text-sm transition-all duration-200
+                  ${isEmergencyCallActive 
+                    ? 'bg-red-300 text-red-700 cursor-not-allowed' 
+                    : 'bg-red-600 hover:bg-red-700 text-white shadow-lg hover:shadow-xl'
+                  }
+                `}
+              >
+                <Phone className={`h-4 w-4 ${isEmergencyCallActive ? 'animate-pulse' : ''}`} />
+                {isEmergencyCallActive ? 'Calling...' : 'Emergency Help'}
+              </motion.button>
+
+              {/* Notification Bell Button */}
+              <NotificationBellButton 
+                eventId={eventId}
+                onSubscribed={() => {
+                  console.log('✅ User subscribed to notifications for event:', eventId);
+                }}
+              />
+            </div>
+          )}
         </div>
       </header>
 
@@ -478,6 +650,14 @@ const UserEventView: React.FC = () => {
       <footer className="text-center text-xs text-gray-500 py-6">
         Data auto-refreshes every 5 minutes • Stay alert and safe 💡
       </footer>
+
+      {/* PWA Install Banner */}
+      <PWAInstallBanner 
+        onRequestNotificationPermission={() => {
+          console.log('📱 User enabled notifications for event:', eventId);
+          // You can send the push subscription to your backend here
+        }}
+      />
     </div>
   );
 };
