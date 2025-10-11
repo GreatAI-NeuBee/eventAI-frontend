@@ -1,6 +1,6 @@
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect, useRef } from "react";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { Activity, AlertTriangle, CheckCircle2, DoorOpen, RefreshCw, TrendingUp, Calendar, ChevronDown, ChevronUp, FileDown, QrCode, X, Download } from "lucide-react";
+import { Activity, AlertTriangle, CheckCircle2, DoorOpen, RefreshCw, TrendingUp, Calendar, ChevronDown, ChevronUp, FileDown, QrCode, X, Download, Camera, CameraOff, AlertCircle } from "lucide-react";
 import Card from "../components/common/Card";
 import Button from "../components/common/Button";
 import Spinner from "../components/common/Spinner";
@@ -8,6 +8,7 @@ import { useEventStore } from "../store/eventStore";
 import { eventAPI } from "../api/apiClient";
 import { Line } from 'react-chartjs-2';
 import { QRCodeSVG } from 'qrcode.react';
+import { io, Socket } from 'socket.io-client';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -31,6 +32,562 @@ ChartJS.register(
   Legend,
   Filler
 );
+
+// CCTV Component for each gate with WebSocket Integration
+interface CCTVFeedProps {
+  gateId: string;
+  gateName: string;
+  isFirstGate: boolean;
+  eventId: string;
+}
+
+interface FallDetectionAlert {
+  sessionId: string;
+  eventId: string;
+  detection: {
+    confidence: number;
+    detections: any[];
+    boundingBox: any;
+    aspectRatio: number;
+    frameIndex: number;
+    timestamp: number;
+  };
+  alert: {
+    title: string;
+    message: string;
+    severity: string;
+    timestamp: number;
+  };
+}
+
+const CCTVFeed: React.FC<CCTVFeedProps> = ({ gateName, isFirstGate, eventId }) => {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [stream, setStream] = useState<MediaStream | null>(null);
+  const [cameraError, setCameraError] = useState<string | null>(null);
+  const [isLoadingCamera, setIsLoadingCamera] = useState(false);
+  const [staticImageUrl, setStaticImageUrl] = useState<string>('');
+  const [imageError, setImageError] = useState<boolean>(false);
+  
+  // WebSocket state
+  const socketRef = useRef<Socket | null>(null);
+  const [socketConnected, setSocketConnected] = useState(false);
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [frameCount, setFrameCount] = useState(0);
+  const frameIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const [fallAlerts, setFallAlerts] = useState<FallDetectionAlert[]>([]);
+  
+  // Configuration
+  const config = {
+    frameRate: 10, // FPS
+    quality: 0.75, // JPEG quality
+    maxWidth: 640,
+    maxHeight: 480,
+    serverUrl: import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'
+  };
+
+  // Generate random image URL for non-first gates
+  const generateRandomImageUrl = () => {
+    const randomNumber = Math.floor(Math.random() * 13) + 1; // 1-13
+    return `https://vkaongvemnzkvvvxgduk.supabase.co/storage/v1/object/public/congestion_image/congested${randomNumber}.jpg`;
+  };
+
+  // Initialize WebSocket connection for first gate
+  useEffect(() => {
+    if (!isFirstGate) {
+      // Generate random image for other gates
+      setStaticImageUrl(generateRandomImageUrl());
+      return;
+    }
+
+    // Initialize Socket.IO connection for first gate
+    console.log('🔌 Initializing Socket.IO connection...');
+    const socket = io(config.serverUrl, {
+      transports: ['websocket', 'polling'],
+      timeout: 20000,
+      forceNew: true
+    });
+
+    socketRef.current = socket;
+
+    // Connection events
+    socket.on('connect', () => {
+      setSocketConnected(true);
+      console.log('✅ Connected to fall detection server, Socket ID:', socket.id);
+    });
+
+    socket.on('disconnect', (reason) => {
+      setSocketConnected(false);
+      console.log('🔌 Disconnected:', reason);
+    });
+
+    socket.on('connect_error', (error) => {
+      console.error('❌ Connection error:', error);
+    });
+
+    // Stream events
+    socket.on('stream_started', (data) => {
+      console.log('🎥 Stream started:', data);
+      setSessionId(data.sessionId);
+    });
+
+    socket.on('stream_stopped', (data) => {
+      console.log('⏹️ Stream stopped:', data);
+      setSessionId(null);
+      setFrameCount(0);
+    });
+
+    socket.on('stream_error', (error) => {
+      console.error('❌ Stream error:', error);
+      setCameraError(error.message);
+    });
+
+    // Fall detection event
+    socket.on('fall_detected', (data: FallDetectionAlert) => {
+      console.log('🚨 FALL DETECTED!', data);
+      handleFallDetection(data);
+    });
+
+    // Cleanup on unmount
+    return () => {
+      console.log('🔌 Cleaning up Socket.IO connection...');
+      if (frameIntervalRef.current) {
+        clearTimeout(frameIntervalRef.current);
+      }
+      socket.disconnect();
+    };
+  }, [isFirstGate]);
+
+  // Sync stream with video element
+  useEffect(() => {
+    if (stream && videoRef.current) {
+      console.log('📹 Setting video srcObject with stream:', stream);
+      console.log('📹 Video element ready:', videoRef.current);
+      console.log('📹 Stream active:', stream.active);
+      console.log('📹 Stream tracks:', stream.getTracks());
+      
+      videoRef.current.srcObject = stream;
+      
+      // Try to play the video explicitly
+      videoRef.current.play().catch((error) => {
+        console.error('❌ Error playing video:', error);
+      });
+
+      // Set canvas dimensions to match video
+      if (canvasRef.current && videoRef.current.videoWidth && videoRef.current.videoHeight) {
+        canvasRef.current.width = videoRef.current.videoWidth;
+        canvasRef.current.height = videoRef.current.videoHeight;
+      }
+    }
+  }, [stream]);
+
+  // Frame capture and sending logic
+  const captureAndSendFrame = () => {
+    if (!videoRef.current || !canvasRef.current || !sessionId || !socketRef.current?.connected) {
+      return;
+    }
+
+    try {
+      const context = canvasRef.current.getContext('2d');
+      if (!context) return;
+
+      // Draw current video frame to canvas
+      context.drawImage(
+        videoRef.current,
+        0, 0,
+        canvasRef.current.width,
+        canvasRef.current.height
+      );
+
+      // Convert canvas to base64 JPEG
+      const frameData = canvasRef.current.toDataURL('image/jpeg', config.quality);
+      const base64Data = frameData.split(',')[1]; // Remove data:image/jpeg;base64, prefix
+
+      // Send frame to server
+      socketRef.current.emit('video_frame', {
+        sessionId: sessionId,
+        frameData: base64Data,
+        timestamp: Date.now(),
+        frameIndex: frameCount
+      });
+
+      setFrameCount(prev => prev + 1);
+      console.log(`📹 Frame ${frameCount} sent to server`);
+
+    } catch (error) {
+      console.error('❌ Error capturing frame:', error);
+    }
+
+    // Schedule next frame capture
+    const frameInterval = 1000 / config.frameRate;
+    frameIntervalRef.current = setTimeout(captureAndSendFrame, frameInterval);
+  };
+
+  // Fall detection handler
+  const handleFallDetection = (data: FallDetectionAlert) => {
+    console.log('🚨 Processing fall detection alert:', data);
+    
+    // Add to alerts list
+    setFallAlerts(prev => [...prev, data]);
+    
+    // Show browser notification
+    if (Notification.permission === 'granted') {
+      new Notification(data.alert.title, {
+        body: data.alert.message,
+        icon: '/logo.png',
+        tag: 'fall-detection',
+        requireInteraction: true,
+        vibrate: [200, 100, 200]
+      } as NotificationOptions);
+    }
+
+    // Play alert sound
+    playAlertSound();
+
+    // Auto-remove alert after 30 seconds
+    setTimeout(() => {
+      setFallAlerts(prev => prev.filter(alert => alert !== data));
+    }, 30000);
+  };
+
+  // Play alert sound
+  const playAlertSound = () => {
+    try {
+      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+      
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+      
+      oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
+      gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+      
+      oscillator.start();
+      oscillator.stop(audioContext.currentTime + 0.2);
+    } catch (error) {
+      console.warn('Could not play alert sound:', error);
+    }
+  };
+
+  // Start camera for first gate
+  const startCamera = async () => {
+    setIsLoadingCamera(true);
+    setCameraError(null);
+    setFallAlerts([]); // Clear previous alerts
+
+    try {
+      if (!socketConnected) {
+        throw new Error('Not connected to fall detection server');
+      }
+
+      console.log('📹 Requesting camera access...');
+      
+      const mediaStream = await navigator.mediaDevices.getUserMedia({ 
+        video: { 
+          width: { ideal: config.maxWidth },
+          height: { ideal: config.maxHeight },
+          frameRate: { ideal: config.frameRate },
+          facingMode: 'user'
+        } 
+      });
+      
+      console.log('✅ Camera access granted!');
+      console.log('📹 Media stream obtained:', mediaStream);
+      
+      // Set stream state
+      setStream(mediaStream);
+
+      // Wait for video to be ready
+      await new Promise<void>((resolve) => {
+        if (videoRef.current) {
+          videoRef.current.onloadedmetadata = () => resolve();
+        }
+      });
+
+      // Set canvas dimensions
+      if (canvasRef.current && videoRef.current) {
+        canvasRef.current.width = videoRef.current.videoWidth;
+        canvasRef.current.height = videoRef.current.videoHeight;
+      }
+
+      // Start streaming session with server
+      socketRef.current?.emit('start_video_stream', {
+        eventId: eventId,
+        config: {
+          frameRate: config.frameRate,
+          quality: config.quality,
+          maxWidth: config.maxWidth,
+          maxHeight: config.maxHeight,
+          requireAck: false
+        }
+      });
+
+      // Start frame capture loop
+      setTimeout(captureAndSendFrame, 1000 / config.frameRate);
+
+      console.log('✅ Camera streaming started with fall detection');
+      
+    } catch (error: any) {
+      console.error('❌ Error starting camera:', error);
+      
+      if (error.name === 'NotAllowedError') {
+        setCameraError('Camera permission denied. Please allow camera access and try again.');
+      } else if (error.name === 'NotFoundError') {
+        setCameraError('No camera found on this device.');
+      } else if (error.name === 'NotReadableError') {
+        setCameraError('Camera is already in use by another application.');
+      } else {
+        setCameraError(`Unable to access camera: ${error.message}`);
+      }
+    } finally {
+      setIsLoadingCamera(false);
+    }
+  };
+
+  // Stop camera
+  const stopCamera = () => {
+    console.log('⏹️ Stopping camera and video stream...');
+    
+    // Stop frame capture
+    if (frameIntervalRef.current) {
+      clearTimeout(frameIntervalRef.current);
+      frameIntervalRef.current = null;
+    }
+
+    // Stop camera stream
+    if (stream) {
+      stream.getTracks().forEach(track => track.stop());
+      setStream(null);
+    }
+
+    // Clear video source
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+
+    // Notify server to stop stream
+    if (socketRef.current && sessionId) {
+      socketRef.current.emit('stop_video_stream', {
+        sessionId: sessionId
+      });
+    }
+
+    // Reset state
+    setSessionId(null);
+    setFrameCount(0);
+    setFallAlerts([]);
+    
+    console.log('✅ Camera stopped');
+  };
+
+  // Refresh static image for non-first gates
+  const refreshImage = () => {
+    setStaticImageUrl(generateRandomImageUrl());
+    setImageError(false);
+  };
+
+            return (
+    <div className="bg-black rounded-lg overflow-hidden border-2 border-gray-300">
+      {/* Hidden Canvas for Frame Capture */}
+      {isFirstGate && <canvas ref={canvasRef} className="hidden" />}
+      
+      {/* Fall Detection Alerts */}
+      {isFirstGate && fallAlerts.length > 0 && (
+        <div className="absolute top-0 left-0 right-0 z-10 p-2 space-y-2">
+          {fallAlerts.map((alert, index) => (
+            <div
+              key={index}
+              className="bg-red-600 text-white p-3 rounded-lg shadow-lg border-2 border-red-800 animate-pulse"
+            >
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <AlertTriangle className="h-5 w-5" />
+                    <h3 className="font-bold text-sm">{alert.alert.title}</h3>
+                  </div>
+                  <p className="text-xs">{alert.alert.message}</p>
+                  <p className="text-xs mt-1 opacity-90">
+                    Confidence: {alert.detection.confidence.toFixed(1)}%
+                  </p>
+                </div>
+                <button
+                  onClick={() => setFallAlerts(prev => prev.filter((_, i) => i !== index))}
+                  className="text-white hover:text-gray-200"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      
+      {/* CCTV Header */}
+      <div className="bg-gray-900 px-3 py-2 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <div className={`w-2 h-2 rounded-full ${
+            (isFirstGate && stream && socketConnected) || (!isFirstGate && !imageError)
+              ? 'bg-red-500 animate-pulse'
+              : 'bg-gray-500'
+          }`}></div>
+          <span className="text-white text-xs font-medium">
+            📹 CCTV - {gateName}
+            {isFirstGate && socketConnected && (
+              <span className="ml-2 text-green-400 text-xs">● AI Fall Detection</span>
+            )}
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          {isFirstGate && (
+            <>
+              {stream ? (
+                <>
+                  <button
+                    onClick={stopCamera}
+                    className="text-red-400 hover:text-red-300 transition-colors"
+                    title="Stop Camera"
+                  >
+                    <CameraOff className="h-4 w-4" />
+                  </button>
+                  {sessionId && (
+                    <span className="text-gray-400 text-xs">
+                      {frameCount} frames
+                    </span>
+                  )}
+                </>
+              ) : (
+                <button
+                  onClick={startCamera}
+                  disabled={isLoadingCamera || !socketConnected}
+                  className="text-green-400 hover:text-green-300 transition-colors disabled:opacity-50"
+                  title={socketConnected ? "Start Camera" : "Connecting to server..."}
+                >
+                  <Camera className="h-4 w-4" />
+                </button>
+              )}
+            </>
+          )}
+          {!isFirstGate && (
+            <button
+              onClick={refreshImage}
+              className="text-blue-400 hover:text-blue-300 transition-colors"
+              title="Refresh Feed"
+            >
+              <RefreshCw className="h-4 w-4" />
+            </button>
+          )}
+          <span className="text-gray-400 text-xs">
+            {new Date().toLocaleTimeString('en-MY', { 
+              hour: '2-digit', 
+              minute: '2-digit', 
+              second: '2-digit',
+              timeZone: 'Asia/Kuala_Lumpur'
+            })}
+          </span>
+        </div>
+      </div>
+
+      {/* CCTV Content */}
+      <div className="relative h-48 bg-gray-900 flex items-center justify-center">
+        {isFirstGate ? (
+          // Live camera feed for first gate
+          <>
+            {stream ? (
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                muted
+                className="w-full h-full object-cover"
+                onLoadedMetadata={() => {
+                  console.log('📹 Video metadata loaded');
+                  if (videoRef.current) {
+                    console.log('📹 Video dimensions:', videoRef.current.videoWidth, 'x', videoRef.current.videoHeight);
+                    videoRef.current.play().catch(err => console.error('❌ Play error:', err));
+                  }
+                }}
+                onCanPlay={() => console.log('📹 Video can play')}
+                onPlay={() => console.log('📹 Video playing')}
+                onError={(e) => console.error('❌ Video element error:', e)}
+              />
+            ) : (
+              <div className="text-center p-4">
+                {isLoadingCamera ? (
+                  <div className="flex flex-col items-center gap-2">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-400"></div>
+                    <p className="text-white text-sm">Starting camera...</p>
+                  </div>
+                ) : cameraError ? (
+                  <div className="flex flex-col items-center gap-2 text-red-400">
+                    <AlertCircle className="h-8 w-8" />
+                    <p className="text-xs text-center max-w-xs">{cameraError}</p>
+                    <button
+                      onClick={startCamera}
+                      className="mt-2 px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-xs rounded transition-colors"
+                    >
+                      Try Again
+                    </button>
+            </div>
+                ) : (
+                  <div className="flex flex-col items-center gap-2 text-gray-400">
+                    <Camera className="h-8 w-8" />
+                    <p className="text-sm">Live Camera Feed</p>
+                    <button
+                      onClick={startCamera}
+                      className="mt-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded transition-colors flex items-center gap-2"
+                    >
+                      <Camera className="h-4 w-4" />
+                      Start Camera
+                    </button>
+            </div>
+                )}
+          </div>
+            )}
+          </>
+        ) : (
+          // Static congestion image for other gates
+          <div className="w-full h-full relative">
+            {imageError ? (
+              <div className="flex flex-col items-center justify-center h-full text-gray-400">
+                <AlertCircle className="h-8 w-8 mb-2" />
+                <p className="text-sm mb-2">Failed to load feed</p>
+                <button
+                  onClick={refreshImage}
+                  className="px-3 py-1 bg-gray-600 hover:bg-gray-500 text-white text-xs rounded transition-colors"
+                >
+                  Retry
+                </button>
+            </div>
+            ) : (
+              <img
+                src={staticImageUrl}
+                alt={`CCTV footage for ${gateName}`}
+                className="w-full h-full object-cover"
+                onError={() => setImageError(true)}
+                onLoad={() => setImageError(false)}
+              />
+            )}
+            
+            {/* Overlay timestamp and gate info */}
+            <div className="absolute bottom-2 left-2 bg-black/70 text-white px-2 py-1 rounded text-xs">
+              Live Feed - {gateName}
+            </div>
+          </div>
+        )}
+
+        {/* Connection status indicator */}
+        <div className="absolute top-2 right-2">
+          <div className={`w-3 h-3 rounded-full ${
+            (isFirstGate && stream) || (!isFirstGate && !imageError) 
+              ? 'bg-green-500' 
+              : 'bg-red-500'
+          }`}></div>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 // ==== Page types ====
 export type FloorZonePolygon = {
@@ -669,7 +1226,7 @@ const OngoingEvent: React.FC = () => {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {Object.entries(gateComparisonCharts).map(([gateName, chartData]: [string, any]) => {
+            {Object.entries(gateComparisonCharts).map(([gateName, chartData]: [string, any], index) => {
               const metrics = gateStatusMetrics?.[gateName];
               const currentData = chartData.currentData;
               
@@ -717,6 +1274,16 @@ const OngoingEvent: React.FC = () => {
                           },
                         },
                       }} 
+                    />
+                  </div>
+                  
+                  {/* CCTV Feed Component */}
+                  <div className="mt-4">
+                    <CCTVFeed 
+                      gateId={chartData.gateId}
+                      gateName={gateName}
+                      isFirstGate={index === 0} // First gate gets camera access
+                      eventId={eventId}
                     />
                   </div>
                   
@@ -1060,12 +1627,12 @@ const OngoingEvent: React.FC = () => {
             <div className="text-center mb-6">
               <div className="inline-flex items-center justify-center w-16 h-16 bg-purple-100 rounded-full mb-4">
                 <QrCode className="h-8 w-8 text-purple-600" />
-              </div>
+                  </div>
               <h2 className="text-2xl font-bold text-gray-900 mb-2">Live Event QR Code</h2>
               <p className="text-sm text-gray-600">
                 Scan this QR code to view live event updates and congestion information
               </p>
-            </div>
+                          </div>
 
             {/* QR Code */}
             <div className="flex justify-center mb-6 bg-white p-6 rounded-xl border-2 border-gray-200">
@@ -1078,7 +1645,7 @@ const OngoingEvent: React.FC = () => {
                 bgColor="#ffffff"
                 fgColor="#000000"
               />
-            </div>
+                          </div>
 
             {/* Event Info */}
             <div className="bg-gradient-to-br from-purple-50 to-indigo-50 rounded-lg p-4 mb-6">
@@ -1087,8 +1654,8 @@ const OngoingEvent: React.FC = () => {
                 <p><span className="font-medium">Name:</span> {activeEvent?.name || 'Event'}</p>
                 <p><span className="font-medium">Venue:</span> {activeEvent?.venue || activeEvent?.venueLocation?.name || '—'}</p>
                 <p><span className="font-medium">Date:</span> {activeEvent?.dateStart ? new Date(activeEvent.dateStart).toLocaleDateString() : '—'}</p>
-              </div>
-            </div>
+                          </div>
+                        </div>
 
             {/* Action Buttons */}
             <div className="flex gap-3">
@@ -1106,10 +1673,10 @@ const OngoingEvent: React.FC = () => {
               >
                 Close
               </Button>
-            </div>
-          </div>
-        </div>
-      )}
+                      </div>
+                    </div>
+                  </div>
+                )}
     </div>
   );
 };
