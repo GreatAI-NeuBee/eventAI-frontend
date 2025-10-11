@@ -16,13 +16,10 @@ declare global {
 window.weatherService = weatherService;
 
 // Register service worker for PWA
-const updateSW = registerSW({
+void registerSW({
   onNeedRefresh() {
     console.log('🔄 New content available, please refresh.');
-    // You can show a toast notification here
-    if (confirm('New version available! Click OK to update.')) {
-      updateSW(true);
-    }
+   
   },
   onOfflineReady() {
     console.log('✅ App ready to work offline');

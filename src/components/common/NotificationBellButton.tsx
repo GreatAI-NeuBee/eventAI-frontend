@@ -39,8 +39,34 @@ export const NotificationBellButton: React.FC<NotificationBellButtonProps> = ({
   };
 
   const handleNotificationRequest = async () => {
+    // Check for HTTPS requirement (except localhost)
+    const isSecureContext = window.isSecureContext || window.location.hostname === 'localhost';
+    if (!isSecureContext) {
+      showToastMessage('❌ Notifications require HTTPS connection');
+      return;
+    }
+
+    // Check for Notification API support
     if (!('Notification' in window)) {
-      showToastMessage('❌ Notifications not supported in this browser');
+      // iOS Safari specific message
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+      if (isIOS) {
+        showToastMessage('📱 iOS: Please install this app to home screen first, then enable notifications');
+      } else {
+        showToastMessage('❌ Notifications not supported in this browser. Try Chrome or Firefox.');
+      }
+      return;
+    }
+
+    // Check for Service Worker support
+    if (!('serviceWorker' in navigator)) {
+      showToastMessage('❌ Service Workers not supported. Notifications unavailable.');
+      return;
+    }
+
+    // Check for Push API support
+    if (!('PushManager' in window)) {
+      showToastMessage('❌ Push notifications not supported in this browser');
       return;
     }
 

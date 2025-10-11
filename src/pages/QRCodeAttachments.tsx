@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { FileText, AlertTriangle, Users, QrCode, ArrowDownToLine, X, Phone } from 'lucide-react';
+import { FileText, AlertTriangle, Users, QrCode, ArrowDownToLine, X, Phone, Smartphone, Bell } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useSearchParams } from 'react-router-dom';
 import { eventAPI } from '../api/apiClient';
@@ -91,6 +91,99 @@ const InfoRow: React.FC<{ label: string; value: string; mono?: boolean }> = ({ l
     <span className={`text-gray-900 ${mono ? 'font-mono' : ''}`}>{value}</span>
   </div>
 );
+
+// Mobile Setup Guide Component
+const MobileSetupGuide: React.FC = () => {
+  const [isVisible, setIsVisible] = useState(false);
+  const [deviceType, setDeviceType] = useState<'ios' | 'android' | 'other'>('other');
+
+  useEffect(() => {
+    // Detect device type
+    const userAgent = navigator.userAgent;
+    const isIOS = /iPad|iPhone|iPod/.test(userAgent);
+    const isAndroid = /Android/.test(userAgent);
+    
+    if (isIOS) {
+      setDeviceType('ios');
+    } else if (isAndroid) {
+      setDeviceType('android');
+    } else {
+      setDeviceType('other');
+    }
+
+    // Check if notifications are supported
+    const notificationsSupported = 'Notification' in window && 'serviceWorker' in navigator;
+    const isSecureContext = window.isSecureContext || window.location.hostname === 'localhost';
+    
+    // Show guide if on mobile and notifications aren't properly set up
+    const isMobile = isIOS || isAndroid;
+    const needsSetup = isMobile && (!notificationsSupported || !isSecureContext);
+    
+    setIsVisible(needsSetup);
+  }, []);
+
+  if (!isVisible) return null;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4 mb-4"
+    >
+      <div className="flex items-start gap-3">
+        <div className="flex-shrink-0">
+          <Smartphone className="h-6 w-6 text-blue-600" />
+        </div>
+        <div className="flex-1">
+          <h3 className="font-semibold text-blue-900 mb-2 flex items-center gap-2">
+            <Bell className="h-4 w-4" />
+            Enable Notifications on Your Phone
+          </h3>
+          
+          {deviceType === 'ios' && (
+            <div className="text-sm text-blue-800 space-y-2">
+              <p className="font-medium">📱 iOS Setup (2 steps):</p>
+              <ol className="list-decimal list-inside space-y-1 ml-2">
+                <li>Tap the <strong>Share</strong> button (square with arrow) in Safari</li>
+                <li>Scroll down and tap <strong>"Add to Home Screen"</strong></li>
+                <li>Open the app from your home screen</li>
+                <li>Tap the notification button to enable alerts</li>
+              </ol>
+              <p className="mt-2 text-xs bg-blue-100 border border-blue-200 rounded p-2">
+                💡 <strong>Note:</strong> iOS only supports notifications for apps installed to home screen
+              </p>
+            </div>
+          )}
+          
+          {deviceType === 'android' && (
+            <div className="text-sm text-blue-800 space-y-2">
+              <p className="font-medium">🤖 Android Setup:</p>
+              <ol className="list-decimal list-inside space-y-1 ml-2">
+                <li>Tap the <strong>menu</strong> (three dots) in Chrome</li>
+                <li>Select <strong>"Install app"</strong> or <strong>"Add to Home screen"</strong></li>
+                <li>Open the app from your home screen</li>
+                <li>Tap the notification button to enable alerts</li>
+              </ol>
+              {!window.isSecureContext && (
+                <p className="mt-2 text-xs bg-amber-100 border border-amber-200 rounded p-2">
+                  ⚠️ <strong>HTTPS Required:</strong> Access this page via HTTPS to enable notifications
+                </p>
+              )}
+            </div>
+          )}
+
+          <button
+            onClick={() => setIsVisible(false)}
+            className="mt-3 text-xs text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1"
+          >
+            <X className="h-3 w-3" />
+            Dismiss
+          </button>
+        </div>
+      </div>
+    </motion.div>
+  );
+};
 
 // Live congestion panel + modal
 const CongestionPanel: React.FC<{ data: CongestionArea[] }> = ({ data }) => {
@@ -633,6 +726,9 @@ const UserEventView: React.FC = () => {
 
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-10">
+        {/* Mobile Setup Guide */}
+        <MobileSetupGuide />
+
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <EventInfoCard data={event} />
           <QuickGuidelines />

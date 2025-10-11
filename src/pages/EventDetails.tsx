@@ -128,7 +128,7 @@ const WeatherCard: React.FC = () => {
           <p className={`text-sm font-medium ${getSecondaryTextColor()}`}>Weather</p>
           {isWeatherNotAvailable ? (
             <p className={`text-sm ${getSecondaryTextColor()}`}>
-              Temporarily not available
+              Weather forecast will only available 7 days before event
             </p>
           ) : (
             <div className="flex items-baseline gap-2">
