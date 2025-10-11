@@ -78,6 +78,10 @@ export interface EventData {
   venue?: string;
   venueLayout?: unknown;
   forecastResult?: unknown;
+  date_of_event_start?: string;
+  date_of_event_end?: string;
+  dateStart?: string; // Legacy field name
+  dateEnd?: string; // Legacy field name
 }
 
 /* ========= Colors / helpers ========= */
@@ -278,6 +282,66 @@ function computeZoneCongestion(
   const normalized: Record<string, number> = {};
   for (const [id, v] of Object.entries(raw)) normalized[id] = Math.round((v / max) * 100);
   return normalized;
+}
+
+/* ========= Generate frames from event time range ========= */
+function generateFramesFromEventTimeRange(
+  _plan: StadiumMapJSON, 
+  timeRange: { startTime: string; endTime: string; eventDate: string } | null
+) {
+  if (!timeRange) {
+    // Fallback to current time if no event time range
+    const now = new Date();
+    return [{
+      time: now,
+      dsKey: toKey(now),
+      phase: "arrivals" as Phase,
+      byId: {}
+    }];
+  }
+
+  // Parse times as UTC to avoid timezone conversion issues
+  const startTime = new Date(timeRange.startTime);
+  const endTime = new Date(timeRange.endTime);
+  const durationMs = endTime.getTime() - startTime.getTime();
+  
+  // Generate frames every 5 minutes during the event
+  const frameIntervalMs = 5 * 60 * 1000; // 5 minutes
+  const totalFrames = Math.ceil(durationMs / frameIntervalMs);
+  const midPoint = Math.floor(totalFrames / 2);
+  
+  console.log('🕐 Generating frames from event time range:', {
+    originalStartTime: timeRange.startTime,
+    originalEndTime: timeRange.endTime,
+    parsedStartTime: startTime.toISOString(),
+    parsedEndTime: endTime.toISOString(),
+    startTimeLocal: startTime.toString(),
+    endTimeLocal: endTime.toString(),
+    durationMs,
+    totalFrames,
+    midPoint
+  });
+
+  const frames = [];
+  for (let i = 0; i < totalFrames; i++) {
+    const frameTime = new Date(startTime.getTime() + (i * frameIntervalMs));
+    const phase = i < midPoint ? "arrivals" : "exits";
+    
+    frames.push({
+      time: frameTime,
+      dsKey: toKey(frameTime),
+      phase: phase as Phase,
+      byId: {}
+    });
+  }
+
+  console.log('Generated event time range frames:', {
+    totalFrames: frames.length,
+    firstFrame: frames[0],
+    lastFrame: frames[frames.length - 1]
+  });
+
+  return frames;
 }
 
 /* ========= Frames from forecast ========= */
@@ -731,6 +795,45 @@ export const VenueLayoutCard: React.FC<{ event: EventData | null }> = ({ event }
   // Facility detail state
   const [selectedFacility, setSelectedFacility] = useState<FacilityDetail | null>(null);
 
+  // Extract time range from event data
+  const timeRange = useMemo(() => {
+    // Prioritize database field names, fallback to legacy field names
+    const startTime = event?.date_of_event_start || event?.dateStart;
+    const endTime = event?.date_of_event_end || event?.dateEnd;
+    
+    // Debug logging to help troubleshoot
+    console.log('🔍 TIME RANGE EXTRACTION:', {
+      date_of_event_start: event?.date_of_event_start,
+      date_of_event_end: event?.date_of_event_end,
+      dateStart: event?.dateStart,
+      dateEnd: event?.dateEnd,
+      resolvedStartTime: startTime,
+      resolvedEndTime: endTime,
+      hasEvent: !!event
+    });
+    
+    if (!startTime || !endTime) {
+      console.log('No valid time data found in event');
+      return null;
+    }
+    
+    try {
+      // Keep the original ISO strings to preserve timezone information
+      const result = {
+        startTime: startTime, // Keep original ISO string
+        endTime: endTime, // Keep original ISO string
+        eventDate: startTime.split('T')[0] // YYYY-MM-DD format from startTime
+      };
+      
+      console.log('Time range result:', result);
+      return result;
+    } catch (error) {
+      console.error('Error parsing event dates:', error);
+      return null;
+    }
+  }, [event?.date_of_event_start, event?.date_of_event_end, event?.dateStart, event?.dateEnd]);
+
+
   // Generate dummy facility data
   const generateFacilityDetail = (facility: any): FacilityDetail => {
     const facilityType = facility.type || 'toilet';
@@ -823,37 +926,171 @@ export const VenueLayoutCard: React.FC<{ event: EventData | null }> = ({ event }
     return coerceForecast(raw, emptyForecast);
   }, [event]);
 
-  const frames = useMemo(() => buildFramesFromForecast(plan, forecast), [plan, forecast]);
+  const frames = useMemo(() => {
+    console.log('Building frames from forecast:', {
+      forecast,
+      plan: plan?.exitsList?.length || 0
+    });
+    
+    // Force using event time range instead of forecast data for now
+    if (timeRange) {
+      console.log('🎯 FORCING EVENT TIME RANGE:', timeRange);
+      const eventFrames = generateFramesFromEventTimeRange(plan, timeRange);
+      console.log('🎯 GENERATED EVENT FRAMES:', eventFrames.length, 'frames');
+      if (eventFrames.length > 0) {
+        console.log('🎯 FIRST EVENT FRAME:', eventFrames[0]);
+        console.log('🎯 LAST EVENT FRAME:', eventFrames[eventFrames.length - 1]);
+      }
+      return eventFrames;
+    }
+    
+    // If no real forecast data, generate frames based on event time range
+    if (!forecast || (Object.keys(forecast.arrivals).length === 0 && Object.keys(forecast.exits).length === 0)) {
+      console.log('No forecast data, generating frames from event time range');
+      return generateFramesFromEventTimeRange(plan, timeRange);
+    }
+    
+    const result = buildFramesFromForecast(plan, forecast);
+    console.log('Generated frames:', result.length, 'frames');
+    if (result.length > 0) {
+      console.log('First frame:', result[0]);
+      console.log('Last frame:', result[result.length - 1]);
+    }
+    return result;
+  }, [plan, forecast, timeRange]);
 
   const [idx, setIdx] = useState(0);
   const max = Math.max(0, frames.length - 1);
   useEffect(() => setIdx(i => Math.min(i, max)), [max]);
 
   const frame = frames[idx] ?? { time: new Date(), dsKey: toKey(new Date()), phase: "arrivals" as Phase, byId: {} };
+  
+  // Debug logging for frame
+  console.log('Current frame debug:', {
+    idx,
+    frameTime: frame.time,
+    frameDsKey: frame.dsKey,
+    framePhase: frame.phase,
+    totalFrames: frames.length
+  });
   const zones = useMemo(() => zonesForFrame(plan, frame.byId), [plan, frame.byId]);
   const prettyTime = useMemo(() => (frame.time ? new Date(frame.time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "--:--"), [frame.time]);
 
+  // Get current simulation time - use UTC time to match the original event time
+  const currentSimulationTime = useMemo(() => {
+    if (!frame?.time) return null;
+    
+    // Use UTC time to match the original event timezone
+    const utcHours = frame.time.getUTCHours().toString().padStart(2, '0');
+    const utcMinutes = frame.time.getUTCMinutes().toString().padStart(2, '0');
+    const timeString = `${utcHours}:${utcMinutes}`;
+    
+    console.log('🕐 Current simulation time debug:', {
+      frameTime: frame.time,
+      frameTimeString: frame.time.toString(),
+      frameTimeISO: frame.time.toISOString(),
+      utcTimeString: timeString,
+      localTimeString: frame.time.toTimeString().slice(0, 5),
+      dsKey: frame.dsKey
+    });
+    return timeString;
+  }, [frame?.time]);
+
+  // Format time from 24-hour format to 12-hour format
+  const formatTime = (time: string) => {
+    if (!time) return '';
+    
+    // Handle both HH:MM format and full date strings
+    if (time.includes('T')) {
+      // Full date string like "2025-10-25T10:00:00+00:00"
+      // Extract time directly from ISO string to avoid timezone conversion
+      const timeMatch = time.match(/T(\d{2}):(\d{2}):/);
+      if (timeMatch) {
+        const hour = parseInt(timeMatch[1]);
+        const minutes = timeMatch[2];
+        const ampm = hour >= 12 ? 'PM' : 'AM';
+        const displayHour = hour % 12 || 12;
+        return `${displayHour}:${minutes} ${ampm}`;
+      }
+    } else {
+      // Just time string like "10:00" (now in UTC format)
+      const [hours, minutes] = time.split(':');
+      const hour = parseInt(hours);
+      const ampm = hour >= 12 ? 'PM' : 'AM';
+      const displayHour = hour % 12 || 12;
+      return `${displayHour}:${minutes} ${ampm}`;
+    }
+    
+    return '';
+  };
+
   const gateLoads = useMemo(() => {
-    const series = frame.phase === "arrivals" ? forecast.arrivals : forecast.exits;
+    // Force using event time range for gate loads
+    if (timeRange) {
+      console.log('Using event time range for gate loads');
+      // Generate realistic gate loads based on event time and phase
+      console.log('Generating realistic gate loads for event time range');
+      const loads: Record<string, number> = {};
+      
+      const exits = plan.exitsList ?? [];
+      exits.forEach((exit) => {
+        const key = normalizeGateKey((exit.name?.match(/\b(\w+)\b$/)?.[1] ?? exit.id) as string);
+        
+        // Generate realistic loads based on phase and time
+        let baseLoad = 50; // Base number of people
+        
+        if (frame.phase === "arrivals") {
+          // Arrivals: higher load at the beginning, tapering off
+          const progress = frames.length > 0 ? idx / Math.max(1, frames.length - 1) : 0;
+          baseLoad = Math.round(100 * (1 - progress * 0.5)); // 100 to 50 people
+        } else {
+          // Exits: lower load at the beginning, increasing
+          const progress = frames.length > 0 ? idx / Math.max(1, frames.length - 1) : 0;
+          baseLoad = Math.round(50 * (0.5 + progress * 0.5)); // 25 to 50 people
+        }
+        
+        // Add some variation
+        const variation = Math.round(baseLoad * 0.3 * (Math.random() - 0.5));
+        loads[key] = Math.max(5, baseLoad + variation);
+      });
+      
+      console.log('Generated gate loads:', loads);
+      return loads;
+    }
     
-    // Combine all forecast data for fallback
-    const allSeries: GateSeries = {};
-    Object.entries(forecast.arrivals).forEach(([key, data]) => {
-      allSeries[key] = [...(allSeries[key] ?? []), ...data];
+    // If we have real forecast data, use it
+    if (forecast && (Object.keys(forecast.arrivals).length > 0 || Object.keys(forecast.exits).length > 0)) {
+      const series = frame.phase === "arrivals" ? forecast.arrivals : forecast.exits;
+      
+      // Combine all forecast data for fallback
+      const allSeries: GateSeries = {};
+      Object.entries(forecast.arrivals).forEach(([key, data]) => {
+        allSeries[key] = [...(allSeries[key] ?? []), ...data];
+      });
+      Object.entries(forecast.exits).forEach(([key, data]) => {
+        allSeries[key] = [...(allSeries[key] ?? []), ...data];
+      });
+      
+      const loads = gateLoadsWithFallback(plan, series, allSeries, frame.dsKey, 150);
+      
+      // Optional debug logging for missing gate data
+      Object.entries(loads).forEach(([k,v]) => {
+        if (v === 0) console.debug("No datapoint within tolerance for", k, "at", frame.dsKey);
+      });
+      
+      return loads;
+    }
+    
+    // Fallback: generate basic gate loads
+    console.log('Using fallback gate loads');
+    const loads: Record<string, number> = {};
+    const exits = plan.exitsList ?? [];
+    exits.forEach((exit) => {
+      const key = normalizeGateKey((exit.name?.match(/\b(\w+)\b$/)?.[1] ?? exit.id) as string);
+      loads[key] = 50; // Default load
     });
-    Object.entries(forecast.exits).forEach(([key, data]) => {
-      allSeries[key] = [...(allSeries[key] ?? []), ...data];
-    });
-    
-    const loads = gateLoadsWithFallback(plan, series, allSeries, frame.dsKey, 150);
-    
-    // Optional debug logging for missing gate data
-    Object.entries(loads).forEach(([k,v]) => {
-      if (v === 0) console.debug("No datapoint within tolerance for", k, "at", frame.dsKey);
-    });
-    
     return loads;
-  }, [plan, forecast, frame.phase, frame.dsKey]);
+  }, [plan, forecast, frame.phase, frame.dsKey, idx, frames.length, timeRange]);
 
   const totalPeopleNow = useMemo(() => Object.values(gateLoads).reduce((s, v) => s + (v || 0), 0), [gateLoads]);
   const dotScale = useMemo(() => getDotScale(totalPeopleNow), [totalPeopleNow]);
@@ -990,7 +1227,24 @@ export const VenueLayoutCard: React.FC<{ event: EventData | null }> = ({ event }
               {frames[idx]?.phase}
             </span>
           </span>
-          <span className="font-medium">{prettyTime}</span>
+          <div className="flex items-center gap-4">
+            {/* Time Range */}
+            {timeRange && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-gray-500">Time Range:</span>
+                <span className="text-sm font-medium">
+                  {formatTime(timeRange.startTime)} - {formatTime(timeRange.endTime)}
+                </span>
+              </div>
+            )}
+            {/* Current Time */}
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-500">Current:</span>
+              <span className="text-sm font-medium">
+                {currentSimulationTime ? formatTime(currentSimulationTime) : prettyTime}
+              </span>
+            </div>
+          </div>
         </div>
 
         <div className="flex items-center gap-2 mb-2">
@@ -1203,6 +1457,7 @@ const StadiumPlanSVG: React.FC<{
 
   return (
     <div className="relative w-full aspect-[16/10] rounded-xl overflow-hidden border border-gray-300 bg-white">
+
       <svg viewBox={`0 0 ${VB_W} ${VB_H}`} preserveAspectRatio="xMidYMid meet" className="h-full w-full">
         <defs>
           {isCircle
