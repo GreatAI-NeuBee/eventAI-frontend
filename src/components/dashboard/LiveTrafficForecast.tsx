@@ -169,6 +169,11 @@ const LiveTrafficForecast: React.FC<LiveTrafficForecastProps> = ({
         });
         
         // Calculate realistic speeds from Google Maps data
+        if (!leg.distance?.value || !leg.duration?.value) {
+          console.warn('⚠️ Missing distance or duration data from Google Maps');
+          return;
+        }
+        
         const distanceKm = leg.distance.value / 1000; // Convert meters to km
         const durationHours = leg.duration.value / 3600; // Convert seconds to hours
         const currentSpeed = distanceKm / durationHours; // km/h
