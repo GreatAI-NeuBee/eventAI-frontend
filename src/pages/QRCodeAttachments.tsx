@@ -736,11 +736,7 @@ const UserEventView: React.FC = () => {
               title="Click to send demo push notification"
             >
               {event.eventName}
-              {isSendingNotification && (
-                <span className="ml-2 text-xs text-indigo-600 font-normal">
-                  📤 Sending notification...
-                </span>
-              )}
+             
             </button>
             <p className="text-sm text-gray-600">{event.venue} • {event.date}</p>
             {error && (
