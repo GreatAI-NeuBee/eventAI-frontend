@@ -76,6 +76,7 @@ const CCTVFeed: React.FC<CCTVFeedProps> = ({ gateName, isFirstGate, eventId }) =
   const [frameCount, setFrameCount] = useState(0);
   const frameIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const [fallAlerts, setFallAlerts] = useState<FallDetectionAlert[]>([]);
+  const fallDetectionTimerRef = useRef<NodeJS.Timeout | null>(null);
   
   // Configuration
   const config = {
@@ -83,7 +84,8 @@ const CCTVFeed: React.FC<CCTVFeedProps> = ({ gateName, isFirstGate, eventId }) =
     quality: 0.75, // JPEG quality
     maxWidth: 640,
     maxHeight: 480,
-    serverUrl: import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'
+    // Socket.IO server URL (remove /api/v1 path if present)
+    serverUrl: (import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000').replace(/\/api\/v1$/, '')
   };
 
   // Generate random image URL for non-first gates
@@ -153,6 +155,9 @@ const CCTVFeed: React.FC<CCTVFeedProps> = ({ gateName, isFirstGate, eventId }) =
       console.log('🔌 Cleaning up Socket.IO connection...');
       if (frameIntervalRef.current) {
         clearTimeout(frameIntervalRef.current);
+      }
+      if (fallDetectionTimerRef.current) {
+        clearTimeout(fallDetectionTimerRef.current);
       }
       socket.disconnect();
     };
@@ -355,6 +360,12 @@ const CCTVFeed: React.FC<CCTVFeedProps> = ({ gateName, isFirstGate, eventId }) =
       frameIntervalRef.current = null;
     }
 
+    // Clear fall detection timer
+    if (fallDetectionTimerRef.current) {
+      clearTimeout(fallDetectionTimerRef.current);
+      fallDetectionTimerRef.current = null;
+    }
+
     // Stop camera stream
     if (stream) {
       stream.getTracks().forEach(track => track.stop());
@@ -381,6 +392,65 @@ const CCTVFeed: React.FC<CCTVFeedProps> = ({ gateName, isFirstGate, eventId }) =
     console.log('✅ Camera stopped');
   };
 
+  // Trigger fall detection manually (for testing)
+  const triggerFallDetection = () => {
+    if (!isFirstGate || !stream) {
+      console.warn('⚠️ Fall detection only works on Gate A with active camera');
+      return;
+    }
+
+    console.log('🎬 Fall detection triggered manually, alert will appear in 5 seconds...');
+    
+    // Clear any existing timer
+    if (fallDetectionTimerRef.current) {
+      clearTimeout(fallDetectionTimerRef.current);
+    }
+
+    // Simulate fall detection after 5 seconds
+    fallDetectionTimerRef.current = setTimeout(() => {
+      console.log('🚨 Simulating fall detection event...');
+      
+      // Create a mock fall detection event
+      const mockFallDetection: FallDetectionAlert = {
+        sessionId: sessionId || 'demo-session',
+        eventId: eventId,
+        detection: {
+          confidence: 92.5,
+          detections: [
+            {
+              class: 'person',
+              confidence: 92.5,
+              bbox: {
+                x1: 150, y1: 280,
+                x2: 420, y2: 350,
+                width: 270, height: 70
+              },
+              is_fallen: true,
+              aspect_ratio: 3.86
+            }
+          ],
+          boundingBox: {
+            x1: 150, y1: 280,
+            x2: 420, y2: 350,
+            width: 270, height: 70
+          },
+          aspectRatio: 3.86,
+          frameIndex: frameCount,
+          timestamp: Date.now()
+        },
+        alert: {
+          title: '🚨 Fall Detected!',
+          message: 'A fall has been detected with 92.5% confidence. 1 person(s) detected in prone position.',
+          severity: 'critical',
+          timestamp: Date.now()
+        }
+      };
+      
+      // Trigger the fall detection handler
+      handleFallDetection(mockFallDetection);
+    }, 5000); // 5 seconds delay
+  };
+
   // Refresh static image for non-first gates
   const refreshImage = () => {
     setStaticImageUrl(generateRandomImageUrl());
@@ -388,13 +458,13 @@ const CCTVFeed: React.FC<CCTVFeedProps> = ({ gateName, isFirstGate, eventId }) =
   };
 
             return (
-    <div className="bg-black rounded-lg overflow-hidden border-2 border-gray-300">
+    <div className="relative bg-black rounded-lg overflow-hidden border-2 border-gray-300">
       {/* Hidden Canvas for Frame Capture */}
       {isFirstGate && <canvas ref={canvasRef} className="hidden" />}
       
       {/* Fall Detection Alerts */}
       {isFirstGate && fallAlerts.length > 0 && (
-        <div className="absolute top-0 left-0 right-0 z-10 p-2 space-y-2">
+        <div className="absolute top-0 left-0 right-0 z-50 p-2 space-y-2">
           {fallAlerts.map((alert, index) => (
             <div
               key={index}
@@ -425,7 +495,11 @@ const CCTVFeed: React.FC<CCTVFeedProps> = ({ gateName, isFirstGate, eventId }) =
       
       {/* CCTV Header */}
       <div className="bg-gray-900 px-3 py-2 flex items-center justify-between">
-        <div className="flex items-center gap-2">
+        <button 
+          onClick={isFirstGate && stream ? triggerFallDetection : undefined}
+          className={`flex items-center gap-2 ${isFirstGate && stream ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}`}
+          disabled={!isFirstGate || !stream}
+        >
           <div className={`w-2 h-2 rounded-full ${
             (isFirstGate && stream && socketConnected) || (!isFirstGate && !imageError)
               ? 'bg-red-500 animate-pulse'
@@ -436,8 +510,9 @@ const CCTVFeed: React.FC<CCTVFeedProps> = ({ gateName, isFirstGate, eventId }) =
             {isFirstGate && socketConnected && (
               <span className="ml-2 text-green-400 text-xs">● AI Fall Detection</span>
             )}
+            
           </span>
-        </div>
+        </button>
         <div className="flex items-center gap-2">
           {isFirstGate && (
             <>
@@ -489,7 +564,7 @@ const CCTVFeed: React.FC<CCTVFeedProps> = ({ gateName, isFirstGate, eventId }) =
       </div>
 
       {/* CCTV Content */}
-      <div className="relative h-48 bg-gray-900 flex items-center justify-center">
+      <div className="relative h-96 bg-gray-900 flex items-center justify-center">
         {isFirstGate ? (
           // Live camera feed for first gate
           <>
@@ -1290,7 +1365,7 @@ const OngoingEvent: React.FC = () => {
                   {/* Live Status Metrics for this gate */}
                   {metrics && (
                     <div className="mt-4 space-y-2">
-                      <div className="p-3 bg-gradient-to-r from-red-50 to-pink-50 rounded-lg border border-red-200">
+                      {/* <div className="p-3 bg-gradient-to-r from-red-50 to-pink-50 rounded-lg border border-red-200">
                         <div className="flex items-center justify-between">
                           <div>
                             <p className="text-xs font-semibold text-gray-900 mb-1">Crowd Density Statistics</p>
@@ -1309,10 +1384,10 @@ const OngoingEvent: React.FC = () => {
                             </div>
                           </div>
                         </div>
-                      </div>
+                      </div> */}
                       
                       {/* Current Status Indicator */}
-                      <div className="flex items-center justify-between p-2 bg-gray-50 rounded border border-gray-200 text-xs">
+                      {/* <div className="flex items-center justify-between p-2 bg-gray-50 rounded border border-gray-200 text-xs">
                         <span className="text-gray-600">Current Status:</span>
                         <span className={`font-medium ${
                           metrics.currentRisk === 'High' ? 'text-red-600' :
@@ -1322,7 +1397,7 @@ const OngoingEvent: React.FC = () => {
                           {metrics.currentRisk === 'High' ? '🔴' : metrics.currentRisk === 'Medium' ? '🟡' : '🟢'} 
                           {' '}{metrics.currentCount} people • {metrics.currentRisk} Risk
                         </span>
-                      </div>
+                      </div> */}
                     </div>
                   )}
                 </Card>

@@ -976,52 +976,63 @@ export const VenueLayoutCard: React.FC<{ event: EventData | null }> = ({ event }
   const zones = useMemo(() => zonesForFrame(plan, frame.byId), [plan, frame.byId]);
   const prettyTime = useMemo(() => (frame.time ? new Date(frame.time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "--:--"), [frame.time]);
 
-  // Get current simulation time - use UTC time to match the original event time
+  // Get current simulation time - convert to Malaysia timezone (UTC+8) and format
   const currentSimulationTime = useMemo(() => {
     if (!frame?.time) return null;
     
-    // Use UTC time to match the original event timezone
-    const utcHours = frame.time.getUTCHours().toString().padStart(2, '0');
-    const utcMinutes = frame.time.getUTCMinutes().toString().padStart(2, '0');
-    const timeString = `${utcHours}:${utcMinutes}`;
-    
-    console.log('🕐 Current simulation time debug:', {
-      frameTime: frame.time,
-      frameTimeString: frame.time.toString(),
-      frameTimeISO: frame.time.toISOString(),
-      utcTimeString: timeString,
-      localTimeString: frame.time.toTimeString().slice(0, 5),
-      dsKey: frame.dsKey
-    });
-    return timeString;
+    try {
+      // Convert to Malaysia timezone and format in 12-hour format
+      const malaysiaTime = frame.time.toLocaleTimeString('en-MY', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true,
+        timeZone: 'Asia/Kuala_Lumpur'
+      });
+      
+      console.log('🕐 Current simulation time debug:', {
+        frameTime: frame.time,
+        frameTimeISO: frame.time.toISOString(),
+        malaysiaTime: malaysiaTime,
+        dsKey: frame.dsKey
+      });
+      
+      return malaysiaTime;
+    } catch (error) {
+      console.error('Error converting to Malaysia time:', error);
+      return null;
+    }
   }, [frame?.time]);
 
-  // Format time from 24-hour format to 12-hour format
+  // Format time from 24-hour format to 12-hour format (Malaysia timezone UTC+8)
   const formatTime = (time: string) => {
     if (!time) return '';
     
-    // Handle both HH:MM format and full date strings
-    if (time.includes('T')) {
-      // Full date string like "2025-10-25T10:00:00+00:00"
-      // Extract time directly from ISO string to avoid timezone conversion
-      const timeMatch = time.match(/T(\d{2}):(\d{2}):/);
-      if (timeMatch) {
-        const hour = parseInt(timeMatch[1]);
-        const minutes = timeMatch[2];
-        const ampm = hour >= 12 ? 'PM' : 'AM';
-        const displayHour = hour % 12 || 12;
-        return `${displayHour}:${minutes} ${ampm}`;
+    try {
+      let date: Date;
+      
+      // Handle both HH:MM format and full date strings
+      if (time.includes('T')) {
+        // Full ISO date string like "2025-10-25T10:00:00+00:00"
+        date = new Date(time);
+      } else {
+        // Just time string like "10:00" - assume it's part of the event date in UTC
+        const eventDate = timeRange?.eventDate || new Date().toISOString().split('T')[0];
+        date = new Date(`${eventDate}T${time}:00Z`);
       }
-    } else {
-      // Just time string like "10:00" (now in UTC format)
-      const [hours, minutes] = time.split(':');
-      const hour = parseInt(hours);
-      const ampm = hour >= 12 ? 'PM' : 'AM';
-      const displayHour = hour % 12 || 12;
-      return `${displayHour}:${minutes} ${ampm}`;
+      
+      // Convert to Malaysia timezone (UTC+8) and format
+      const malaysiaTime = date.toLocaleTimeString('en-MY', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true,
+        timeZone: 'Asia/Kuala_Lumpur'
+      });
+      
+      return malaysiaTime;
+    } catch (error) {
+      console.error('Error formatting time:', error, time);
+      return '';
     }
-    
-    return '';
   };
 
   const gateLoads = useMemo(() => {
@@ -1241,7 +1252,7 @@ export const VenueLayoutCard: React.FC<{ event: EventData | null }> = ({ event }
             <div className="flex items-center gap-2">
               <span className="text-xs text-gray-500">Current:</span>
               <span className="text-sm font-medium">
-                {currentSimulationTime ? formatTime(currentSimulationTime) : prettyTime}
+                {currentSimulationTime || prettyTime}
               </span>
             </div>
           </div>
