@@ -129,7 +129,7 @@ export const PWAInstallBanner: React.FC<PWAInstallBannerProps> = ({
         // Show a test notification
         new Notification('EventBuddy Notifications Enabled! 🎉', {
           body: 'You will now receive real-time congestion alerts',
-          icon: '/pwa-192x192.png',
+          icon: '/pwa-192x192.png', 
           badge: '/pwa-64x64.png',
           tag: 'welcome'
         } as NotificationOptions);

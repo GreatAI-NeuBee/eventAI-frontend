@@ -422,6 +422,7 @@ const UserEventView: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isEmergencyCallActive, setIsEmergencyCallActive] = useState(false);
+  const [isSendingNotification, setIsSendingNotification] = useState(false);
 
   // Helper random int
   const rand = (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min;
@@ -519,6 +520,48 @@ const UserEventView: React.FC = () => {
         femaleWaiting,
       } as CongestionArea;
     });
+  };
+
+  // Send push notification function (demo only)
+  const handleSendPushNotification = async () => {
+    if (!eventId || !event) {
+      return;
+    }
+
+    try {
+      setIsSendingNotification(true);
+      
+      console.log('📤 Sending push notification for event:', eventId);
+
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/notifications/send`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          eventId: eventId,
+          title: '🎉 Event Update',
+          body: `Gates will open in 30 minutes for ${event.eventName}!`,
+          requireInteraction: false,
+          data: {
+            type: 'event_update',
+            eventId: eventId,
+            url: `/qrCodeAttachments?eventId=${eventId}`
+          }
+        }),
+      });
+
+      if (response.ok) {
+        console.log('✅ Push notification sent successfully');
+      } else {
+        console.log('⚠️ Push notification send failed:', response.status);
+      }
+    } catch (error) {
+      // Silent error for demo purposes
+      console.log('⚠️ Push notification error:', error);
+    } finally {
+      setIsSendingNotification(false);
+    }
   };
 
   // Emergency call function
@@ -682,7 +725,23 @@ const UserEventView: React.FC = () => {
       <header className="bg-white shadow-sm border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 py-6 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
           <div className="flex flex-col gap-3">
-            <h1 className="text-2xl font-bold text-gray-900">{event.eventName}</h1>
+            <button
+              onClick={handleSendPushNotification}
+              disabled={isSendingNotification}
+              className={`text-2xl font-bold text-left transition-all duration-200 ${
+                isSendingNotification 
+                  ? 'text-gray-400 cursor-wait' 
+                  : 'text-gray-900 hover:text-indigo-600 cursor-pointer'
+              }`}
+              title="Click to send demo push notification"
+            >
+              {event.eventName}
+              {isSendingNotification && (
+                <span className="ml-2 text-xs text-indigo-600 font-normal">
+                  📤 Sending notification...
+                </span>
+              )}
+            </button>
             <p className="text-sm text-gray-600">{event.venue} • {event.date}</p>
             {error && (
               <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded px-2 py-1 inline-block">
