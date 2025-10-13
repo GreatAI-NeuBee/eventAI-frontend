@@ -1,6 +1,6 @@
 # Event Buddy Frontend
 
-Deployed Live: **https://eventai.munymunyhom.tech/**
+Deployed Live: **https://eventbuddy.munymunyhom.tech/dashboard**
 
 A React-based frontend application for intelligent crowd simulation and event planning. This application allows event organizers to upload event data and venue layouts to receive smart crowd flow predictions and actionable recommendations.
 
